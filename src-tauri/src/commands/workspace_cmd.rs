@@ -13,7 +13,9 @@
 
 use crate::database::DbConnection;
 use crate::models::project_model::ProjectContext;
-use crate::services::workspace_health_service::ensure_workspace_root_ready;
+use crate::services::workspace_health_service::{
+    ensure_workspace_ready_with_auto_relocate, ensure_workspace_root_ready,
+};
 use crate::workspace::{
     Workspace, WorkspaceManager, WorkspaceSettings, WorkspaceType, WorkspaceUpdate,
 };
@@ -85,6 +87,9 @@ pub struct WorkspaceEnsureResult {
     pub existed: bool,
     pub created: bool,
     pub repaired: bool,
+    pub relocated: bool,
+    pub previous_root_path: Option<String>,
+    pub warning: Option<String>,
 }
 
 impl From<Workspace> for WorkspaceListItem {
@@ -200,12 +205,12 @@ pub async fn workspace_update(
 
     let new_root_path = if let Some(ref path_str) = request.root_path {
         let path = PathBuf::from(path_str);
-        // 预校验新路径：路径必须存在且为目录
-        if !path.exists() {
-            return Err(format!("指定的路径不存在: {path_str}"));
-        }
-        if !path.is_dir() {
-            return Err(format!("指定的路径不是目录: {path_str}"));
+        let created = ensure_workspace_root_ready(&path)?;
+        if created {
+            tracing::warn!(
+                "[Workspace] 更新路径时检测到目录缺失，已自动创建: {}",
+                path.to_string_lossy()
+            );
         }
         Some(path)
     } else {
@@ -277,23 +282,31 @@ pub async fn workspace_ensure_ready(
     let workspace = manager
         .get(&id)?
         .ok_or_else(|| format!("Workspace 不存在: {id}"))?;
-    let root_path = workspace.root_path.to_string_lossy().to_string();
+    let ensured = ensure_workspace_ready_with_auto_relocate(&manager, &workspace)?;
+    let root_path = ensured.root_path.to_string_lossy().to_string();
+    let previous_root_path = ensured
+        .previous_root_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
 
-    let created = ensure_workspace_root_ready(&workspace.root_path)?;
-    if created {
+    if ensured.repaired {
         tracing::warn!(
-            "[Workspace] 检测到目录缺失，已自动创建: id={}, root={}",
+            "[Workspace] 检测到目录异常并已修复: id={}, root={}, relocated={}",
             workspace.id,
-            root_path
+            root_path,
+            ensured.relocated
         );
     }
 
     Ok(WorkspaceEnsureResult {
         workspace_id: workspace.id,
         root_path,
-        existed: !created,
-        created,
-        repaired: created,
+        existed: ensured.existed,
+        created: ensured.created,
+        repaired: ensured.repaired,
+        relocated: ensured.relocated,
+        previous_root_path,
+        warning: ensured.warning,
     })
 }
 
@@ -306,21 +319,29 @@ pub async fn workspace_ensure_default_ready(
     let Some(workspace) = manager.get_default()? else {
         return Ok(None);
     };
-    let root_path = workspace.root_path.to_string_lossy().to_string();
-    let created = ensure_workspace_root_ready(&workspace.root_path)?;
-    if created {
+    let ensured = ensure_workspace_ready_with_auto_relocate(&manager, &workspace)?;
+    let root_path = ensured.root_path.to_string_lossy().to_string();
+    let previous_root_path = ensured
+        .previous_root_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
+    if ensured.repaired {
         tracing::warn!(
-            "[Workspace] 启动检查发现默认 workspace 目录缺失，已自动创建: id={}, root={}",
+            "[Workspace] 启动检查发现默认 workspace 目录异常并已修复: id={}, root={}, relocated={}",
             workspace.id,
-            root_path
+            root_path,
+            ensured.relocated
         );
     }
     Ok(Some(WorkspaceEnsureResult {
         workspace_id: workspace.id,
         root_path,
-        existed: !created,
-        created,
-        repaired: created,
+        existed: ensured.existed,
+        created: ensured.created,
+        repaired: ensured.repaired,
+        relocated: ensured.relocated,
+        previous_root_path,
+        warning: ensured.warning,
     }))
 }
 
@@ -375,9 +396,8 @@ pub async fn get_or_create_default_project(
     // 不存在则创建默认项目
     let default_project_path = get_workspace_projects_root_dir()?.join("default");
 
-    std::fs::create_dir_all(&default_project_path).map_err(|e| {
-        format!("创建默认项目目录失败: {e}")
-    })?;
+    std::fs::create_dir_all(&default_project_path)
+        .map_err(|e| format!("创建默认项目目录失败: {e}"))?;
 
     let workspace = manager.create_with_type(
         "默认项目".to_string(),

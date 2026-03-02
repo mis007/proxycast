@@ -469,11 +469,11 @@ export function AgentChatPage({
     const normalizedId = normalizeProjectId(projectId);
     if (!normalizedId) return;
 
-    invoke<{ created: boolean; rootPath: string }>("workspace_ensure_ready", {
+    invoke<{ created: boolean; repaired: boolean; rootPath: string }>("workspace_ensure_ready", {
       id: normalizedId,
     })
-      .then(({ created, rootPath }) => {
-        if (created) {
+      .then(({ repaired, rootPath }) => {
+        if (repaired) {
           recordWorkspaceRepair({
             workspaceId: normalizedId,
             rootPath,

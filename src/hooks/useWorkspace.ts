@@ -71,6 +71,9 @@ interface WorkspaceEnsureResult {
   existed: boolean;
   created: boolean;
   repaired: boolean;
+  relocated?: boolean;
+  previousRootPath?: string | null;
+  warning?: string | null;
 }
 
 /**
@@ -103,7 +106,7 @@ export function useWorkspace(): UseWorkspaceReturn {
           "workspace_ensure_ready",
           { id: defaultWs.id },
         );
-        if (ensureResult.created) {
+        if (ensureResult.repaired) {
           recordWorkspaceRepair({
             workspaceId: ensureResult.workspaceId,
             rootPath: ensureResult.rootPath,
@@ -165,7 +168,7 @@ export function useWorkspace(): UseWorkspaceReturn {
         "workspace_ensure_ready",
         { id },
       );
-      if (ensureResult.created) {
+      if (ensureResult.repaired) {
         recordWorkspaceRepair({
           workspaceId: ensureResult.workspaceId,
           rootPath: ensureResult.rootPath,

@@ -21,6 +21,9 @@ interface WorkspaceEnsureResult {
   existed: boolean;
   created: boolean;
   repaired: boolean;
+  relocated?: boolean;
+  previousRootPath?: string | null;
+  warning?: string | null;
 }
 // WorkspaceType 用于类型定义，暂未使用
 // import type { WorkspaceType } from '@/types/workspace';
@@ -79,7 +82,7 @@ export function useProjects(): UseProjectsReturn {
           "workspace_ensure_ready",
           { id: defaultProj.id },
         );
-        if (ensureResult.created) {
+        if (ensureResult.repaired) {
           recordWorkspaceRepair({
             workspaceId: ensureResult.workspaceId,
             rootPath: ensureResult.rootPath,
