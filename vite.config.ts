@@ -4,9 +4,15 @@ import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
 
 // ES 模块中获取 __dirname 的方式
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "./package.json"), "utf-8"),
+) as { version?: string };
+const appVersion =
+  process.env.VITE_APP_VERSION?.trim() || packageJson.version || "unknown";
 
 // 获取 Tauri mock 目录路径
 const tauriMockDir = path.resolve(__dirname, "./src/lib/tauri-mock");
@@ -29,6 +35,9 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
+  },
   plugins: [
     react({
       jsxRuntime: mode === "development" ? "automatic" : "automatic",

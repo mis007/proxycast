@@ -18,4 +18,11 @@ export type {
   BridgeStatus,
 } from "./http-client";
 
-export { safeInvoke, safeListen, safeEmit } from "./safeInvoke";
+export {
+  safeInvoke,
+  safeListen,
+  safeEmit,
+  getInvokeErrorBuffer,
+  clearInvokeErrorBuffer,
+} from "./safeInvoke";
+export type { InvokeErrorBufferEntry } from "./safeInvoke";

@@ -6,6 +6,7 @@ import {
 } from "@/hooks/useTauri";
 import { safeInvoke } from "@/lib/dev-bridge";
 import configEventManager from "@/lib/configEventManager";
+import { getRuntimeAppVersion } from "@/lib/appVersion";
 
 export type CrashContext = Record<string, unknown>;
 
@@ -27,6 +28,17 @@ interface FrontendCrashReportPayload {
   context?: Record<string, unknown>;
 }
 
+export interface FrontendCrashBufferEntry {
+  timestamp: string;
+  message: string;
+  name?: string;
+  stack_preview?: string;
+  workflow_step?: string;
+  creation_mode?: string;
+  source?: string;
+  page_url?: string;
+}
+
 const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/\bBearer\s+[A-Za-z0-9._-]+\b/gi, "Bearer ***"],
   [/\bapi[_-]?key\s*[:=]\s*["']?[A-Za-z0-9._-]+["']?/gi, "api_key=***"],
@@ -35,6 +47,9 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/\btoken\s*[:=]\s*["']?[A-Za-z0-9._-]{10,}["']?/gi, "token=***"],
   [/\bsk-[A-Za-z0-9]{12,}\b/g, "sk-***"],
 ];
+
+const FRONTEND_CRASH_BUFFER_KEY = "proxycast_frontend_crash_buffer_v1";
+const FRONTEND_CRASH_BUFFER_LIMIT = 80;
 
 const DEFAULT_CRASH_REPORTING_CONFIG: ResolvedCrashReportingConfig = {
   enabled: true,
@@ -146,9 +161,7 @@ function getRuntimeTags(context: CrashContext): Record<string, string> {
 
   const tags: Record<string, string> = {
     platform,
-    app_version:
-      (import.meta.env.VITE_APP_VERSION as string | undefined)?.trim() ||
-      "unknown",
+    app_version: getRuntimeAppVersion(),
   };
 
   const workflowStep = context.workflow_step;
@@ -229,7 +242,79 @@ function buildCrashReportPayload(
   };
 }
 
+function readFrontendCrashBufferFromStorage(): FrontendCrashBufferEntry[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(FRONTEND_CRASH_BUFFER_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter(
+        (item): item is FrontendCrashBufferEntry =>
+          item &&
+          typeof item === "object" &&
+          typeof item.timestamp === "string" &&
+          typeof item.message === "string",
+      )
+      .slice(-FRONTEND_CRASH_BUFFER_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function writeFrontendCrashBufferToStorage(
+  items: FrontendCrashBufferEntry[],
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      FRONTEND_CRASH_BUFFER_KEY,
+      JSON.stringify(items.slice(-FRONTEND_CRASH_BUFFER_LIMIT)),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function persistFrontendCrashToLocalBuffer(report: FrontendCrashReportPayload): void {
+  const stackPreview = report.stack
+    ? sanitizeText(report.stack).split("\n").slice(0, 3).join(" | ")
+    : undefined;
+  const entry: FrontendCrashBufferEntry = {
+    timestamp: new Date().toISOString(),
+    message: sanitizeText(report.message),
+    name: report.name ? sanitizeText(report.name) : undefined,
+    stack_preview: stackPreview,
+    workflow_step: report.workflow_step
+      ? sanitizeText(report.workflow_step)
+      : undefined,
+    creation_mode: report.creation_mode
+      ? sanitizeText(report.creation_mode)
+      : undefined,
+    source:
+      typeof report.context?.source === "string"
+        ? sanitizeText(String(report.context.source))
+        : undefined,
+    page_url:
+      typeof window !== "undefined" ? sanitizeText(window.location.href) : undefined,
+  };
+
+  const current = readFrontendCrashBufferFromStorage();
+  current.push(entry);
+  writeFrontendCrashBufferToStorage(current);
+}
+
 function persistFrontendCrash(report: FrontendCrashReportPayload): void {
+  persistFrontendCrashToLocalBuffer(report);
   void safeInvoke("report_frontend_crash", { report }).catch((error) => {
     console.warn("[CrashReporting] 写入后端崩溃日志失败:", error);
   });
@@ -397,4 +482,23 @@ export async function reportFrontendError(
     );
     Sentry.captureException(normalizedError);
   });
+}
+
+export function getFrontendCrashBuffer(limit = 30): FrontendCrashBufferEntry[] {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(200, Math.max(1, Math.floor(limit)))
+    : 30;
+  const entries = readFrontendCrashBufferFromStorage();
+  return entries.slice(-safeLimit);
+}
+
+export function clearFrontendCrashBuffer(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(FRONTEND_CRASH_BUFFER_KEY);
+  } catch {
+    // ignore
+  }
 }

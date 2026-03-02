@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { sanitizeCrashValue } from "./crashReporting";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  clearFrontendCrashBuffer,
+  getFrontendCrashBuffer,
+  reportFrontendError,
+  sanitizeCrashValue,
+} from "./crashReporting";
+
+afterEach(() => {
+  clearFrontendCrashBuffer();
+});
 
 describe("crashReporting sanitizeCrashValue", () => {
   it("应脱敏常见密钥与 token", () => {
@@ -31,5 +40,18 @@ describe("crashReporting sanitizeCrashValue", () => {
     expect(sanitized.ok).toBe(true);
     expect(Array.isArray(sanitized.list)).toBe(true);
     expect(String((sanitized.list as unknown[])[2])).toContain("Bearer ***");
+  });
+
+  it("应将前端崩溃写入本地缓冲区", async () => {
+    clearFrontendCrashBuffer();
+    await reportFrontendError(new Error("frontend buffer test"), {
+      source: "unit-test",
+      workflow_step: "test",
+    });
+
+    const buffer = getFrontendCrashBuffer(10);
+    expect(buffer.length).toBeGreaterThan(0);
+    expect(buffer[buffer.length - 1].message).toContain("frontend buffer test");
+    expect(buffer[buffer.length - 1].source).toBe("unit-test");
   });
 });

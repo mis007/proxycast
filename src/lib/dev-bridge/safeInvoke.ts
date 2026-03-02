@@ -13,6 +13,153 @@ import { listen as baseListen, emit as baseEmit } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { invokeViaHttp, isDevBridgeAvailable } from "./http-client";
 
+export interface InvokeErrorBufferEntry {
+  timestamp: string;
+  command: string;
+  transport: "tauri-ipc" | "tauri-legacy" | "http-bridge" | "fallback-invoke";
+  error: string;
+  args_preview?: Record<string, unknown>;
+}
+
+const INVOKE_ERROR_BUFFER_KEY = "proxycast_invoke_error_buffer_v1";
+const INVOKE_ERROR_BUFFER_LIMIT = 120;
+const INVOKE_ERROR_TEXT_LIMIT = 800;
+
+const SECRET_PATTERNS: Array<[RegExp, string]> = [
+  [/\bBearer\s+[A-Za-z0-9._-]+\b/gi, "Bearer ***"],
+  [/\bapi[_-]?key\s*[:=]\s*["']?[A-Za-z0-9._-]+["']?/gi, "api_key=***"],
+  [/\baccess[_-]?token\s*[:=]\s*["']?[A-Za-z0-9._-]+["']?/gi, "access_token=***"],
+  [/\brefresh[_-]?token\s*[:=]\s*["']?[A-Za-z0-9._-]+["']?/gi, "refresh_token=***"],
+  [/\btoken\s*[:=]\s*["']?[A-Za-z0-9._-]{10,}["']?/gi, "token=***"],
+  [/\bsk-[A-Za-z0-9]{12,}\b/g, "sk-***"],
+];
+
+function sanitizeText(input: string): string {
+  let sanitized = input;
+  for (const [pattern, replacement] of SECRET_PATTERNS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+  return sanitized;
+}
+
+function sanitizeValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) {
+    return "[depth_limited]";
+  }
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return sanitizeText(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item, depth + 1));
+  }
+  if (typeof value === "object") {
+    const output: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      output[key] = sanitizeValue(nestedValue, depth + 1);
+    }
+    return output;
+  }
+  return sanitizeText(String(value));
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const core = error.message || error.name || "Unknown error";
+    return sanitizeText(core).slice(0, INVOKE_ERROR_TEXT_LIMIT);
+  }
+  return sanitizeText(String(error || "Unknown error")).slice(
+    0,
+    INVOKE_ERROR_TEXT_LIMIT,
+  );
+}
+
+function readInvokeErrorBuffer(): InvokeErrorBufferEntry[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(INVOKE_ERROR_BUFFER_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter(
+        (item): item is InvokeErrorBufferEntry =>
+          item &&
+          typeof item === "object" &&
+          typeof item.timestamp === "string" &&
+          typeof item.command === "string" &&
+          typeof item.transport === "string" &&
+          typeof item.error === "string",
+      )
+      .slice(-INVOKE_ERROR_BUFFER_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function writeInvokeErrorBuffer(items: InvokeErrorBufferEntry[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      INVOKE_ERROR_BUFFER_KEY,
+      JSON.stringify(items.slice(-INVOKE_ERROR_BUFFER_LIMIT)),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function recordInvokeError(
+  command: string,
+  args: Record<string, unknown> | undefined,
+  error: unknown,
+  transport: InvokeErrorBufferEntry["transport"],
+): void {
+  const current = readInvokeErrorBuffer();
+  const entry: InvokeErrorBufferEntry = {
+    timestamp: new Date().toISOString(),
+    command: sanitizeText(command),
+    transport,
+    error: toErrorMessage(error),
+    args_preview: args
+      ? (sanitizeValue(args) as Record<string, unknown>)
+      : undefined,
+  };
+  current.push(entry);
+  writeInvokeErrorBuffer(current);
+}
+
+export function getInvokeErrorBuffer(limit = 50): InvokeErrorBufferEntry[] {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(200, Math.max(1, Math.floor(limit)))
+    : 50;
+  return readInvokeErrorBuffer().slice(-safeLimit);
+}
+
+export function clearInvokeErrorBuffer(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(INVOKE_ERROR_BUFFER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * 安全的 Tauri invoke 封装
  * 支持三种模式：Tauri IPC → HTTP Bridge → Mock
@@ -26,12 +173,22 @@ export async function safeInvoke<T = any>(
     typeof window !== "undefined" &&
     (window as any).__TAURI__?.core?.invoke
   ) {
-    return (window as any).__TAURI__.core.invoke(cmd, args);
+    try {
+      return await (window as any).__TAURI__.core.invoke(cmd, args);
+    } catch (error) {
+      recordInvokeError(cmd, args, error, "tauri-ipc");
+      throw error;
+    }
   }
 
   // Legacy check for older Tauri versions
   if (typeof window !== "undefined" && (window as any).__TAURI__?.invoke) {
-    return (window as any).__TAURI__.invoke(cmd, args);
+    try {
+      return await (window as any).__TAURI__.invoke(cmd, args);
+    } catch (error) {
+      recordInvokeError(cmd, args, error, "tauri-legacy");
+      throw error;
+    }
   }
 
   // 2. Dev 模式下尝试 HTTP 桥接（浏览器环境，Tauri 后端在运行）
@@ -39,13 +196,19 @@ export async function safeInvoke<T = any>(
     try {
       const result = await invokeViaHttp(cmd, args);
       return result as T;
-    } catch {
+    } catch (error) {
+      recordInvokeError(cmd, args, error, "http-bridge");
       // 继续尝试 mock
     }
   }
 
   // 3. Fallback 到 mock（Vite alias 会替换 @tauri-apps 导入）
-  return baseInvoke(cmd, args);
+  try {
+    return await baseInvoke(cmd, args);
+  } catch (error) {
+    recordInvokeError(cmd, args, error, "fallback-invoke");
+    throw error;
+  }
 }
 
 /**
