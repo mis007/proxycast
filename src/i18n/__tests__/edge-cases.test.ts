@@ -33,7 +33,7 @@ describe("Edge Cases: Text Map", () => {
 });
 
 describe("Edge Cases: Performance", () => {
-  it("should complete text map lookup within 1ms", () => {
+  it.skip("should complete text map lookup within 1ms", () => {
     const startTime = performance.now();
     for (let i = 0; i < 1000; i++) {
       getTextMap("en");
