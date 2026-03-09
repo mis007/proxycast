@@ -2080,7 +2080,7 @@ pub trait SSHAuthCallback: Send + Sync {
     /// 请求密钥密码
     ///
     /// 当私钥需要密码时调用。
-    fn request_passphrase(&self, key_path: &PathBuf) -> Option<String>;
+    fn request_passphrase(&self, key_path: &Path) -> Option<String>;
 
     /// 请求密码
     ///

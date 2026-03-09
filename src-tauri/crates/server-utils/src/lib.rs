@@ -29,8 +29,6 @@ pub fn parse_error_status_code(error_message: &str) -> StatusCode {
         StatusCode::SERVICE_UNAVAILABLE
     } else if error_message.contains("502") {
         StatusCode::BAD_GATEWAY
-    } else if error_message.contains("500") {
-        StatusCode::INTERNAL_SERVER_ERROR
     } else {
         StatusCode::INTERNAL_SERVER_ERROR
     }

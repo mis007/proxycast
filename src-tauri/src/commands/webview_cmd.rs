@@ -399,6 +399,8 @@ pub async fn create_webview_panel(
             tracing::warn!("[Webview] 已存在窗口导航失败: {}", e);
         }
         let _ = window.set_title(&title);
+        let _ = window.unminimize();
+        let _ = window.show();
         let _ = window.set_focus();
 
         let mut manager = state.0.write().await;
@@ -1975,8 +1977,26 @@ pub async fn resize_webview_panel(
 /// 获取所有活跃的浏览器窗口
 #[tauri::command]
 pub async fn get_webview_panels(
+    app: AppHandle,
     state: tauri::State<'_, WebviewManagerWrapper>,
 ) -> Result<Vec<WebviewPanelInfo>, String> {
+    let stale_panel_ids = {
+        let manager = state.0.read().await;
+        manager
+            .panels
+            .keys()
+            .filter(|panel_id| app.get_webview_window(panel_id).is_none())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+
+    if !stale_panel_ids.is_empty() {
+        let mut manager = state.0.write().await;
+        for panel_id in stale_panel_ids {
+            manager.panels.remove(&panel_id);
+        }
+    }
+
     let manager = state.0.read().await;
     Ok(manager.panels.values().cloned().collect())
 }
@@ -1985,6 +2005,8 @@ pub async fn get_webview_panels(
 #[tauri::command]
 pub async fn focus_webview_panel(app: AppHandle, panel_id: String) -> Result<bool, String> {
     if let Some(window) = app.get_webview_window(&panel_id) {
+        let _ = window.unminimize();
+        window.show().map_err(|e| format!("显示窗口失败: {e}"))?;
         window.set_focus().map_err(|e| format!("聚焦失败: {e}"))?;
         Ok(true)
     } else {

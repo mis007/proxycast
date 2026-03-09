@@ -905,6 +905,7 @@ impl ModelRegistryService {
         // 构建 API URL
         let api_url = Self::build_models_api_url(api_host);
         tracing::info!("[ModelRegistry] API URL: {}", api_url);
+        let diagnostic_hint = Self::build_models_api_hint(provider_id, api_host, &api_url);
 
         // 尝试从 API 获取
         match self.call_models_api(&api_url, api_key).await {
@@ -922,6 +923,8 @@ impl ModelRegistryService {
                     models,
                     source: ModelFetchSource::Api,
                     error: None,
+                    request_url: Some(api_url),
+                    diagnostic_hint: None,
                 })
             }
             Err(api_error) => {
@@ -945,12 +948,16 @@ impl ModelRegistryService {
                         models: vec![],
                         source: ModelFetchSource::LocalFallback,
                         error: Some(format!("API 获取失败: {api_error}, 本地也无数据")),
+                        request_url: Some(api_url),
+                        diagnostic_hint,
                     })
                 } else {
                     Ok(FetchModelsResult {
                         models: local_models,
                         source: ModelFetchSource::LocalFallback,
                         error: Some(format!("API 获取失败: {api_error}, 已使用本地数据")),
+                        request_url: Some(api_url),
+                        diagnostic_hint,
                     })
                 }
             }
@@ -1287,15 +1294,65 @@ impl ModelRegistryService {
     fn build_models_api_url(api_host: &str) -> String {
         let host = api_host.trim_end_matches('/');
 
+        if host.ends_with("/models") {
+            return host.to_string();
+        }
+
         // 检查是否已经包含 /v1 路径
         if host.ends_with("/v1") || host.ends_with("/v1/") {
             format!("{}/models", host.trim_end_matches('/'))
         } else if host.contains("/v1/") {
             // 如果路径中间有 /v1/，直接追加 models
             format!("{}models", host.trim_end_matches('/').to_string() + "/")
+        } else if Self::has_versioned_api_suffix(host) {
+            format!("{host}/models")
         } else {
             format!("{host}/v1/models")
         }
+    }
+
+    fn has_versioned_api_suffix(api_host: &str) -> bool {
+        let path = api_host
+            .split_once("://")
+            .map(|(_, rest)| rest)
+            .unwrap_or(api_host)
+            .split_once('/')
+            .map(|(_, path)| path)
+            .unwrap_or("");
+
+        let segments: Vec<&str> = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect();
+        if segments.len() < 2 {
+            return false;
+        }
+
+        let version = segments[segments.len() - 1];
+        let api_segment = segments[segments.len() - 2];
+        api_segment.eq_ignore_ascii_case("api")
+            && version.starts_with('v')
+            && version
+                .strip_prefix('v')
+                .map(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
+                .unwrap_or(false)
+    }
+
+    fn build_models_api_hint(provider_id: &str, api_host: &str, api_url: &str) -> Option<String> {
+        let host = api_host.to_lowercase();
+        let provider = provider_id.to_lowercase();
+
+        if provider.contains("doubao")
+            || provider.contains("volc")
+            || host.contains("volces.com")
+            || host.contains("volcengine")
+        {
+            return Some(format!(
+                "豆包 / 火山方舟通常应使用 Base URL `https://ark.cn-beijing.volces.com/api/v3`。当前模型列表请求为 `{api_url}`，如果出现 404，请优先检查 Base URL 是否配置为该地址。"
+            ));
+        }
+
+        None
     }
 
     /// 调用 /v1/models API
@@ -1323,7 +1380,12 @@ impl ModelRegistryService {
                 .text()
                 .await
                 .unwrap_or_else(|_| "无法读取响应体".to_string());
-            return Err(format!("API 返回错误 {status}: {body}"));
+            if status == reqwest::StatusCode::NOT_FOUND {
+                return Err(format!(
+                    "API 返回错误 {status}: {body}（请求地址: {url}）。这通常表示 Base URL 路径不兼容，请检查 Provider Base URL 是否已经包含版本路径，或是否应直接使用 /models 端点。"
+                ));
+            }
+            return Err(format!("API 返回错误 {status}: {body}（请求地址: {url}）"));
         }
 
         let body = response
@@ -1424,6 +1486,10 @@ pub struct FetchModelsResult {
     pub source: ModelFetchSource,
     /// 错误信息（如果有）
     pub error: Option<String>,
+    /// 实际请求 URL（如果有）
+    pub request_url: Option<String>,
+    /// 面向用户的诊断建议（如果有）
+    pub diagnostic_hint: Option<String>,
 }
 
 #[cfg(test)]
@@ -1449,6 +1515,28 @@ mod tests {
             ModelRegistryService::build_models_api_url("https://open.bigmodel.cn/api/anthropic"),
             "https://open.bigmodel.cn/api/anthropic/v1/models"
         );
+        assert_eq!(
+            ModelRegistryService::build_models_api_url("https://ark.cn-beijing.volces.com/api/v3/"),
+            "https://ark.cn-beijing.volces.com/api/v3/models"
+        );
+        assert_eq!(
+            ModelRegistryService::build_models_api_url("https://example.com/proxy/api/v9"),
+            "https://example.com/proxy/api/v9/models"
+        );
+    }
+
+    #[test]
+    fn test_build_models_api_hint_for_doubao() {
+        let hint = ModelRegistryService::build_models_api_hint(
+            "doubao",
+            "https://ark.cn-beijing.volces.com/api/v3",
+            "https://ark.cn-beijing.volces.com/api/v3/models",
+        );
+
+        assert!(hint.is_some());
+        assert!(hint
+            .unwrap()
+            .contains("https://ark.cn-beijing.volces.com/api/v3"));
     }
 
     fn create_service_with_resource_dir(resource_dir: std::path::PathBuf) -> ModelRegistryService {

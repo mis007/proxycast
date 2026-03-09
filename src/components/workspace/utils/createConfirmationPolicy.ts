@@ -52,19 +52,25 @@ export const CREATE_CONFIRMATION_FORM_FIELDS = {
 } as const;
 
 const SOURCE_HINTS: Record<CreateConfirmationSource, string> = {
-  project_created: "已创建项目，请先确认本次是否需要新开文稿。",
-  open_project_for_writing: "当前项目暂无文稿，请确认是继续历史还是新建。",
-  workspace_create_entry: "请先确认创建意图，避免误建大量文稿。",
-  workspace_prompt: "检测到快速提示词，请确认是否创建新文稿。",
-  quick_create: "快捷创建前请再次确认，避免重复开稿。",
+  project_created: "项目已经准备好。先确认这次是继续已有内容，还是新开一篇。",
+  open_project_for_writing: "开始创作前，再确认一下这次希望如何进入工作流。",
+  workspace_create_entry: "先确认开始方式，我会按你的选择继续处理。",
+  workspace_prompt: "我已经收到你的提示，先确认要继续已有内容还是创建新稿。",
+  quick_create: "快捷创建前先补一条确认信息，避免重复开稿。",
 };
 
 const OPTION_LABELS: Record<CreateConfirmationOption, string> = {
-  continue_history: "仅继续历史文稿（不新建）",
-  new_post: "新开帖子（创建新文稿）",
-  new_version: "新建版本（创建新文稿）",
-  other: "其他（需补充说明）",
+  continue_history: "继续完善已有内容",
+  new_post: "新写一篇内容",
+  new_version: "新建一个版本",
+  other: "其他方式",
 };
+
+export function getCreateConfirmationSourceHint(
+  source: CreateConfirmationSource,
+): string {
+  return SOURCE_HINTS[source] || "先确认开始方式，我会据此继续处理。";
+}
 
 function normalizeConfirmationOption(
   rawValue: unknown,
@@ -93,7 +99,7 @@ export function parseCreateConfirmationIntent(
   if (!option) {
     return {
       ok: false,
-      message: "请选择本次处理方式",
+      message: "请先选择这次希望如何开始",
     };
   }
 
@@ -104,7 +110,7 @@ export function parseCreateConfirmationIntent(
   if (option === "other" && note.length < 2) {
     return {
       ok: false,
-      message: "选择“其他”时请至少填写 2 个字说明",
+      message: "选择“其他方式”时请至少补充 2 个字说明",
     };
   }
 
@@ -172,7 +178,6 @@ export function buildCreateConfirmationA2UI(
   pending: PendingCreateConfirmation,
 ): A2UIResponse {
   const rootId = "create_confirmation_root";
-  const titleId = "create_confirmation_title";
   const hintId = "create_confirmation_hint";
   const optionId = CREATE_CONFIRMATION_FORM_FIELDS.option;
   const noteId = CREATE_CONFIRMATION_FORM_FIELDS.note;
@@ -183,46 +188,38 @@ export function buildCreateConfirmationA2UI(
     data: {},
     components: [
       {
-        id: titleId,
-        component: "Text",
-        text: "创建前确认",
-        variant: "h3",
-      },
-      {
         id: hintId,
         component: "Text",
-        text:
-          SOURCE_HINTS[pending.source] ||
-          "请先确认本次是否需要新建文稿，确认后才会生成。",
-        variant: "caption",
+        text: getCreateConfirmationSourceHint(pending.source),
+        variant: "body",
       },
       {
         id: optionId,
         component: "ChoicePicker",
-        label: "本次操作类型",
-        value: ["new_post"],
+        label: "你希望我如何开始这次创作？",
+        value: [],
         variant: "mutuallyExclusive",
-        layout: "wrap",
+        layout: "vertical",
         options: [
           {
             value: "continue_history",
             label: OPTION_LABELS.continue_history,
-            description: "直接回到已有文稿，不新建",
+            description: "直接回到最近相关文稿继续，不额外新建。",
           },
           {
             value: "new_post",
             label: OPTION_LABELS.new_post,
-            description: "新开一个独立文稿",
+            description: "创建新的独立文稿，从这次需求开始写。",
           },
           {
             value: "new_version",
             label: OPTION_LABELS.new_version,
-            description: "基于当前项目新增一个版本文稿",
+            description: "保留当前项目语境，再开一个版本文稿。",
           },
           {
             value: "other",
             label: OPTION_LABELS.other,
-            description: "填写你的自定义意图",
+            description: "如果你有特殊开始方式，可以补充说明。",
           },
         ],
       },
@@ -232,19 +229,22 @@ export function buildCreateConfirmationA2UI(
         label: "补充说明（可选）",
         value: "",
         variant: "longText",
-        placeholder: "如选择“其他”，请在这里说明你的创建意图",
-        helperText: "不会自动生成，点击下方确认后才会执行。",
+        placeholder: "如果你有明确主题、素材、目标读者或限制条件，可以补充在这里",
+        helperText: "选择“其他方式”时，建议在这里补充说明。",
+        visible: {
+          path: `formData.${optionId}.0`,
+        },
       },
       {
         id: rootId,
         component: "Column",
-        children: [titleId, hintId, optionId, noteId],
-        gap: 12,
+        children: [hintId, optionId, noteId],
+        gap: 16,
         align: "stretch",
       },
     ],
     submitAction: {
-      label: "确认生成",
+      label: "开始处理",
       action: {
         name: "submit",
       },

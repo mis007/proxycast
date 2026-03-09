@@ -5,6 +5,7 @@
 
 import type { DividerComponent } from "../../types";
 import { cn } from "@/lib/utils";
+import { A2UI_LAYOUT_TOKENS } from "../../layoutTokens";
 
 interface DividerRendererProps {
   component: DividerComponent;
@@ -15,8 +16,10 @@ export function DividerRenderer({ component }: DividerRendererProps) {
   return (
     <div
       className={cn(
-        "bg-border",
-        isVertical ? "w-px h-full min-h-[20px]" : "h-px w-full",
+        A2UI_LAYOUT_TOKENS.dividerBase,
+        isVertical
+          ? A2UI_LAYOUT_TOKENS.dividerVertical
+          : A2UI_LAYOUT_TOKENS.dividerHorizontal,
       )}
     />
   );

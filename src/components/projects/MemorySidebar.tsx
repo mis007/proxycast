@@ -16,12 +16,14 @@ import {
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   ProjectMemory,
@@ -30,6 +32,8 @@ import {
   StyleGuide,
   getProjectMemory,
 } from "@/lib/api/memory";
+import { buildStyleSummary, getStyleCategoryLabel, getStyleProfileFromGuide } from "@/lib/style-guide";
+import { StyleGuidePanel } from "./memory/StyleGuidePanel";
 
 interface MemorySidebarProps {
   projectId: string;
@@ -42,6 +46,7 @@ export function MemorySidebar({ projectId, className }: MemorySidebarProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["characters", "world", "style"]),
   );
+  const [styleGuideDialogOpen, setStyleGuideDialogOpen] = useState(false);
 
   const loadMemory = useCallback(async () => {
     setLoading(true);
@@ -87,16 +92,26 @@ export function MemorySidebar({ projectId, className }: MemorySidebarProps) {
   return (
     <div className={cn("border-l bg-muted/30 flex flex-col", className)}>
       {/* 头部 */}
-      <div className="flex items-center justify-between p-3 border-b">
+      <div className="flex items-center justify-between gap-2 p-3 border-b">
         <span className="text-sm font-medium">项目记忆</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={loadMemory}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setStyleGuideDialogOpen(true)}
+          >
+            风格
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={loadMemory}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* 内容 */}
@@ -145,13 +160,37 @@ export function MemorySidebar({ projectId, className }: MemorySidebarProps) {
             onToggle={() => toggleSection("style")}
           >
             {memory?.style_guide ? (
-              <StyleGuideItem styleGuide={memory.style_guide} />
+              <StyleGuideItem
+                styleGuide={memory.style_guide}
+                onEdit={() => setStyleGuideDialogOpen(true)}
+              />
             ) : (
-              <p className="text-xs text-muted-foreground py-2">暂无风格指南</p>
+              <div className="py-2 space-y-2">
+                <p className="text-xs text-muted-foreground">暂无风格指南</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setStyleGuideDialogOpen(true)}
+                >
+                  立即设置风格
+                </Button>
+              </div>
             )}
           </SidebarSection>
         </div>
       </ScrollArea>
+
+      <Dialog open={styleGuideDialogOpen} onOpenChange={setStyleGuideDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>项目默认风格</DialogTitle>
+          </DialogHeader>
+          <div className="p-6">
+            <StyleGuidePanel projectId={projectId} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -250,44 +289,78 @@ function WorldBuildingItem({ worldBuilding }: WorldBuildingItemProps) {
 // 风格指南项组件
 interface StyleGuideItemProps {
   styleGuide: StyleGuide;
+  onEdit?: () => void;
 }
 
-function StyleGuideItem({ styleGuide }: StyleGuideItemProps) {
+function StyleGuideItem({ styleGuide, onEdit }: StyleGuideItemProps) {
+  const profile = getStyleProfileFromGuide(styleGuide);
+  const summary = buildStyleSummary(styleGuide);
+
   return (
     <div className="p-2 rounded bg-background border text-xs space-y-2">
-      {styleGuide.style && (
-        <div>
-          <span className="text-muted-foreground">风格：</span>
-          <p className="line-clamp-2">{styleGuide.style}</p>
-        </div>
-      )}
-      {styleGuide.tone && (
-        <div>
-          <span className="text-muted-foreground">语气：</span>
-          <span>{styleGuide.tone}</span>
-        </div>
-      )}
-      {styleGuide.forbidden_words.length > 0 && (
-        <div>
-          <span className="text-muted-foreground">禁用词：</span>
-          <span>{styleGuide.forbidden_words.slice(0, 5).join(", ")}</span>
-          {styleGuide.forbidden_words.length > 5 && (
-            <span className="text-muted-foreground">
-              {" "}
-              等 {styleGuide.forbidden_words.length} 个
-            </span>
+      {profile ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-sm">{profile.name}</span>
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {getStyleCategoryLabel(profile.category)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] font-normal">
+              强度 {profile.simulationStrength}
+            </Badge>
+          </div>
+
+          {summary.length > 0 && (
+            <div className="space-y-1">
+              {summary.map((item) => (
+                <p key={item} className="text-muted-foreground line-clamp-2">
+                  {item}
+                </p>
+              ))}
+            </div>
           )}
-        </div>
-      )}
-      {styleGuide.preferred_words.length > 0 && (
-        <div>
-          <span className="text-muted-foreground">偏好词：</span>
-          <span>{styleGuide.preferred_words.slice(0, 5).join(", ")}</span>
-          {styleGuide.preferred_words.length > 5 && (
-            <span className="text-muted-foreground">
-              {" "}
-              等 {styleGuide.preferred_words.length} 个
-            </span>
+
+          {profile.targetPlatforms.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {profile.targetPlatforms.map((platform) => (
+                <Badge key={platform} variant="outline" className="text-[10px]">
+                  {platform}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {profile.donts.length > 0 && (
+            <div>
+              <span className="text-muted-foreground">避免：</span>
+              <span>{profile.donts.slice(0, 3).join("、")}</span>
+            </div>
+          )}
+          {onEdit && (
+            <div className="pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={onEdit}
+              >
+                编辑风格
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-muted-foreground">暂无风格摘要</p>
+          {onEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onEdit}
+            >
+              去设置风格
+            </Button>
           )}
         </div>
       )}

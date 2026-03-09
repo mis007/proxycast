@@ -17,6 +17,7 @@ import {
   Library,
   Wrench,
   BrainCircuit,
+  Palette,
   PenTool,
   Video,
   Music,
@@ -28,6 +29,7 @@ import {
   Activity,
   Layers,
   Terminal,
+  Bot,
   LucideIcon,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
@@ -36,6 +38,7 @@ import {
   AgentPageParams,
   getThemeWorkspacePage,
   LAST_THEME_WORKSPACE_PAGE_STORAGE_KEY,
+  OpenClawPageParams,
   Page,
   PageParams,
   ThemeWorkspacePage,
@@ -48,6 +51,7 @@ import {
 
 interface AppSidebarProps {
   currentPage: Page;
+  currentPageParams?: PageParams;
   onNavigate: (page: Page, params?: PageParams) => void;
 }
 
@@ -57,7 +61,7 @@ interface SidebarNavItem {
   icon: LucideIcon;
   page: Page;
   params?: PageParams;
-  isActive?: (currentPage: Page) => boolean;
+  isActive?: (currentPage: Page, currentParams?: PageParams) => boolean;
 }
 
 const Container = styled.aside`
@@ -346,6 +350,14 @@ const THEME_MENU_ITEMS: SidebarNavItem[] = [
 
 const FOOTER_MENU_ITEMS: SidebarNavItem[] = [
   {
+    id: "openclaw",
+    label: "OpenClaw",
+    icon: Bot,
+    page: "openclaw",
+    params: { subpage: "runtime" } as OpenClawPageParams,
+    isActive: (currentPage) => currentPage === "openclaw",
+  },
+  {
     id: "settings",
     label: "设置",
     icon: Settings,
@@ -367,6 +379,14 @@ const FOOTER_MENU_ITEMS: SidebarNavItem[] = [
     isActive: (currentPage) => currentPage === "tools",
   },
   {
+    id: "style-library",
+    label: "我的风格",
+    icon: Palette,
+    page: "style",
+    params: { section: "overview" },
+    isActive: (currentPage) => currentPage === "style",
+  },
+  {
     id: "memory",
     label: "记忆",
     icon: BrainCircuit,
@@ -375,11 +395,7 @@ const FOOTER_MENU_ITEMS: SidebarNavItem[] = [
   },
 ];
 
-const DEFAULT_ENABLED_NAV_ITEMS = [
-  "home-general",
-  "video",
-  "image-gen",
-];
+const DEFAULT_ENABLED_NAV_ITEMS = ["home-general", "video", "image-gen"];
 
 const ALL_NAV_ITEM_IDS = [
   ...MAIN_MENU_ITEMS.map((item) => item.id),
@@ -436,7 +452,11 @@ function isThemeWorkspacePage(page: Page): page is ThemeWorkspacePage {
   return typeof page === "string" && page.startsWith("workspace-");
 }
 
-export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
+export function AppSidebar({
+  currentPage,
+  currentPageParams,
+  onNavigate,
+}: AppSidebarProps) {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       return document.documentElement.classList.contains("dark")
@@ -590,7 +610,7 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
     }
 
     if (item.isActive) {
-      return item.isActive(currentPage);
+      return item.isActive(currentPage, currentPageParams);
     }
 
     return currentPage === item.page;
@@ -607,10 +627,10 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
         ? buildHomeAgentParams(item.params as AgentPageParams | undefined)
         : isThemeWorkspacePage(item.page)
           ? buildWorkspaceResetParams(
-            item.params as AgentPageParams | undefined,
-            (item.params as AgentPageParams | undefined)?.workspaceViewMode ??
-              "project-management",
-          )
+              item.params as AgentPageParams | undefined,
+              (item.params as AgentPageParams | undefined)?.workspaceViewMode ??
+                "project-management",
+            )
           : item.params;
 
     onNavigate(item.page, params);

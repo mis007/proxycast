@@ -49,6 +49,29 @@ npm test -- src/lib/dev-bridge/safeInvoke.test.ts src/lib/tauri-mock/core.test.t
 - 修改了 `src/lib/tauri-mock/`
 - 修改了浏览器模式 bridge/mock 优先级
 
+### 桥接健康检查
+
+```bash
+npm run bridge:health -- --timeout-ms 120000
+```
+
+用途：
+- 等待 `http://127.0.0.1:3030/health` 就绪
+- 避免 Playwright MCP 进入页面时，前端早于 DevBridge 启动而产生 `Failed to fetch` 噪音
+- 首次编译较慢时，比手工反复刷新页面更稳定
+
+### 已验证的最小冒烟路径（当前仓库）
+
+1. 终端 A：`npm run tauri:dev:headless`
+2. 终端 B：`npm run bridge:health -- --timeout-ms 120000`
+3. Playwright MCP 打开 `http://127.0.0.1:1420/`
+4. 等待首页从“正在加载...”进入默认首页
+5. 检查 `browser_console_messages(level=error)` 应为 `0`
+
+补充说明：
+- 若首页已可用但仍有 warning，先区分是第三方库 warning 还是 bridge 缺口
+- 若 `bridge:health` 已通过，但页面仍报未知命令，优先检查 `dispatcher.rs` 是否缺少该命令分发
+
 ## 继续测试的标准流程
 
 ### 1. 先确认当前 Playwright 会话是否可复用

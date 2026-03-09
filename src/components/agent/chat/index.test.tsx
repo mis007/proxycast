@@ -96,26 +96,29 @@ vi.mock("@/components/content-creator/hooks/useWorkflow", () => ({
   }),
 }));
 
-vi.mock("@/components/content-creator/core/LayoutTransition/LayoutTransition", () => ({
-  LayoutTransition: ({
-    mode,
-    chatContent,
-    canvasContent,
-  }: {
-    mode: string;
-    chatContent: ReactNode;
-    canvasContent: ReactNode;
-  }) => (
-    <div data-testid="layout-transition" data-mode={mode}>
-      <div data-testid="layout-chat" hidden={mode === "canvas"}>
-        {chatContent}
+vi.mock(
+  "@/components/content-creator/core/LayoutTransition/LayoutTransition",
+  () => ({
+    LayoutTransition: ({
+      mode,
+      chatContent,
+      canvasContent,
+    }: {
+      mode: string;
+      chatContent: ReactNode;
+      canvasContent: ReactNode;
+    }) => (
+      <div data-testid="layout-transition" data-mode={mode}>
+        <div data-testid="layout-chat" hidden={mode === "canvas"}>
+          {chatContent}
+        </div>
+        <div data-testid="layout-canvas" hidden={mode !== "canvas"}>
+          {canvasContent}
+        </div>
       </div>
-      <div data-testid="layout-canvas" hidden={mode !== "canvas"}>
-        {canvasContent}
-      </div>
-    </div>
-  ),
-}));
+    ),
+  }),
+);
 
 vi.mock("./components/ChatNavbar", () => ({
   ChatNavbar: ({
@@ -217,7 +220,6 @@ vi.mock("./components/ThemeWorkbenchSidebar", () => ({
   ),
 }));
 
-
 vi.mock("./components/MessageList", () => ({
   MessageList: (props: Record<string, unknown>) => mockMessageList(props),
 }));
@@ -282,9 +284,15 @@ vi.mock("@/components/content-creator/canvas/document", () => ({
   })),
 }));
 
-vi.mock("./utils/workflowMapping", () => ({
-  getFileToStepMap: vi.fn(() => new Map()),
-}));
+vi.mock("./utils/workflowMapping", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./utils/workflowMapping")>();
+  return {
+    ...actual,
+    getFileToStepMap: vi.fn(() => ({})),
+    getSupportedFilenames: vi.fn(() => []),
+  };
+});
 
 vi.mock("@/lib/workspace/navigation", () => ({
   buildHomeAgentParams: vi.fn(() => ({})),
@@ -381,9 +389,7 @@ function renderPage(
 }
 
 function createMockThemeContextWorkspaceState(
-  overrides: Partial<
-    ReturnType<typeof mockUseThemeContextWorkspace>
-  > = {},
+  overrides: Partial<ReturnType<typeof mockUseThemeContextWorkspace>> = {},
 ) {
   const merged = {
     enabled: false,
@@ -410,9 +416,9 @@ function createMockThemeContextWorkspaceState(
   };
 
   if (!("prepareActiveContextPrompt" in overrides)) {
-    merged.prepareActiveContextPrompt = vi.fn().mockResolvedValue(
-      merged.activeContextPrompt || "",
-    );
+    merged.prepareActiveContextPrompt = vi
+      .fn()
+      .mockResolvedValue(merged.activeContextPrompt || "");
   }
 
   return merged;
@@ -457,6 +463,15 @@ beforeEach(() => {
       IS_REACT_ACT_ENVIRONMENT?: boolean;
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
+
+  vi.stubGlobal(
+    "ResizeObserver",
+    class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
 
   vi.clearAllMocks();
   localStorage.clear();
@@ -560,6 +575,7 @@ afterEach(() => {
     mounted.container.remove();
   }
   localStorage.clear();
+  vi.unstubAllGlobals();
 });
 
 describe("AgentChatPage 话题切换项目恢复", () => {
@@ -610,7 +626,9 @@ describe("AgentChatPage 话题切换项目恢复", () => {
   it("无可用项目时应自动创建默认项目并继续切换话题", async () => {
     mockGetProject.mockResolvedValue(null);
     mockGetDefaultProject.mockResolvedValue(null);
-    mockGetOrCreateDefaultProject.mockResolvedValue(createProject("default-new"));
+    mockGetOrCreateDefaultProject.mockResolvedValue(
+      createProject("default-new"),
+    );
 
     const container = renderPage();
     await flushEffects();
@@ -661,7 +679,6 @@ describe("AgentChatPage 话题切换项目恢复", () => {
     await flushEffects();
     expect(observedWorkspaceIds[observedWorkspaceIds.length - 1]).toBe("");
   });
-
 });
 
 describe("AgentChatPage 侧栏显示控制", () => {
@@ -703,11 +720,15 @@ describe("AgentChatPage 侧栏显示控制", () => {
     const container = renderPage();
     await flushEffects();
 
-    expect(container.querySelector('[data-testid="chat-sidebar"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="chat-sidebar"]'),
+    ).not.toBeNull();
 
     clickButton(container, "set-project");
     await flushEffects();
-    expect(container.querySelector('[data-testid="chat-sidebar"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="chat-sidebar"]'),
+    ).not.toBeNull();
   });
 
   it("showChatPanel=false 时应保持侧栏隐藏", async () => {
@@ -898,8 +919,14 @@ describe("AgentChatPage 自动引导", () => {
 
     const layout = container.querySelector('[data-testid="layout-transition"]');
     expect(layout?.getAttribute("data-mode")).toBe("canvas");
-    expect(container.querySelector('[data-testid="canvas-loading-state"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="layout-chat"]')?.hasAttribute("hidden")).toBe(true);
+    expect(
+      container.querySelector('[data-testid="canvas-loading-state"]'),
+    ).not.toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="layout-chat"]')
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
   });
 
   it("主题工作台打开已有文稿时首帧应直接显示画布，避免旧对话闪现", async () => {
@@ -957,13 +984,21 @@ describe("AgentChatPage 自动引导", () => {
 
     const layout = container.querySelector('[data-testid="layout-transition"]');
     expect(layout?.getAttribute("data-mode")).toBe("canvas");
-    expect(container.querySelector('[data-testid="layout-chat"]')?.hasAttribute("hidden")).toBe(true);
-    expect(container.querySelector('[data-testid="canvas-loading-state"]')).not.toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="layout-chat"]')
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(
+      container.querySelector('[data-testid="canvas-loading-state"]'),
+    ).not.toBeNull();
     expect(container.textContent).not.toContain("历史对话");
 
     await flushEffects(10);
 
-    expect(container.querySelector('[data-testid="canvas-factory"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="canvas-factory"]'),
+    ).not.toBeNull();
   });
 
   it("主题工作台启用时应仅保留专用侧栏，不再渲染右侧旧操作面板", async () => {
@@ -981,14 +1016,16 @@ describe("AgentChatPage 自动引导", () => {
     });
     await flushEffects(10);
 
-    expect(container.querySelector('[data-testid="theme-workbench-sidebar"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="theme-workbench-skills"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="theme-workbench-sidebar"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="theme-workbench-skills"]'),
+    ).toBeNull();
     expect(container.querySelector('[data-testid="chat-sidebar"]')).toBeNull();
     expect(container.querySelector('[data-testid="empty-state"]')).toBeNull();
     expect(container.querySelector('[data-testid="inputbar"]')).not.toBeNull();
   });
-
-
 
   it("主题工作台在初始意图稍后注入时应自动发送首条创作请求", async () => {
     mockIsContentCreationTheme.mockReturnValue(true);
@@ -1229,7 +1266,7 @@ describe("AgentChatPage 自动引导", () => {
         "social-posts/demo-post.md",
       );
       latestMessageListProps?.onWriteFile?.(
-        "{\"pipeline\":[\"topic_select\",\"write_mode\",\"publish_confirm\"]}",
+        '{"pipeline":["topic_select","write_mode","publish_confirm"]}',
         "social-posts/demo-post.publish-pack.json",
       );
     });
@@ -1400,7 +1437,9 @@ describe("AgentChatPage 自动引导", () => {
     });
     await flushEffects(16);
 
-    const latestTopicBranchCall = mockUseTopicBranchBoard.mock.calls.at(-1)?.[0] as
+    const latestTopicBranchCall = mockUseTopicBranchBoard.mock.calls.at(
+      -1,
+    )?.[0] as
       | { topics?: Array<{ id: string }>; currentTopicId?: string | null }
       | undefined;
     expect(latestTopicBranchCall?.currentTopicId).toBe(
@@ -1408,7 +1447,9 @@ describe("AgentChatPage 自动引导", () => {
     );
     expect(latestTopicBranchCall?.topics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "artifact:social-posts/local-fallback.md" }),
+        expect.objectContaining({
+          id: "artifact:social-posts/local-fallback.md",
+        }),
       ]),
     );
 
@@ -1509,8 +1550,14 @@ describe("AgentChatPage 自动引导", () => {
     expect(workflowSteps).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ title: "生成社媒主稿", status: "completed" }),
-        expect.objectContaining({ title: "写入 social-posts/final.md", status: "completed" }),
-        expect.objectContaining({ title: "生成封面图（1024x1024）", status: "active" }),
+        expect.objectContaining({
+          title: "写入 social-posts/final.md",
+          status: "completed",
+        }),
+        expect.objectContaining({
+          title: "生成封面图（1024x1024）",
+          status: "active",
+        }),
       ]),
     );
     expect(workflowSteps.some((step) => step.title === "平台适配")).toBe(false);
@@ -1604,7 +1651,10 @@ describe("AgentChatPage 自动引导", () => {
     expect(workflowSteps).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ title: "生成社媒主稿", status: "completed" }),
-        expect.objectContaining({ title: "生成封面图（1024x1024）", status: "error" }),
+        expect.objectContaining({
+          title: "生成封面图（1024x1024）",
+          status: "error",
+        }),
       ]),
     );
   });
@@ -1651,7 +1701,9 @@ describe("AgentChatPage 自动引导", () => {
                 {
                   id: "tool-browser-1",
                   name: "browser_navigate",
-                  arguments: JSON.stringify({ url: "https://www.rokid.com/glasses" }),
+                  arguments: JSON.stringify({
+                    url: "https://www.rokid.com/glasses",
+                  }),
                   status: "running",
                   startTime: new Date("2026-03-06T11:00:02.500Z"),
                 },
@@ -1695,8 +1747,14 @@ describe("AgentChatPage 自动引导", () => {
 
     expect(workflowSteps).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ title: "检索 Rokid Glasses 最新功能", status: "completed" }),
-        expect.objectContaining({ title: "打开 https://www.rokid.com/glasses", status: "active" }),
+        expect.objectContaining({
+          title: "检索 Rokid Glasses 最新功能",
+          status: "completed",
+        }),
+        expect.objectContaining({
+          title: "打开 https://www.rokid.com/glasses",
+          status: "active",
+        }),
       ]),
     );
   });
@@ -1751,7 +1809,9 @@ describe("AgentChatPage 自动引导", () => {
                 {
                   id: "tool-bash-1",
                   name: "bash",
-                  arguments: JSON.stringify({ command: "ffmpeg -i input.mp4 output.mp4" }),
+                  arguments: JSON.stringify({
+                    command: "ffmpeg -i input.mp4 output.mp4",
+                  }),
                   status: "running",
                   startTime: new Date("2026-03-06T12:00:03.500Z"),
                 },
@@ -1795,8 +1855,14 @@ describe("AgentChatPage 自动引导", () => {
 
     expect(workflowSteps).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ title: "点击「发布按钮」", status: "completed" }),
-        expect.objectContaining({ title: "分析页面区域：结果区域", status: "completed" }),
+        expect.objectContaining({
+          title: "点击「发布按钮」",
+          status: "completed",
+        }),
+        expect.objectContaining({
+          title: "分析页面区域：结果区域",
+          status: "completed",
+        }),
         expect.objectContaining({ title: "处理音视频素材", status: "active" }),
       ]),
     );
@@ -1841,7 +1907,9 @@ describe("AgentChatPage 自动引导", () => {
           workflowSteps?: Array<{ title: string; status: string }>;
         }
       | undefined;
-    expect(latestInputbarProps?.themeWorkbenchGate?.key).toBe("publish_confirm");
+    expect(latestInputbarProps?.themeWorkbenchGate?.key).toBe(
+      "publish_confirm",
+    );
     const workflowSteps = latestInputbarProps?.workflowSteps || [];
     expect(workflowSteps.length).toBeGreaterThan(0);
     expect(workflowSteps.at(-1)?.status).toBe("active");

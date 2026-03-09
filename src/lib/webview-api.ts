@@ -284,7 +284,7 @@ export async function closeChromeProfileSession(
   profileKey: string,
 ): Promise<boolean> {
   return safeInvoke<boolean>("close_chrome_profile_session", {
-    profile_key: profileKey,
+    profileKey,
   });
 }
 
@@ -365,7 +365,7 @@ export async function closeWebviewPanel(panelId: string): Promise<boolean> {
       console.log("[webview-api] Tauri API 关闭成功");
       // 也调用后端清理状态
       await safeInvoke<boolean>("close_webview_panel", {
-        panel_id: panelId,
+        panelId,
       }).catch(() => {});
       return true;
     }
@@ -376,7 +376,7 @@ export async function closeWebviewPanel(panelId: string): Promise<boolean> {
   // 方法 2: 使用后端命令关闭
   try {
     const result = await safeInvoke<boolean>("close_webview_panel", {
-      panel_id: panelId,
+      panelId,
     });
     console.log("[webview-api] 后端命令关闭结果:", result);
     return result;
@@ -398,7 +398,7 @@ export async function navigateWebviewPanel(
   url: string,
 ): Promise<boolean> {
   return safeInvoke<boolean>("navigate_webview_panel", {
-    panel_id: panelId,
+    panelId,
     url,
   });
 }
@@ -419,7 +419,7 @@ export async function getWebviewPanels(): Promise<WebviewPanelInfo[]> {
  * @returns 是否成功
  */
 export async function focusWebviewPanel(panelId: string): Promise<boolean> {
-  return safeInvoke<boolean>("focus_webview_panel", { panel_id: panelId });
+  return safeInvoke<boolean>("focus_webview_panel", { panelId });
 }
 
 /**
@@ -440,7 +440,7 @@ export async function resizeWebviewPanel(
   height: number,
 ): Promise<boolean> {
   return safeInvoke<boolean>("resize_webview_panel", {
-    panel_id: panelId,
+    panelId,
     x,
     y,
     width,

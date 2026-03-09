@@ -102,23 +102,30 @@ const PROJECT_TAB_CONFIG: Record<ProjectType, TabConfig[]> = {
   poster: [
     { value: "contents", label: "设计", icon: Image },
     { value: "assets", label: "素材", icon: Image },
+    { value: "style", label: "风格", icon: Palette },
   ],
   music: [
     { value: "contents", label: "歌曲", icon: FileEdit },
     { value: "style", label: "风格", icon: Palette },
   ],
-  knowledge: [{ value: "contents", label: "笔记", icon: FileText }],
+  knowledge: [
+    { value: "contents", label: "笔记", icon: FileText },
+    { value: "style", label: "风格", icon: Palette },
+  ],
   planning: [
     { value: "contents", label: "计划", icon: FileEdit },
+    { value: "style", label: "风格", icon: Palette },
     { value: "outline", label: "大纲", icon: List },
   ],
   document: [
     { value: "contents", label: "文档", icon: FileText },
+    { value: "style", label: "风格", icon: Palette },
     { value: "templates", label: "模板", icon: Copy },
   ],
   video: [
     { value: "contents", label: "剧集", icon: Film },
     { value: "characters", label: "角色", icon: Users },
+    { value: "style", label: "风格", icon: Palette },
     { value: "scenes", label: "场景", icon: MapPin },
     { value: "storyboard", label: "分镜", icon: LayoutGrid },
     { value: "outline", label: "大纲", icon: List },

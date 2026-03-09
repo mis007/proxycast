@@ -1,0 +1,978 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import type { ConfiguredProvider } from "@/hooks/useConfiguredProviders";
+import { useProviderModels } from "@/hooks/useProviderModels";
+import { useApiKeyProvider } from "@/hooks/useApiKeyProvider";
+import { getRegistryIdFromType } from "@/lib/constants/providerMappings";
+import type { EnhancedModelMetadata } from "@/lib/types/modelRegistry";
+import type {
+  OpenClawPageParams,
+  OpenClawSubpage,
+  Page,
+  PageParams,
+} from "@/types/page";
+import {
+  openclawApi,
+  type OpenClawBinaryAvailabilityStatus,
+  type OpenClawBinaryInstallStatus,
+  type OpenClawChannelInfo,
+  type OpenClawGatewayStatus,
+  type OpenClawHealthInfo,
+  type OpenClawInstallProgressEvent,
+  type OpenClawNodeCheckResult,
+  type OpenClawSyncModelEntry,
+} from "@/lib/api/openclaw";
+
+import { OpenClawConfigurePage } from "./OpenClawConfigurePage";
+import { OpenClawDashboardPage } from "./OpenClawDashboardPage";
+import { OpenClawInstallPage } from "./OpenClawInstallPage";
+import { OpenClawProgressPage } from "./OpenClawProgressPage";
+import { OpenClawRuntimePage } from "./OpenClawRuntimePage";
+import {
+  type OpenClawOperationKind,
+  type OpenClawOperationState,
+  type OpenClawSubpage as LocalOpenClawSubpage,
+} from "./types";
+import { useOpenClawStore } from "./useOpenClawStore";
+import { openUrl } from "./openUrl";
+import { useOpenClawDashboardWindow } from "./useOpenClawDashboardWindow";
+
+const OPENCLAW_DOCS_URL = "https://docs.openclaw.ai/";
+const SUPPORTED_PROVIDER_TYPES = new Set([
+  "openai",
+  "openai-response",
+  "codex",
+  "anthropic",
+  "anthropic-compatible",
+  "gemini",
+  "new-api",
+  "gateway",
+  "ollama",
+  "fal",
+]);
+
+const progressSubpageByAction: Record<OpenClawOperationKind, OpenClawSubpage> =
+  {
+    install: "installing",
+    uninstall: "uninstalling",
+    restart: "restarting",
+  };
+
+const progressActionBySubpage: Partial<
+  Record<OpenClawSubpage, OpenClawOperationKind>
+> = {
+  installing: "install",
+  uninstalling: "uninstall",
+  restarting: "restart",
+};
+
+function isOpenClawSubpage(value: unknown): value is OpenClawSubpage {
+  return [
+    "install",
+    "installing",
+    "configure",
+    "runtime",
+    "restarting",
+    "uninstalling",
+    "dashboard",
+  ].includes(String(value));
+}
+
+function formatNodeStatus(nodeStatus: OpenClawNodeCheckResult | null): string {
+  if (!nodeStatus) return "未检查";
+  if (nodeStatus.status === "ok") {
+    return `可用${nodeStatus.version ? ` · ${nodeStatus.version}` : ""}`;
+  }
+  if (nodeStatus.status === "version_low") {
+    return `版本过低${nodeStatus.version ? ` · ${nodeStatus.version}` : ""}`;
+  }
+  return "未检测到 Node.js";
+}
+
+function formatBinaryStatus(
+  status: OpenClawBinaryAvailabilityStatus | null,
+  successLabel: string,
+  failureLabel: string,
+): string {
+  if (!status) return "未检查";
+  return status.available
+    ? `${successLabel}${status.path ? ` · ${status.path}` : ""}`
+    : failureLabel;
+}
+
+function buildCompatibleProviders(
+  providers: ReturnType<typeof useApiKeyProvider>["providers"],
+): ConfiguredProvider[] {
+  return providers
+    .filter(
+      (provider) =>
+        provider.enabled &&
+        provider.api_key_count > 0 &&
+        SUPPORTED_PROVIDER_TYPES.has(provider.type),
+    )
+    .map((provider) => ({
+      key: provider.id,
+      label: provider.name,
+      registryId: provider.id,
+      fallbackRegistryId: getRegistryIdFromType(provider.type),
+      type: provider.type,
+      providerId: provider.id,
+      customModels: provider.custom_models,
+      credentialType: `${provider.type}_key`,
+    }));
+}
+
+function toSyncModels(
+  models: EnhancedModelMetadata[],
+): OpenClawSyncModelEntry[] {
+  return models.map((model) => ({
+    id: model.id,
+    name: model.display_name,
+    contextWindow: model.limits.context_length ?? undefined,
+  }));
+}
+
+function renderBlockedPage(
+  title: string,
+  description: string,
+  actionLabel: string,
+  onAction: () => void,
+) {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center px-6 py-10">
+      <section className="w-full max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <p className="mt-3 text-sm leading-7 text-muted-foreground">
+          {description}
+        </p>
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-6 inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+        >
+          {actionLabel}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function resolveOpenClawSubpage(
+  candidate: OpenClawSubpage,
+  installed: boolean,
+  gatewayRunning: boolean,
+  gatewayStarting: boolean,
+  operationState: OpenClawOperationState,
+): OpenClawSubpage {
+  if (operationState.running && operationState.kind) {
+    return progressSubpageByAction[operationState.kind];
+  }
+
+  if (!installed) {
+    return "install";
+  }
+
+  if (candidate === "install" || candidate === "installing") {
+    return "runtime";
+  }
+
+  if (candidate === "dashboard" && !gatewayRunning && !gatewayStarting) {
+    return "runtime";
+  }
+
+  if (
+    (candidate === "uninstalling" || candidate === "restarting") &&
+    !operationState.running
+  ) {
+    return gatewayRunning || gatewayStarting ? "runtime" : "configure";
+  }
+
+  return candidate;
+}
+
+interface OpenClawPageProps {
+  pageParams?: OpenClawPageParams;
+  onNavigate?: (page: Page, params?: PageParams) => void;
+}
+
+export function OpenClawPage({ pageParams, onNavigate }: OpenClawPageProps) {
+  const {
+    providers,
+    loading: providersLoading,
+    refresh: refreshProviders,
+  } = useApiKeyProvider();
+  const compatibleProviders = useMemo(
+    () => buildCompatibleProviders(providers),
+    [providers],
+  );
+
+  const selectedProviderId = useOpenClawStore(
+    (state) => state.selectedProviderId,
+  );
+  const selectedModelId = useOpenClawStore((state) => state.selectedModelId);
+  const gatewayPort = useOpenClawStore((state) => state.gatewayPort);
+  const lastSynced = useOpenClawStore((state) => state.lastSynced);
+  const setSelectedProviderId = useOpenClawStore(
+    (state) => state.setSelectedProviderId,
+  );
+  const setSelectedModelId = useOpenClawStore(
+    (state) => state.setSelectedModelId,
+  );
+  const setGatewayPort = useOpenClawStore((state) => state.setGatewayPort);
+  const setLastSynced = useOpenClawStore((state) => state.setLastSynced);
+  const clearLastSynced = useOpenClawStore((state) => state.clearLastSynced);
+
+  const [fallbackSubpage, setFallbackSubpage] =
+    useState<LocalOpenClawSubpage>("install");
+  const [statusResolved, setStatusResolved] = useState(false);
+  const [installedStatus, setInstalledStatus] =
+    useState<OpenClawBinaryInstallStatus | null>(null);
+  const [nodeStatus, setNodeStatus] = useState<OpenClawNodeCheckResult | null>(
+    null,
+  );
+  const [gitStatus, setGitStatus] =
+    useState<OpenClawBinaryAvailabilityStatus | null>(null);
+  const [gatewayStatus, setGatewayStatus] =
+    useState<OpenClawGatewayStatus>("stopped");
+  const [healthInfo, setHealthInfo] = useState<OpenClawHealthInfo | null>(null);
+  const [channels, setChannels] = useState<OpenClawChannelInfo[]>([]);
+  const [installLogs, setInstallLogs] = useState<
+    OpenClawInstallProgressEvent[]
+  >([]);
+  const [syncing, setSyncing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+  const [operationState, setOperationState] = useState<OpenClawOperationState>({
+    kind: null,
+    running: false,
+    message: null,
+    returnSubpage: "install",
+  });
+
+  const requestedSubpage = isOpenClawSubpage(pageParams?.subpage)
+    ? pageParams.subpage
+    : null;
+
+  const selectedProvider = useMemo(
+    () =>
+      compatibleProviders.find(
+        (provider) => provider.key === selectedProviderId,
+      ),
+    [compatibleProviders, selectedProviderId],
+  );
+
+  const {
+    models: providerModels,
+    loading: modelsLoading,
+    error: modelsError,
+  } = useProviderModels(selectedProvider, { returnFullMetadata: true });
+
+  const installed = installedStatus?.installed ?? false;
+  const gatewayRunning = gatewayStatus === "running";
+  const gatewayStarting = gatewayStatus === "starting";
+  const canStartGateway = installed && !gatewayRunning && !gatewayStarting;
+  const canStopGateway = installed && gatewayStatus !== "stopped";
+  const canRestartGateway = installed && gatewayRunning;
+  const hasSelectedConfig =
+    Boolean(selectedProvider) && selectedModelId.trim().length > 0;
+  const canSync = installed && hasSelectedConfig;
+  const canStartFromConfigure =
+    canStartGateway && (hasSelectedConfig || !!lastSynced);
+  const {
+    dashboardLoading,
+    dashboardUrl,
+    dashboardWindowBusy,
+    dashboardWindowOpen,
+    refreshDashboardUrl,
+    refreshDashboardWindowState,
+    handleOpenDashboardWindow,
+    handleOpenDashboardExternal,
+    closeDashboardWindowSilently,
+  } = useOpenClawDashboardWindow({ gatewayStatus });
+
+  const defaultSubpage = useMemo<OpenClawSubpage>(() => {
+    if (operationState.running && operationState.kind) {
+      return progressSubpageByAction[operationState.kind];
+    }
+
+    if (!installed) {
+      return "install";
+    }
+
+    return "runtime";
+  }, [installed, operationState.kind, operationState.running]);
+
+  const requestedOrFallbackSubpage =
+    requestedSubpage ?? (onNavigate ? defaultSubpage : fallbackSubpage);
+  const currentSubpage = useMemo(
+    () =>
+      resolveOpenClawSubpage(
+        requestedOrFallbackSubpage,
+        installed,
+        gatewayRunning,
+        gatewayStarting,
+        operationState,
+      ),
+    [
+      gatewayRunning,
+      gatewayStarting,
+      installed,
+      operationState,
+      requestedOrFallbackSubpage,
+    ],
+  );
+
+  const navigateSubpage = useCallback(
+    (subpage: OpenClawSubpage) => {
+      if (onNavigate) {
+        onNavigate("openclaw", { subpage });
+      } else {
+        setFallbackSubpage(subpage);
+      }
+    },
+    [onNavigate],
+  );
+
+  useEffect(() => {
+    if (compatibleProviders.length === 0) {
+      if (selectedProviderId) {
+        setSelectedProviderId(null);
+      }
+      return;
+    }
+
+    if (!selectedProviderId || !selectedProvider) {
+      setSelectedProviderId(compatibleProviders[0].key);
+    }
+  }, [
+    compatibleProviders,
+    selectedProvider,
+    selectedProviderId,
+    setSelectedProviderId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProviderId || modelsLoading || providerModels.length === 0) {
+      return;
+    }
+
+    if (!selectedModelId) {
+      setSelectedModelId(providerModels[0].id);
+    }
+  }, [
+    modelsLoading,
+    providerModels,
+    selectedModelId,
+    selectedProviderId,
+    setSelectedModelId,
+  ]);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | null = null;
+
+    void openclawApi
+      .listenInstallProgress((payload) => {
+        if (!active) return;
+        setInstallLogs((prev) => [...prev, payload].slice(-400));
+      })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch((error) => {
+        console.warn("[OpenClaw] 安装日志监听失败:", error);
+      });
+
+    return () => {
+      active = false;
+      if (unlisten) {
+        void unlisten();
+      }
+    };
+  }, []);
+
+  const refreshGatewayRuntime = useCallback(async () => {
+    const status = await openclawApi.getStatus();
+    setGatewayStatus(status.status);
+    if (status.port !== gatewayPort) {
+      setGatewayPort(status.port);
+    }
+
+    await refreshDashboardUrl({ silent: true });
+
+    if (status.status === "running") {
+      const [healthResult, channelListResult] = await Promise.allSettled([
+        openclawApi.checkHealth(),
+        openclawApi.getChannels(),
+      ]);
+      setHealthInfo(
+        healthResult.status === "fulfilled" ? healthResult.value : null,
+      );
+      setChannels(
+        channelListResult.status === "fulfilled" ? channelListResult.value : [],
+      );
+    } else {
+      setHealthInfo(null);
+      setChannels([]);
+    }
+  }, [gatewayPort, refreshDashboardUrl, setGatewayPort]);
+
+  const refreshAll = useCallback(async () => {
+    try {
+      const [installedResult, nodeResult, gitResult] = await Promise.all([
+        openclawApi.checkInstalled(),
+        openclawApi.checkNodeVersion(),
+        openclawApi.checkGitAvailable(),
+      ]);
+      setInstalledStatus(installedResult);
+      setNodeStatus(nodeResult);
+      setGitStatus(gitResult);
+      await Promise.all([
+        refreshGatewayRuntime(),
+        refreshDashboardWindowState(),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setStatusResolved(true);
+    }
+  }, [refreshDashboardWindowState, refreshGatewayRuntime]);
+
+  useEffect(() => {
+    void refreshAll();
+  }, [refreshAll]);
+
+  useEffect(() => {
+    if (!statusResolved || requestedSubpage || operationState.running) {
+      return;
+    }
+
+    const resolvedSubpage = !installed ? "install" : "runtime";
+
+    if (!onNavigate && fallbackSubpage !== resolvedSubpage) {
+      setFallbackSubpage(resolvedSubpage);
+    }
+  }, [
+    fallbackSubpage,
+    gatewayRunning,
+    gatewayStarting,
+    installed,
+    onNavigate,
+    operationState.running,
+    requestedSubpage,
+    statusResolved,
+  ]);
+
+  useEffect(() => {
+    if (gatewayStatus !== "running" && gatewayStatus !== "starting") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshGatewayRuntime().catch((error) => {
+        console.warn("[OpenClaw] 轮询状态失败:", error);
+      });
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [gatewayStatus, refreshGatewayRuntime]);
+
+  useEffect(() => {
+    if (currentSubpage === "dashboard" && gatewayRunning && !dashboardUrl) {
+      void refreshDashboardUrl({ silent: true, showLoading: true });
+    }
+  }, [currentSubpage, dashboardUrl, gatewayRunning, refreshDashboardUrl]);
+
+  const syncProviderConfig = useCallback(
+    async ({ showSuccessToast = true, trackLoading = true } = {}) => {
+      if (!selectedProvider) {
+        toast.error("请先选择 Provider。");
+        return false;
+      }
+
+      const primaryModelId = selectedModelId.trim();
+      if (!primaryModelId) {
+        toast.error("请先选择或输入主模型 ID。");
+        return false;
+      }
+
+      if (trackLoading) {
+        setSyncing(true);
+      }
+
+      try {
+        const requestModels = toSyncModels(providerModels);
+        if (!requestModels.some((model) => model.id === primaryModelId)) {
+          requestModels.unshift({
+            id: primaryModelId,
+            name: primaryModelId,
+          });
+        }
+
+        const result = await openclawApi.syncProviderConfig({
+          providerId: selectedProvider.key,
+          primaryModelId,
+          models: requestModels,
+        });
+
+        if (!result.success) {
+          toast.error(result.message);
+          return false;
+        }
+
+        setLastSynced({
+          providerId: selectedProvider.key,
+          modelId: primaryModelId,
+        });
+
+        if (showSuccessToast) {
+          toast.success(result.message);
+        }
+
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error));
+        return false;
+      } finally {
+        if (trackLoading) {
+          setSyncing(false);
+        }
+      }
+    },
+    [providerModels, selectedModelId, selectedProvider, setLastSynced],
+  );
+
+  const runProgressOperation = useCallback(
+    async (
+      kind: OpenClawOperationKind,
+      action: () => Promise<{ success: boolean; message: string }>,
+      successSubpage: OpenClawSubpage,
+      returnSubpage: OpenClawSubpage,
+      initialLogs: OpenClawInstallProgressEvent[] = [],
+      onSuccess?: () => void,
+    ) => {
+      setInstallLogs(initialLogs);
+      setOperationState({
+        kind,
+        running: true,
+        message: null,
+        returnSubpage,
+      });
+      navigateSubpage(progressSubpageByAction[kind]);
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      try {
+        const result = await action();
+        setOperationState({
+          kind,
+          running: false,
+          message: result.message,
+          returnSubpage,
+        });
+
+        if (!result.success) {
+          toast.error(result.message);
+          await refreshAll();
+          return;
+        }
+
+        toast.success(result.message);
+        onSuccess?.();
+        await refreshAll();
+        navigateSubpage(successSubpage);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setOperationState({
+          kind,
+          running: false,
+          message,
+          returnSubpage,
+        });
+        toast.error(message);
+        await refreshAll();
+      }
+    },
+    [navigateSubpage, refreshAll],
+  );
+
+  const handleInstall = useCallback(async () => {
+    await runProgressOperation(
+      "install",
+      () => openclawApi.install(),
+      "runtime",
+      "install",
+      [
+        {
+          level: "info",
+          message: "已发送安装请求，正在等待后端返回安装命令...",
+        },
+      ],
+    );
+  }, [runProgressOperation]);
+
+  const handleUninstall = useCallback(async () => {
+    if (!window.confirm("确定要卸载 OpenClaw 吗？")) {
+      return;
+    }
+
+    await closeDashboardWindowSilently();
+
+    await runProgressOperation(
+      "uninstall",
+      () => openclawApi.uninstall(),
+      "install",
+      installed ? "configure" : "install",
+      [
+        {
+          level: "info",
+          message: "已发送卸载请求，正在等待后端返回卸载命令...",
+        },
+      ],
+      () => {
+        clearLastSynced();
+        setSelectedModelId("");
+      },
+    );
+  }, [
+    clearLastSynced,
+    closeDashboardWindowSilently,
+    installed,
+    runProgressOperation,
+    setSelectedModelId,
+  ]);
+
+  const handleRestart = useCallback(async () => {
+    await closeDashboardWindowSilently();
+
+    await runProgressOperation(
+      "restart",
+      () => openclawApi.restartGateway(),
+      "runtime",
+      "runtime",
+      [
+        {
+          level: "info",
+          message: "已发送重启请求，正在停止并重新拉起 Gateway...",
+        },
+      ],
+    );
+  }, [closeDashboardWindowSilently, runProgressOperation]);
+
+  const handleSync = useCallback(async () => {
+    await syncProviderConfig();
+  }, [syncProviderConfig]);
+
+  const handleStart = useCallback(async () => {
+    if (!lastSynced && !hasSelectedConfig) {
+      toast.error("请先选择 Provider 和模型，或先完成一次配置同步。");
+      return;
+    }
+
+    setStarting(true);
+    try {
+      const primaryModelId = selectedModelId.trim();
+      const needsSync =
+        hasSelectedConfig &&
+        selectedProvider &&
+        (!lastSynced ||
+          lastSynced.providerId !== selectedProvider.key ||
+          lastSynced.modelId !== primaryModelId);
+
+      if (needsSync) {
+        const synced = await syncProviderConfig({
+          showSuccessToast: false,
+          trackLoading: false,
+        });
+        if (!synced) {
+          return;
+        }
+      }
+
+      const result = await openclawApi.startGateway(gatewayPort);
+      if (!result.success) {
+        toast.error(result.message);
+        await refreshGatewayRuntime();
+        return;
+      }
+
+      toast.success(result.message);
+      await refreshGatewayRuntime();
+      await refreshDashboardUrl({
+        silent: false,
+        showLoading: false,
+      });
+      navigateSubpage("runtime");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setStarting(false);
+    }
+  }, [
+    gatewayPort,
+    hasSelectedConfig,
+    lastSynced,
+    navigateSubpage,
+    refreshDashboardUrl,
+    refreshGatewayRuntime,
+    selectedModelId,
+    selectedProvider,
+    syncProviderConfig,
+  ]);
+
+  const handleStop = useCallback(async () => {
+    setStopping(true);
+    try {
+      const result = await openclawApi.stopGateway();
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      await closeDashboardWindowSilently();
+      toast.success(result.message);
+      await refreshGatewayRuntime();
+      navigateSubpage("configure");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setStopping(false);
+    }
+  }, [closeDashboardWindowSilently, navigateSubpage, refreshGatewayRuntime]);
+
+  const handleCheckHealth = useCallback(async () => {
+    setCheckingHealth(true);
+    try {
+      const health = await openclawApi.checkHealth();
+      setHealthInfo(health);
+      if (health.status === "healthy") {
+        toast.success("Gateway 健康检查通过。");
+      } else {
+        toast.warning("Gateway 当前不可用。", {
+          description: "请确认已同步配置并成功启动。",
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCheckingHealth(false);
+    }
+  }, []);
+
+  const handleCopyPath = useCallback(async () => {
+    const path = installedStatus?.path;
+    if (!path) {
+      toast.error("当前没有可复制的安装路径。");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(path);
+      toast.success("安装路径已复制。");
+    } catch {
+      toast.error("复制安装路径失败。");
+    }
+  }, [installedStatus?.path]);
+
+  const handleCloseProgress = useCallback(() => {
+    navigateSubpage(operationState.returnSubpage);
+  }, [navigateSubpage, operationState.returnSubpage]);
+
+  if (!statusResolved && !operationState.running) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center px-6 py-10">
+        <div className="flex w-full max-w-xl flex-col items-center rounded-2xl border bg-card px-8 py-10 text-center shadow-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+            正在检查 OpenClaw 状态
+          </h1>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            正在检测本地安装、Gateway 与配置状态，稍后会自动进入正确页面。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentSubpage === "install") {
+    return (
+      <OpenClawInstallPage
+        binaryPath={installedStatus?.path}
+        nodeStatusText={formatNodeStatus(nodeStatus)}
+        gitStatusText={formatBinaryStatus(gitStatus, "可用", "未检测到 Git")}
+        installing={operationState.running && operationState.kind === "install"}
+        onInstall={() => void handleInstall()}
+        onOpenDocs={() => void openUrl(OPENCLAW_DOCS_URL)}
+        onDownloadNode={() =>
+          void openclawApi
+            .getNodeDownloadUrl()
+            .then((url) => openUrl(url))
+            .catch((error) => toast.error(String(error)))
+        }
+        onDownloadGit={() =>
+          void openclawApi
+            .getGitDownloadUrl()
+            .then((url) => openUrl(url))
+            .catch((error) => toast.error(String(error)))
+        }
+      />
+    );
+  }
+
+  if (
+    currentSubpage === "installing" ||
+    currentSubpage === "uninstalling" ||
+    currentSubpage === "restarting"
+  ) {
+    return (
+      <OpenClawProgressPage
+        kind={
+          progressActionBySubpage[currentSubpage] ??
+          operationState.kind ??
+          "install"
+        }
+        running={
+          operationState.running &&
+          operationState.kind === progressActionBySubpage[currentSubpage]
+        }
+        message={operationState.message}
+        logs={installLogs}
+        onClose={handleCloseProgress}
+      />
+    );
+  }
+
+  if (!installed) {
+    return (
+      <OpenClawInstallPage
+        binaryPath={installedStatus?.path}
+        nodeStatusText={formatNodeStatus(nodeStatus)}
+        gitStatusText={formatBinaryStatus(gitStatus, "可用", "未检测到 Git")}
+        installing={operationState.running && operationState.kind === "install"}
+        onInstall={() => void handleInstall()}
+        onOpenDocs={() => void openUrl(OPENCLAW_DOCS_URL)}
+        onDownloadNode={() =>
+          void openclawApi
+            .getNodeDownloadUrl()
+            .then((url) => openUrl(url))
+            .catch((error) => toast.error(String(error)))
+        }
+        onDownloadGit={() =>
+          void openclawApi
+            .getGitDownloadUrl()
+            .then((url) => openUrl(url))
+            .catch((error) => toast.error(String(error)))
+        }
+      />
+    );
+  }
+
+  if (currentSubpage === "configure") {
+    return (
+      <OpenClawConfigurePage
+        installPath={installedStatus?.path}
+        uninstalling={
+          operationState.running && operationState.kind === "uninstall"
+        }
+        syncing={syncing}
+        starting={starting}
+        canSync={canSync}
+        canStart={canStartFromConfigure}
+        providersLoading={providersLoading}
+        modelsLoading={modelsLoading}
+        modelsError={modelsError ?? null}
+        selectedProviderKey={selectedProvider?.key ?? ""}
+        selectedModelId={selectedModelId}
+        compatibleProviders={compatibleProviders}
+        providerModels={providerModels}
+        lastSynced={lastSynced}
+        gatewayStatus={gatewayStatus}
+        gatewayPort={gatewayPort}
+        healthInfo={healthInfo}
+        gatewayRunning={gatewayRunning}
+        onCopyPath={() => void handleCopyPath()}
+        onUninstall={() => void handleUninstall()}
+        onOpenDocs={() => void openUrl(OPENCLAW_DOCS_URL)}
+        onSelectProvider={(providerId) => {
+          setSelectedProviderId(providerId || null);
+          setSelectedModelId("");
+        }}
+        onSelectModel={setSelectedModelId}
+        onInputModel={setSelectedModelId}
+        onRefreshProviders={() => void refreshProviders()}
+        onSync={() => void handleSync()}
+        onStart={() => void handleStart()}
+        onOpenRuntime={() => navigateSubpage("runtime")}
+        onGoProviderPool={() => onNavigate?.("provider-pool")}
+      />
+    );
+  }
+
+  if (currentSubpage === "runtime") {
+    return (
+      <OpenClawRuntimePage
+        gatewayStatus={gatewayStatus}
+        gatewayPort={gatewayPort}
+        healthInfo={healthInfo}
+        channelCount={channels.length}
+        startReady={hasSelectedConfig || !!lastSynced}
+        canStart={canStartGateway}
+        canStop={canStopGateway}
+        canRestart={canRestartGateway}
+        starting={starting}
+        stopping={stopping}
+        restarting={operationState.running && operationState.kind === "restart"}
+        checkingHealth={checkingHealth}
+        dashboardWindowOpen={dashboardWindowOpen}
+        dashboardWindowBusy={dashboardWindowBusy}
+        onStart={() => void handleStart()}
+        onStop={() => void handleStop()}
+        onRestart={() => void handleRestart()}
+        onOpenDashboard={() => void handleOpenDashboardWindow()}
+        onOpenDashboardPage={() => navigateSubpage("dashboard")}
+        onBackToConfigure={() => navigateSubpage("configure")}
+        onCheckHealth={() => void handleCheckHealth()}
+      />
+    );
+  }
+
+  if (currentSubpage === "dashboard") {
+    if (!gatewayRunning && !gatewayStarting) {
+      return renderBlockedPage(
+        "Dashboard 暂不可用",
+        "Gateway 当前未运行，请先进入运行页启动后再打开 Dashboard。",
+        "返回运行页",
+        () => navigateSubpage("runtime"),
+      );
+    }
+
+    return (
+      <OpenClawDashboardPage
+        dashboardUrl={dashboardUrl}
+        loading={dashboardLoading}
+        running={gatewayRunning}
+        windowBusy={dashboardWindowBusy}
+        windowOpen={dashboardWindowOpen}
+        onBack={() => navigateSubpage("runtime")}
+        onOpenExternal={() => void handleOpenDashboardExternal()}
+        onOpenWindow={() => void handleOpenDashboardWindow()}
+        onRefresh={() =>
+          void Promise.all([
+            refreshDashboardUrl({ silent: false, showLoading: true }),
+            refreshDashboardWindowState(),
+          ])
+        }
+      />
+    );
+  }
+
+  return renderBlockedPage(
+    "页面状态异常",
+    "当前 OpenClaw 页面状态无法识别，请返回配置页重试。",
+    "返回配置页",
+    () => navigateSubpage("configure"),
+  );
+}
+
+export default OpenClawPage;

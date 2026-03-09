@@ -1,4 +1,5 @@
 import type { ProjectMemory } from "@/lib/api/memory";
+import { hasStyleGuideContent } from "@/lib/style-guide";
 
 export interface LayerMetricsInput {
   unifiedTotalEntries: number;
@@ -27,7 +28,7 @@ function hasWorldBuilding(memory: ProjectMemory | null): boolean {
 }
 
 function hasStyleGuide(memory: ProjectMemory | null): boolean {
-  return !!memory?.style_guide?.style?.trim();
+  return hasStyleGuideContent(memory?.style_guide);
 }
 
 function projectCoverageCount(memory: ProjectMemory | null): number {

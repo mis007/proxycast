@@ -10,6 +10,7 @@ import type {
   A2UIEvent,
 } from "../../types";
 import { getComponentById } from "../../parser";
+import { A2UI_LAYOUT_TOKENS } from "../../layoutTokens";
 import { ComponentRenderer } from "../ComponentRenderer";
 
 interface CardRendererProps {
@@ -33,7 +34,7 @@ export function CardRenderer({
   if (!child) return null;
 
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
+    <div className={A2UI_LAYOUT_TOKENS.cardShell}>
       <ComponentRenderer
         component={child}
         components={components}

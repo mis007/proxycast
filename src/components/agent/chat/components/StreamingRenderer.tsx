@@ -9,11 +9,12 @@ import React, { memo, useMemo, useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Lightbulb, FileText } from "lucide-react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { A2UITaskCard, A2UITaskLoadingCard } from "./A2UITaskCard";
 import { ToolCallList, ToolCallItem } from "./ToolCallDisplay";
 import { DecisionPanel } from "./DecisionPanel";
 import { parseAIResponse } from "@/components/content-creator/a2ui/parser";
-import { A2UIRenderer } from "@/components/content-creator/a2ui/components";
 import type { A2UIFormData } from "@/components/content-creator/a2ui/types";
+import { CHAT_A2UI_TASK_CARD_PRESET } from "@/components/content-creator/a2ui/taskCardPresets";
 import type { ToolCallState } from "@/lib/api/agent";
 import type { ContentPart, ActionRequired, ConfirmResponse } from "../types";
 
@@ -77,6 +78,12 @@ interface StreamingTextProps {
   charInterval?: number;
   /** A2UI 表单提交回调 */
   onA2UISubmit?: (formData: A2UIFormData) => void;
+  /** A2UI 表单 ID（用于持久化） */
+  a2uiFormId?: string;
+  /** A2UI 初始表单数据（从数据库加载） */
+  a2uiInitialFormData?: A2UIFormData;
+  /** A2UI 表单数据变化回调（用于持久化） */
+  onA2UIFormChange?: (formId: string, formData: A2UIFormData) => void;
   /** 是否折叠代码块 */
   collapseCodeBlocks?: boolean;
   /** 代码块点击回调 */
@@ -96,6 +103,9 @@ const StreamingText: React.FC<StreamingTextProps> = memo(
     showCursor = true,
     charInterval = 12,
     onA2UISubmit,
+    a2uiFormId,
+    a2uiInitialFormData,
+    onA2UIFormChange,
     collapseCodeBlocks,
     onCodeBlockClick,
   }) => {
@@ -220,11 +230,14 @@ const StreamingText: React.FC<StreamingTextProps> = memo(
                 // 直接渲染 A2UI 表单
                 if (typeof part.content !== "string") {
                   return (
-                    <A2UIRenderer
+                    <A2UITaskCard
                       key={`a2ui-${index}`}
                       response={part.content}
                       onSubmit={onA2UISubmit}
-                      className="my-3"
+                      formId={a2uiFormId}
+                      initialFormData={a2uiInitialFormData}
+                      onFormChange={onA2UIFormChange}
+                      preset={CHAT_A2UI_TASK_CARD_PRESET}
                     />
                   );
                 }
@@ -233,15 +246,11 @@ const StreamingText: React.FC<StreamingTextProps> = memo(
               case "pending_a2ui":
                 // 显示加载状态
                 return (
-                  <div
+                  <A2UITaskLoadingCard
                     key={`pending-${index}`}
-                    className="flex items-center gap-2 px-3 py-4 bg-muted/50 rounded-lg animate-pulse"
-                  >
-                    <div className="w-4 h-4 rounded-full bg-muted-foreground/20" />
-                    <span className="text-sm text-muted-foreground">
-                      表单加载中...
-                    </span>
-                  </div>
+                    preset={CHAT_A2UI_TASK_CARD_PRESET}
+                    subtitle="正在解析结构化问题，请稍等。"
+                  />
                 );
 
               case "text":
@@ -549,6 +558,9 @@ export const StreamingRenderer: React.FC<StreamingRendererProps> = memo(
                               pIndex === partParsed.parts.length - 1
                             }
                             onA2UISubmit={onA2UISubmit}
+                            a2uiFormId={a2uiFormId}
+                            a2uiInitialFormData={a2uiInitialFormData}
+                            onA2UIFormChange={onA2UIFormChange}
                             collapseCodeBlocks={collapseCodeBlocks}
                             onCodeBlockClick={onCodeBlockClick}
                           />
@@ -568,6 +580,9 @@ export const StreamingRenderer: React.FC<StreamingRendererProps> = memo(
                   isStreaming={isStreaming && isLastPart}
                   showCursor={shouldShowCursor && isLastPart}
                   onA2UISubmit={onA2UISubmit}
+                  a2uiFormId={a2uiFormId}
+                  a2uiInitialFormData={a2uiInitialFormData}
+                  onA2UIFormChange={onA2UIFormChange}
                   collapseCodeBlocks={collapseCodeBlocks}
                   onCodeBlockClick={onCodeBlockClick}
                 />
@@ -630,14 +645,14 @@ export const StreamingRenderer: React.FC<StreamingRendererProps> = memo(
             // 渲染 A2UI 表单 - content 是 A2UIResponse 类型
             if (typeof part.content !== "string") {
               return (
-                <A2UIRenderer
+                <A2UITaskCard
                   key={`a2ui-${index}`}
                   response={part.content}
                   onSubmit={onA2UISubmit}
                   formId={a2uiFormId}
                   initialFormData={a2uiInitialFormData}
                   onFormChange={onA2UIFormChange}
-                  className="my-3"
+                  preset={CHAT_A2UI_TASK_CARD_PRESET}
                 />
               );
             }
@@ -701,6 +716,9 @@ export const StreamingRenderer: React.FC<StreamingRendererProps> = memo(
                   shouldShowCursor && index === parsedContent.parts.length - 1
                 }
                 onA2UISubmit={onA2UISubmit}
+                a2uiFormId={a2uiFormId}
+                a2uiInitialFormData={a2uiInitialFormData}
+                onA2UIFormChange={onA2UIFormChange}
                 collapseCodeBlocks={collapseCodeBlocks}
                 onCodeBlockClick={onCodeBlockClick}
               />

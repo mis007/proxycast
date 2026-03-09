@@ -1,34 +1,54 @@
-## ProxyCast v0.82.0
+## ProxyCast v0.83.0
 
-### 🔧 优化与重构
-
-- 大量 Rust 代码质量改进：为枚举类型添加 `#[derive(Default)]` 属性
-- 实现 `FromStr` trait 替代手动 `from_str` 方法，提升代码规范性和类型安全性
-- 修复不必要的 `unwrap()` 调用，改用更安全的 `if let` 模式
-- 优化代码结构：修复 TypeScript lint 错误，移除未使用的变量和函数
-- 修复 `react-hooks/exhaustive-deps` 警告，优化 Hook 依赖项
-- 使用 `vec![]` 宏替代 `vec init then push` 模式，提升代码简洁性
+### ✨ 新功能
+- 新增 OpenClaw 服务集成和相关命令支持
+- 新增 Windows 启动诊断命令和故障排查文档
+- 新增样式库管理面板 (StyleLibraryPanel)
+- 新增 A2UI 任务卡片组件和完整测试覆盖
+- 新增输入栏多个子组件：提示路由弹窗、执行策略选择、模型扩展配置等
+- 新增工作台创建入口主页和右侧面板扩展视图
+- 新增运行时样式控制栏组件
+- 新增样式运行时工具模块和测试
+- 新增内容审查面板测试
+- 新增多个工作台右侧面板能力：音频任务、视频任务、画外音任务、图片任务等
+- 新增 Windows 支持包收集脚本
+- 新增开发桥健康检查脚本
 
 ### 🐛 修复
+- 修复 TypeScript 编译错误
+- 修复崩溃诊断逻辑
+- 修复 Tauri mock 核心模块
+- 修复开发桥 HTTP 客户端
+- 修复 webview API 调用
+- 修复 Provider 模型列表组件
 
-- 修复 ThemeWorkbenchSidebar 组件中的 20+ 个 ESLint 错误
-- 修复 useConfiguredProviders hook 中的依赖项警告
-- 修复 Rust 代码中的 33 个 clippy 警告
-- 修复 6 个失败的 Rust 测试：
-  - test_bundled_social_post_with_cover_skill_contract: 支持 SKILL.md 中的中文引号格式
-  - workspace_commands_roundtrip: 使用驼峰命名 workspaceType
-  - should_embed_social_image_tool_contract_in_default_skill: 更新为 **配图说明** 格式
-  - 修复 normalize 相关测试中的配图说明断言
-- 修复 sticky_manager.rs 中的不必要的 unwrap 调用
-- 修复 poster_material_dao.rs 中的不必要的 unwrap 调用
+### 🔧 优化与重构
+- 重构输入栏组件架构，拆分为多个独立 hooks 和子组件
+- 重构工作台右侧面板，拆分为多个独立模块和配置文件
+- 优化 A2UI 组件渲染器和布局系统
+- 优化内容创建器文档画布和工具栏
+- 优化记忆层指标计算和测试
+- 优化项目提示工具
+- 优化主题工作台侧边栏
+- 优化样式指南面板
+- 优化工作台导航和面板渲染 hooks
+- 优化确认策略创建工具
+- 优化主题模块（novel、video）和共享面板渲染器
+- 优化 Agent 事件转换器和会话存储
+- 优化数据库 DAO 层
+- 优化模型注册服务和技能服务
+- 优化日志命令和应用运行器
+- 优化开发桥调度器
+- 更新 Windows 平台 Tauri 配置
+- 更新 CI release workflow
 
 ### 📦 其他
-
-- AI 代码质量验证全部通过（30 个文件，平均分 96/100）
-- 所有核心测试通过 (328 passed; 0 failed)
-- 代码格式化和 lint 检查全部通过
-- 为未来的 Rust 代码改进打下基础
+- 新增 Windows 启动问题故障排查文档
+- 更新 Playwright E2E 测试文档
+- 更新构建和运维文档
+- 更新常见问题文档
+- 更新 README
 
 ---
 
-**完整变更**: v0.81.0...v0.82.0
+**完整变更**: v0.82.0...v0.83.0

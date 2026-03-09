@@ -116,7 +116,9 @@ const QuickInsertItem = styled.button`
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 
   &:hover {
     background: hsl(var(--muted) / 0.75);
@@ -148,6 +150,11 @@ const ActionPill = styled.button<{ $active?: boolean }>`
     color: ${({ $active }) =>
       $active ? "hsl(var(--primary))" : "hsl(var(--foreground))"};
   }
+`;
+
+const ActionMeta = styled.span`
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
 `;
 
 const ActiveBadge = styled.span`
@@ -313,6 +320,7 @@ export const DocumentToolbar: React.FC<DocumentToolbarProps> = memo(
     onAddImage,
     onImportDocument,
     onTextStylize,
+    textStylizeSourceLabel,
     onContentReview,
     contentReviewActive = false,
     onUndo,
@@ -333,8 +341,7 @@ export const DocumentToolbar: React.FC<DocumentToolbarProps> = memo(
   }) => {
     const [autoContinuePopoverOpen, setAutoContinuePopoverOpen] =
       useState(false);
-    const [quickInsertPopoverOpen, setQuickInsertPopoverOpen] =
-      useState(false);
+    const [quickInsertPopoverOpen, setQuickInsertPopoverOpen] = useState(false);
     const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
     const renderCountRef = useRef(0);
     const lastCommitAtRef = useRef<number | null>(null);
@@ -429,7 +436,10 @@ export const DocumentToolbar: React.FC<DocumentToolbarProps> = memo(
               >
                 <QuickInsertMenu>
                   {onAddImage ? (
-                    <QuickInsertItem type="button" onClick={handleAddImageClick}>
+                    <QuickInsertItem
+                      type="button"
+                      onClick={handleAddImageClick}
+                    >
                       <ImageIcon size={16} />
                       <span>添加图片</span>
                     </QuickInsertItem>
@@ -678,9 +688,20 @@ export const DocumentToolbar: React.FC<DocumentToolbarProps> = memo(
               </AutoContinuePanel>
             </PopoverContent>
           </Popover>
-          <ActionPill type="button" onClick={onTextStylize}>
+          <ActionPill
+            type="button"
+            onClick={onTextStylize}
+            title={
+              textStylizeSourceLabel
+                ? `当前生效风格：${textStylizeSourceLabel}`
+                : undefined
+            }
+          >
             <Wand2 size={16} />
             文本风格化
+            {textStylizeSourceLabel ? (
+              <ActionMeta>{textStylizeSourceLabel}</ActionMeta>
+            ) : null}
           </ActionPill>
           <ActionPill
             type="button"

@@ -7,6 +7,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { A2UIResponse, A2UIEvent, A2UIFormData } from "../types";
 import { getComponentById, resolveDynamicValue } from "../parser";
+import { A2UI_RENDERER_TOKENS } from "../rendererTokens";
 import { cn } from "@/lib/utils";
 import { ComponentRenderer } from "./ComponentRenderer";
 
@@ -18,6 +19,7 @@ interface A2UIRendererProps {
   response: A2UIResponse;
   onEvent?: (event: A2UIEvent) => void;
   onSubmit?: (formData: A2UIFormData) => void;
+  onFormStateChange?: (formData: A2UIFormData) => void;
   className?: string;
   /** 表单 ID（用于持久化） */
   formId?: string;
@@ -25,6 +27,8 @@ interface A2UIRendererProps {
   initialFormData?: A2UIFormData;
   /** 表单数据变化回调（用于持久化） */
   onFormChange?: (formId: string, formData: A2UIFormData) => void;
+  submitDisabled?: boolean;
+  submitButtonClassName?: string;
 }
 
 // ============================================================
@@ -35,10 +39,13 @@ export function A2UIRenderer({
   response,
   onEvent,
   onSubmit,
+  onFormStateChange,
   className,
   formId,
   initialFormData,
   onFormChange,
+  submitDisabled = false,
+  submitButtonClassName,
 }: A2UIRendererProps) {
   // 防抖定时器引用
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,10 +79,16 @@ export function A2UIRenderer({
     }
   }, [initialFormData]);
 
+  useEffect(() => {
+    onFormStateChange?.(formData);
+  }, [formData, onFormStateChange]);
+
   const handleFormChange = useCallback(
     (id: string, value: unknown) => {
+      let nextFormData: A2UIFormData | null = null;
       setFormData((prev) => {
         const newData = { ...prev, [id]: value };
+        nextFormData = newData;
 
         // 防抖保存到数据库
         if (formId && onFormChange) {
@@ -89,9 +102,14 @@ export function A2UIRenderer({
 
         return newData;
       });
-      onEvent?.({ type: "change", componentId: id, value });
+      onEvent?.({
+        type: "change",
+        componentId: id,
+        value,
+        formData: nextFormData || formData,
+      });
     },
-    [formId, onFormChange, onEvent],
+    [formData, formId, onFormChange, onEvent],
   );
 
   // 清理防抖定时器
@@ -116,30 +134,38 @@ export function A2UIRenderer({
   );
 
   const handleSubmit = useCallback(() => {
+    if (submitDisabled) {
+      return;
+    }
     onSubmit?.(formData);
     onEvent?.({
       type: "submit",
       componentId: "form",
       formData,
     });
-  }, [formData, onEvent, onSubmit]);
+  }, [formData, onEvent, onSubmit, submitDisabled]);
 
   const rootComponent = useMemo(
     () => getComponentById(response.components, response.root),
     [response.components, response.root],
   );
+  const renderData = useMemo(
+    () => ({
+      ...(response.data || {}),
+      formData,
+    }),
+    [formData, response.data],
+  );
 
   if (!rootComponent) {
-    return (
-      <div className="text-red-500">错误：找不到根组件 {response.root}</div>
-    );
+    return <div className={A2UI_RENDERER_TOKENS.errorText}>错误：找不到根组件 {response.root}</div>;
   }
 
   return (
-    <div className={cn("a2ui-container", className)}>
+    <div className={cn(A2UI_RENDERER_TOKENS.container, className)}>
       {/* 思考过程 */}
       {response.thinking && (
-        <div className="mb-3 text-sm text-muted-foreground italic">
+        <div className={A2UI_RENDERER_TOKENS.thinkingText}>
           {response.thinking}
         </div>
       )}
@@ -148,7 +174,7 @@ export function A2UIRenderer({
       <ComponentRenderer
         component={rootComponent}
         components={response.components}
-        data={response.data || {}}
+        data={renderData}
         formData={formData}
         onFormChange={handleFormChange}
         onAction={handleAction}
@@ -156,10 +182,14 @@ export function A2UIRenderer({
 
       {/* 提交按钮 */}
       {response.submitAction && (
-        <div className="mt-4 flex justify-end">
+        <div className={A2UI_RENDERER_TOKENS.submitRow}>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            disabled={submitDisabled}
+            className={cn(
+              A2UI_RENDERER_TOKENS.submitButton,
+              submitButtonClassName,
+            )}
           >
             {response.submitAction.label}
           </button>

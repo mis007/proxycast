@@ -8,6 +8,8 @@ use aster::conversation::message::{ActionRequiredData, Message, MessageContent};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+const JSON_RECURSION_LIMIT: usize = 50;
+
 /// 从工具结果中提取文本内容
 ///
 /// 使用 serde_json 来处理，避免直接依赖 rmcp 类型
@@ -47,19 +49,31 @@ fn dedupe_preserve_order(items: Vec<String>) -> Vec<String> {
 }
 
 fn collect_tool_result_text(value: &serde_json::Value, target: &mut Vec<String>) {
+    collect_tool_result_text_with_depth(value, target, 0);
+}
+
+fn collect_tool_result_text_with_depth(
+    value: &serde_json::Value,
+    target: &mut Vec<String>,
+    depth: usize,
+) {
+    if depth >= JSON_RECURSION_LIMIT {
+        return;
+    }
+
     match value {
         serde_json::Value::String(text) => push_non_empty(target, Some(text)),
         serde_json::Value::Array(items) => {
             for item in items {
-                collect_tool_result_text(item, target);
+                collect_tool_result_text_with_depth(item, target, depth + 1);
             }
         }
         serde_json::Value::Object(obj) => {
             if let Some(content) = obj.get("content") {
-                collect_tool_result_text(content, target);
+                collect_tool_result_text_with_depth(content, target, depth + 1);
             }
             if let Some(value) = obj.get("value") {
-                collect_tool_result_text(value, target);
+                collect_tool_result_text_with_depth(value, target, depth + 1);
             }
             for key in ["text", "output", "stdout", "stderr", "message", "error"] {
                 push_non_empty(target, obj.get(key).and_then(|v| v.as_str()));
@@ -243,6 +257,19 @@ fn collect_tool_result_images(
     target: &mut Vec<TauriToolImage>,
     seen_sources: &mut std::collections::HashSet<String>,
 ) {
+    collect_tool_result_images_with_depth(value, target, seen_sources, 0);
+}
+
+fn collect_tool_result_images_with_depth(
+    value: &serde_json::Value,
+    target: &mut Vec<TauriToolImage>,
+    seen_sources: &mut std::collections::HashSet<String>,
+    depth: usize,
+) {
+    if depth >= JSON_RECURSION_LIMIT {
+        return;
+    }
+
     match value {
         serde_json::Value::String(text) => {
             for data_url in extract_data_urls_from_text(text) {
@@ -255,7 +282,7 @@ fn collect_tool_result_images(
         }
         serde_json::Value::Array(items) => {
             for item in items {
-                collect_tool_result_images(item, target, seen_sources);
+                collect_tool_result_images_with_depth(item, target, seen_sources, depth + 1);
             }
         }
         serde_json::Value::Object(obj) => {
@@ -269,7 +296,7 @@ fn collect_tool_result_images(
                 }
             }
             for nested in obj.values() {
-                collect_tool_result_images(nested, target, seen_sources);
+                collect_tool_result_images_with_depth(nested, target, seen_sources, depth + 1);
             }
         }
         _ => {}
@@ -872,5 +899,16 @@ mod tests {
         assert!(!filtered.to_ascii_lowercase().contains("<html"));
         assert!(!filtered.to_ascii_lowercase().contains("<script"));
         assert!(filtered.contains("正文"));
+    }
+
+    #[test]
+    fn test_extract_tool_result_text_should_stop_on_excessive_depth() {
+        let mut nested = serde_json::json!({ "text": "不会到达" });
+        for _ in 0..(JSON_RECURSION_LIMIT + 10) {
+            nested = serde_json::json!({ "value": nested });
+        }
+
+        let text = extract_tool_result_text(&nested);
+        assert_eq!(text, "");
     }
 }

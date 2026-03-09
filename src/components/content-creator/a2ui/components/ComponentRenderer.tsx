@@ -4,6 +4,7 @@
  */
 
 import type { A2UIComponent, A2UIFormData, A2UIEvent } from "../types";
+import { resolveDynamicValue } from "../parser";
 
 // 布局组件
 import { RowRenderer } from "./layout/Row";
@@ -38,6 +39,21 @@ export function ComponentRenderer({
   onFormChange,
   onAction,
 }: ComponentRendererProps) {
+  const isVisible =
+    component.visible === undefined
+      ? true
+      : Boolean(
+          resolveDynamicValue(
+            component.visible as boolean | { path: string } | undefined,
+            data,
+            false,
+          ),
+        );
+
+  if (!isVisible) {
+    return null;
+  }
+
   switch (component.component) {
     case "Row":
       return (

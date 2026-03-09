@@ -15,9 +15,11 @@ import {
   PanelRightClose,
   PanelRight,
   Check,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   ContentListItem,
@@ -29,6 +31,7 @@ import {
 } from "@/lib/api/project";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { MemorySidebar } from "./MemorySidebar";
+import { StyleGuidePanel } from "./memory/StyleGuidePanel";
 import { toast } from "sonner";
 
 interface ContentEditorPageProps {
@@ -51,6 +54,7 @@ export function ContentEditorPage({
   const [title, setTitle] = useState(content.title);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [showSidebar, setShowSidebar] = useState(true);
+  const [styleGuideDialogOpen, setStyleGuideDialogOpen] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TipTap 编辑器
@@ -226,6 +230,15 @@ export function ContentEditorPage({
         <Button
           variant="outline"
           size="sm"
+          onClick={() => setStyleGuideDialogOpen(true)}
+        >
+          <Palette className="h-4 w-4 mr-2" />
+          风格
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleManualSave}
           disabled={saveStatus === "saving" || saveStatus === "saved"}
         >
@@ -286,6 +299,19 @@ export function ContentEditorPage({
           <MemorySidebar projectId={project.id} className="w-72" />
         )}
       </div>
+      <Dialog open={styleGuideDialogOpen} onOpenChange={setStyleGuideDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              项目默认风格
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-6">
+            <StyleGuidePanel projectId={project.id} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,17 +3,23 @@
  * @description 开发者设置页面 - 组件视图调试等开发工具
  */
 import { useCallback, useState } from "react";
-import { Bug, Code2, Eye } from "lucide-react";
+import { Bug, Code2, Eye, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useComponentDebug } from "@/contexts/ComponentDebugContext";
 import {
   getConfig,
   getLogs,
+  getLogStorageDiagnostics,
   getPersistedLogsTail,
+  getServerDiagnostics,
+  getWindowsStartupDiagnostics,
 } from "@/hooks/useTauri";
 import {
   buildCrashDiagnosticPayload,
+  clearCrashDiagnosticHistory,
+  collectRuntimeSnapshotForDiagnostic,
   collectThemeWorkbenchDocumentStateForDiagnostic,
+  CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT,
   copyCrashDiagnosticToClipboard,
   copyCrashDiagnosticJsonToClipboard,
   exportCrashDiagnosticToJson,
@@ -35,17 +41,39 @@ export function DeveloperSettings() {
   const [showClipboardGuide, setShowClipboardGuide] = useState(false);
 
   const buildDiagnosticPayload = useCallback(async () => {
-    const [config, logs, persistedLogs, themeWorkbenchDocumentState] = await Promise.all([
-      getConfig(),
+    const configPromise = getConfig();
+    const runtimeSnapshotPromise = configPromise.then((config) =>
+      collectRuntimeSnapshotForDiagnostic(config),
+    );
+    const [
+      config,
+      logs,
+      persistedLogs,
+      themeWorkbenchDocumentState,
+      serverDiagnostics,
+      logStorageDiagnostics,
+      windowsStartupDiagnostics,
+      runtimeSnapshotResult,
+    ] = await Promise.all([
+      configPromise,
       getLogs(),
       getPersistedLogsTail(200),
       collectThemeWorkbenchDocumentStateForDiagnostic(),
+      getServerDiagnostics().catch(() => null),
+      getLogStorageDiagnostics().catch(() => null),
+      getWindowsStartupDiagnostics().catch(() => null),
+      runtimeSnapshotPromise,
     ]);
     return buildCrashDiagnosticPayload({
       crashConfig: normalizeCrashReportingConfig(config.crash_reporting),
       logs,
       persistedLogTail: persistedLogs,
+      collectionNotes: runtimeSnapshotResult.collectionNotes,
       themeWorkbenchDocumentState,
+      serverDiagnostics,
+      logStorageDiagnostics,
+      windowsStartupDiagnostics,
+      runtimeSnapshot: runtimeSnapshotResult.runtimeSnapshot,
       appVersion: import.meta.env.VITE_APP_VERSION,
       platform: navigator.platform,
       userAgent: navigator.userAgent,
@@ -157,6 +185,35 @@ export function DeveloperSettings() {
     }
   }, []);
 
+  const handleClearDiagnosticHistory = useCallback(async () => {
+    const confirmed =
+      typeof window === "undefined" ||
+      window.confirm(CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT);
+    if (!confirmed) {
+      return;
+    }
+
+    setDiagnosticBusy(true);
+    setMessage(null);
+    setShowClipboardGuide(false);
+    try {
+      await clearCrashDiagnosticHistory();
+      setMessage({
+        type: "success",
+        text: "已清空旧诊断信息，后续复制将只包含新的诊断数据",
+      });
+      setTimeout(() => setMessage(null), 2500);
+    } catch (err) {
+      console.error("清空旧诊断信息失败:", err);
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "清空旧诊断信息失败",
+      });
+    } finally {
+      setDiagnosticBusy(false);
+    }
+  }, []);
+
   return (
     <div className="space-y-6 max-w-2xl">
       {/* 标题 */}
@@ -219,12 +276,26 @@ export function DeveloperSettings() {
           <div>
             <h4 className="font-medium">崩溃诊断日志（开发协作）</h4>
             <p className="text-sm text-muted-foreground">
-              用于定位 Windows 闪退与前端异常，包含 FrontendCrash、失败命令以及最近调用轨迹（DSN 自动脱敏）
+              用于定位 Windows 闪退与初装异常，包含
+              FrontendCrash、调用轨迹、服务器/日志诊断与 Windows 启动自检（DSN
+              自动脱敏）
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleClearDiagnosticHistory()}
+            disabled={diagnosticBusy}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 transition-colors dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300",
+              diagnosticBusy && "opacity-50 cursor-not-allowed",
+            )}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            清空旧诊断信息
+          </button>
           <button
             type="button"
             onClick={() => void handleCopyDiagnostic()}

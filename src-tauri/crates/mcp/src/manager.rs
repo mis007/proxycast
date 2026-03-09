@@ -114,7 +114,7 @@ impl McpClientManager {
     /// # Arguments
     ///
     /// * `emitter` - 事件发射器，用于发送事件到前端。
-    ///                  如果为 None，则不会发送事件。
+    ///   如果为 None，则不会发送事件。
     ///
     /// # Returns
     ///

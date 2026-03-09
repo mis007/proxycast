@@ -10,7 +10,7 @@ import type {
   A2UIEvent,
 } from "../../types";
 import { getComponentById } from "../../parser";
-import { cn } from "@/lib/utils";
+import { getA2UILayoutClasses } from "../../layoutTokens";
 import { ComponentRenderer } from "../ComponentRenderer";
 
 interface ColumnRendererProps {
@@ -21,23 +21,6 @@ interface ColumnRendererProps {
   onFormChange: (id: string, value: unknown) => void;
   onAction: (event: A2UIEvent) => void;
 }
-
-const justifyClass: Record<string, string> = {
-  start: "justify-start",
-  center: "justify-center",
-  end: "justify-end",
-  spaceBetween: "justify-between",
-  spaceAround: "justify-around",
-  spaceEvenly: "justify-evenly",
-  stretch: "justify-stretch",
-};
-
-const alignClass: Record<string, string> = {
-  start: "items-start",
-  center: "items-center",
-  end: "items-end",
-  stretch: "items-stretch",
-};
 
 export function ColumnRenderer({
   component,
@@ -51,11 +34,12 @@ export function ColumnRenderer({
 
   return (
     <div
-      className={cn(
-        "flex flex-col",
-        justifyClass[component.justify || "start"],
-        alignClass[component.align || "stretch"],
-      )}
+      className={getA2UILayoutClasses({
+        direction: "column",
+        justify: component.justify,
+        align: component.align,
+        defaultAlign: "stretch",
+      })}
       style={{ gap: component.gap || 12 }}
     >
       {childIds.map((childId: string) => {

@@ -33,6 +33,8 @@ use proxycast_services::{
     api_key_provider_service::ApiKeyProviderService, model_registry_service::ModelRegistryService,
     provider_pool_service::ProviderPoolService, skill_service::SkillService,
 };
+#[cfg(debug_assertions)]
+use tauri::AppHandle;
 
 #[cfg(debug_assertions)]
 #[derive(Debug, Deserialize)]
@@ -52,6 +54,7 @@ pub struct InvokeResponse {
 #[cfg(debug_assertions)]
 #[derive(Clone)]
 pub struct DevBridgeState {
+    pub app_handle: Option<AppHandle>,
     pub server: app::AppState,
     pub logs: app::LogState,
     pub db: Option<DbConnection>,
@@ -95,6 +98,7 @@ impl DevBridgeServer {
     ///
     /// 服务器会在后台持续运行，直到应用退出。
     pub async fn start(
+        app_handle: AppHandle,
         server: app::AppState,
         logs: app::LogState,
         db: Option<DbConnection>,
@@ -108,6 +112,7 @@ impl DevBridgeServer {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let config = config.unwrap_or_default();
         let bridge_state = DevBridgeState {
+            app_handle: Some(app_handle),
             server,
             logs,
             db,

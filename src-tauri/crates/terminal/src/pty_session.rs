@@ -187,9 +187,9 @@ impl PtySession {
             return None;
         }
 
-        let expanded = if cleaned.starts_with("~/") {
+        let expanded = if let Some(stripped) = cleaned.strip_prefix("~/") {
             if let Some(home) = dirs::home_dir() {
-                home.join(&cleaned[2..])
+                home.join(stripped)
             } else {
                 PathBuf::from(&cleaned)
             }

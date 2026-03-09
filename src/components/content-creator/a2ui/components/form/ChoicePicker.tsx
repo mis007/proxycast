@@ -6,6 +6,12 @@
 import type { ChoicePickerComponent, A2UIFormData } from "../../types";
 import { resolveDynamicValue } from "../../parser";
 import { cn } from "@/lib/utils";
+import {
+  A2UI_FORM_TOKENS,
+  getA2UIChoiceIndicatorClasses,
+  getA2UIChoiceOptionClasses,
+  getA2UIChoiceTitleClasses,
+} from "../../taskFormTokens";
 
 interface ChoicePickerRendererProps {
   component: ChoicePickerComponent;
@@ -29,6 +35,8 @@ export function ChoicePickerRenderer({
   const isMultiple = component.variant === "multipleSelection";
   const isWrap =
     component.layout === "wrap" || component.layout === "horizontal";
+  const isMutuallyExclusive =
+    component.variant === "mutuallyExclusive" || !isMultiple;
 
   const handleSelect = (optionValue: string) => {
     if (isMultiple) {
@@ -42,9 +50,14 @@ export function ChoicePickerRenderer({
   };
 
   return (
-    <div className="space-y-2">
-      {label && <div className="text-sm font-medium">{label}</div>}
-      <div className={cn("flex gap-2", isWrap ? "flex-wrap" : "flex-col")}>
+    <div className={A2UI_FORM_TOKENS.fieldStack}>
+      {label && <div className={A2UI_FORM_TOKENS.fieldLabel}>{label}</div>}
+      <div
+        className={cn(
+          A2UI_FORM_TOKENS.optionList,
+          isWrap ? "flex-wrap" : "flex-col",
+        )}
+      >
         {component.options.map((option) => {
           const optionLabel = String(
             resolveDynamicValue(option.label, data, ""),
@@ -56,22 +69,28 @@ export function ChoicePickerRenderer({
               key={option.value}
               type="button"
               onClick={() => handleSelect(option.value)}
-              className={cn(
-                "px-3 py-2 text-sm rounded-lg border transition-all text-left",
-                isSelected
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border hover:border-primary/50 hover:bg-accent",
-              )}
+              className={getA2UIChoiceOptionClasses(isWrap, isSelected)}
             >
-              <div className="flex items-center gap-2">
-                {option.icon && <span>{option.icon}</span>}
-                <span>{optionLabel}</span>
-              </div>
-              {option.description && (
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {option.description}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className={getA2UIChoiceTitleClasses(isSelected)}>
+                    {option.icon && <span>{option.icon}</span>}
+                    <span>{optionLabel}</span>
+                  </div>
+                  {option.description && (
+                    <div className={A2UI_FORM_TOKENS.optionDescription}>
+                      {option.description}
+                    </div>
+                  )}
                 </div>
-              )}
+                <span
+                  className={getA2UIChoiceIndicatorClasses(
+                    isMutuallyExclusive,
+                    isSelected,
+                  )}
+                  aria-hidden="true"
+                />
+              </div>
             </button>
           );
         })}

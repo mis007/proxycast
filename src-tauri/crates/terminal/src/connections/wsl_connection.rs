@@ -72,7 +72,7 @@ pub struct WSLDistro {
 }
 
 /// WSL 发行版状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum WSLDistroState {
     /// 已停止
@@ -82,13 +82,8 @@ pub enum WSLDistroState {
     /// 正在安装
     Installing,
     /// 未知状态
+    #[default]
     Unknown,
-}
-
-impl Default for WSLDistroState {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 impl std::fmt::Display for WSLDistroState {

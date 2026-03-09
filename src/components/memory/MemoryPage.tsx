@@ -31,7 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Page, PageParams } from "@/types/page";
+import type { MemoryPageParams, Page, PageParams } from "@/types/page";
 import { SettingsTabs } from "@/types/settings";
 import {
   getConfig,
@@ -65,6 +65,8 @@ import {
 import { buildHomeAgentParams } from "@/lib/workspace/navigation";
 import { CanvasBreadcrumbHeader } from "@/components/content-creator/canvas/shared/CanvasBreadcrumbHeader";
 import { buildLayerMetrics } from "./memoryLayerMetrics";
+import { hasStyleGuideContent } from "@/lib/style-guide";
+
 type CategoryType = MemoryCategory;
 type CategoryFilter = "all" | CategoryType;
 type MemorySection = "home" | CategoryType;
@@ -196,6 +198,23 @@ const SECTION_SHORTCUTS: Record<string, MemorySection> = {
   "5": "experience",
   "6": "activity",
 };
+
+function resolveMemorySection(
+  section?: MemoryPageParams["section"],
+): MemorySection {
+  if (
+    section === "home" ||
+    section === "identity" ||
+    section === "context" ||
+    section === "preference" ||
+    section === "experience" ||
+    section === "activity"
+  ) {
+    return section;
+  }
+
+  return "home";
+}
 
 const DEFAULT_MEMORY_CONFIG: TauriMemoryConfig = {
   enabled: true,
@@ -506,7 +525,9 @@ function MemoryDetailPanel({
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div>
           <div className="text-muted-foreground mb-1">记忆类型</div>
-          <div className="font-medium">{memoryTypeLabel(entry.memory_type)}</div>
+          <div className="font-medium">
+            {memoryTypeLabel(entry.memory_type)}
+          </div>
         </div>
         <div>
           <div className="text-muted-foreground mb-1">记忆来源</div>
@@ -589,9 +610,10 @@ function MemoryDetailPanel({
 
 interface MemoryPageProps {
   onNavigate?: (page: Page, params?: PageParams) => void;
+  pageParams?: MemoryPageParams;
 }
 
-export function MemoryPage({ onNavigate }: MemoryPageProps) {
+export function MemoryPage({ onNavigate, pageParams }: MemoryPageProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [config, setConfig] = useState<Config | null>(null);
@@ -605,7 +627,9 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
   const [projectId, setProjectId] = useState<string | null>(() =>
     getStoredResourceProjectId({ includeLegacy: true }),
   );
-  const [projectMemory, setProjectMemory] = useState<ProjectMemory | null>(null);
+  const [projectMemory, setProjectMemory] = useState<ProjectMemory | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -614,7 +638,9 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
     useState(false);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
 
-  const [activeSection, setActiveSection] = useState<MemorySection>("home");
+  const [activeSection, setActiveSection] = useState<MemorySection>(() =>
+    resolveMemorySection(pageParams?.section),
+  );
   const [searchKeyword, setSearchKeyword] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -681,7 +707,12 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
         projectId,
         projectMemory,
       }),
-    [contextLayerStats?.total_entries, projectId, projectMemory, stats.total_entries],
+    [
+      contextLayerStats?.total_entries,
+      projectId,
+      projectMemory,
+      stats.total_entries,
+    ],
   );
 
   const activeCategoryFilter: CategoryFilter =
@@ -738,24 +769,24 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
   const loadOverview = useCallback(async () => {
     const [statsResult, memories, contextOverviewResult, projectMemoryResult] =
       await Promise.all([
-      getUnifiedMemoryStats(),
-      listUnifiedMemories({
-        archived: false,
-        sort_by: "updated_at",
-        order: "desc",
-        limit: 1000,
-      }),
-      getContextMemoryOverview(200).catch((error) => {
-        console.warn("加载上下文记忆总览失败:", error);
-        return null;
-      }),
-      projectId
-        ? getProjectMemory(projectId).catch((error) => {
-            console.warn("加载项目记忆失败:", error);
-            return null;
-          })
-        : Promise.resolve(null),
-    ]);
+        getUnifiedMemoryStats(),
+        listUnifiedMemories({
+          archived: false,
+          sort_by: "updated_at",
+          order: "desc",
+          limit: 1000,
+        }),
+        getContextMemoryOverview(200).catch((error) => {
+          console.warn("加载上下文记忆总览失败:", error);
+          return null;
+        }),
+        projectId
+          ? getProjectMemory(projectId).catch((error) => {
+              console.warn("加载项目记忆失败:", error);
+              return null;
+            })
+          : Promise.resolve(null),
+      ]);
 
     const normalizedStats: MemoryOverviewResponse = {
       stats: {
@@ -797,6 +828,13 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
       setProjectId(detail.projectId);
     });
   }, []);
+
+  useEffect(() => {
+    const nextSection = resolveMemorySection(pageParams?.section);
+    setActiveSection((previous) =>
+      previous === nextSection ? previous : nextSection,
+    );
+  }, [pageParams?.section]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -858,8 +896,9 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
     }
 
     const hasCharacters = (projectMemory?.characters.length ?? 0) > 0;
-    const hasWorldBuilding = !!projectMemory?.world_building?.description?.trim();
-    const hasStyleGuide = !!projectMemory?.style_guide?.style?.trim();
+    const hasWorldBuilding =
+      !!projectMemory?.world_building?.description?.trim();
+    const hasStyleGuide = hasStyleGuideContent(projectMemory?.style_guide);
     const hasOutline = (projectMemory?.outline.length ?? 0) > 0;
 
     if (hasCharacters && hasWorldBuilding && hasStyleGuide && hasOutline) {
@@ -926,7 +965,7 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
     projectId,
     projectMemory?.characters.length,
     projectMemory?.outline.length,
-    projectMemory?.style_guide?.style,
+    projectMemory?.style_guide,
     projectMemory?.world_building?.description,
     showMessage,
   ]);
@@ -1063,7 +1102,7 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
               记忆
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              按 / 搜索，按 1-6 切换分类
+              按 / 搜索，按 1-6 切换视图
             </div>
           </div>
 
@@ -1212,7 +1251,8 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div className="text-sm font-medium">三层记忆可用性</div>
                     <div className="text-xs text-muted-foreground">
-                      已可用 {layerMetrics.readyLayers}/{layerMetrics.totalLayers} 层
+                      已可用 {layerMetrics.readyLayers}/
+                      {layerMetrics.totalLayers} 层
                     </div>
                   </div>
 
@@ -1269,12 +1309,20 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
                                   </button>
                                 )}
                                 <button
+                                  onClick={() => onNavigate?.("style")}
+                                  className="rounded border px-2 py-1 text-[11px] hover:bg-muted"
+                                >
+                                  前往风格资产
+                                </button>
+                                <button
                                   onClick={() =>
-                                    onNavigate?.("project-detail", { projectId })
+                                    onNavigate?.("project-detail", {
+                                      projectId,
+                                    })
                                   }
                                   className="rounded border px-2 py-1 text-[11px] hover:bg-muted"
                                 >
-                                  前往项目记忆
+                                  前往项目工作台
                                 </button>
                               </>
                             )}
@@ -1438,7 +1486,8 @@ export function MemoryPage({ onNavigate }: MemoryPageProps) {
                       <MemoryDetailPanel
                         entry={selectedEntry}
                         deleting={
-                          !!selectedEntry && deletingEntryId === selectedEntry.id
+                          !!selectedEntry &&
+                          deletingEntryId === selectedEntry.id
                         }
                         onDelete={handleDeleteEntry}
                       />

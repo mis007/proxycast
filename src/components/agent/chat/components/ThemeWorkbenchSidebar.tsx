@@ -1065,7 +1065,7 @@ const ActivityStepItem = styled.div`
   padding: 5px 6px;
 `;
 
-const _RunLinkButton = styled.button`
+const RunLinkButton = styled.button`
   border: 0;
   background: transparent;
   padding: 0;
@@ -1081,7 +1081,7 @@ const _RunLinkButton = styled.button`
   }
 `;
 
-const _RunDetailPanel = styled.div`
+const RunDetailPanel = styled.div`
   margin-top: 8px;
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
@@ -1089,14 +1089,14 @@ const _RunDetailPanel = styled.div`
   padding: 8px;
 `;
 
-const _RunDetailTitle = styled.div`
+const RunDetailTitle = styled.div`
   font-size: 11px;
   font-weight: 600;
   color: hsl(var(--foreground));
   margin-bottom: 6px;
 `;
 
-const _RunDetailRow = styled.div`
+const RunDetailRow = styled.div`
   font-size: 11px;
   color: hsl(var(--muted-foreground));
   line-height: 1.45;
@@ -1129,7 +1129,7 @@ const RunDetailArtifactPath = styled.code`
   text-overflow: ellipsis;
 `;
 
-const _RunDetailCode = styled.pre`
+const RunDetailCode = styled.pre`
   margin-top: 6px;
   font-size: 10px;
   line-height: 1.4;
@@ -1179,7 +1179,7 @@ function getBranchStatusText(status: TopicBranchStatus): string {
   return "备选";
 }
 
-function _formatGateLabel(
+function formatGateLabel(
   gateKey?: SidebarActivityLog["gateKey"],
 ): string | null {
   if (!gateKey || gateKey === "idle") {
@@ -1197,7 +1197,7 @@ function _formatGateLabel(
   return null;
 }
 
-function _formatRunIdShort(runId?: string): string | null {
+function formatRunIdShort(runId?: string): string | null {
   const trimmed = runId?.trim();
   if (!trimmed) {
     return null;
@@ -1208,7 +1208,7 @@ function _formatRunIdShort(runId?: string): string | null {
   return `${trimmed.slice(0, 8)}…`;
 }
 
-function _formatRunStatusLabel(status: AgentRun["status"]): string {
+function formatRunStatusLabel(status: AgentRun["status"]): string {
   if (status === "queued") return "排队中";
   if (status === "running") return "运行中";
   if (status === "success") return "成功";
@@ -1605,7 +1605,7 @@ function ThemeWorkbenchSidebarComponent({
   onRequestCollapse,
   messages = [],
 }: ThemeWorkbenchSidebarProps) {
-  const [showActivityLogs, _setShowActivityLogs] = useState(false);
+  const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [showCreationTasks, setShowCreationTasks] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>("context");
   const [selectedSearchResultId, setSelectedSearchResultId] = useState<string | null>(null);
@@ -1620,16 +1620,16 @@ function ThemeWorkbenchSidebarComponent({
   );
   const progressPercent =
     workflowSteps.length > 0 ? (completedSteps / workflowSteps.length) * 100 : 0;
-  const _runMetadataText = useMemo(
+  const runMetadataText = useMemo(
     () => formatRunMetadata(activeRunDetail?.metadata ?? null),
     [activeRunDetail?.metadata],
   );
-  const _runMetadataSummary = useMemo(
+  const runMetadataSummary = useMemo(
     () => parseRunMetadataSummary(activeRunDetail?.metadata ?? null),
     [activeRunDetail?.metadata],
   );
   const runDetailSessionId = activeRunDetail?.session_id?.trim() || null;
-  const _handleRevealArtifactInFinder = useCallback(
+  const handleRevealArtifactInFinder = useCallback(
     async (artifactPath: string, sessionId?: string | null) => {
       const resolvedSessionId = sessionId?.trim() || runDetailSessionId;
       if (!resolvedSessionId) {
@@ -1645,7 +1645,7 @@ function ThemeWorkbenchSidebarComponent({
     },
     [runDetailSessionId],
   );
-  const _handleOpenArtifactWithDefaultApp = useCallback(
+  const handleOpenArtifactWithDefaultApp = useCallback(
     async (artifactPath: string, sessionId?: string | null) => {
       const resolvedSessionId = sessionId?.trim() || runDetailSessionId;
       if (!resolvedSessionId) {
@@ -1980,6 +1980,97 @@ function ThemeWorkbenchSidebarComponent({
         return rightLatest - leftLatest;
       });
   }, [creationTaskEvents]);
+
+  const renderActivityLogItem = useCallback(
+    (group: ActivityLogGroup) => {
+      const gateLabel = formatGateLabel(group.gateKey);
+      const runLabel = formatRunIdShort(group.runId);
+      const sourceLabel = group.source?.trim() || "-";
+      const primaryLog =
+        group.logs.find((log) => log.source === "skill") || group.logs[0];
+
+      return (
+        <ActivityItem key={`activity-${group.key}`}>
+          <ActivityGroupHeader>
+            <span>●</span>
+            <span>{primaryLog?.source === "skill" ? `技能：${primaryLog.name}` : primaryLog?.name || "活动日志"}</span>
+            <span style={{ marginLeft: "auto" }}>{group.timeLabel}</span>
+          </ActivityGroupHeader>
+          {gateLabel || sourceLabel ? (
+            <ActivityMeta>
+              {gateLabel ? `闸门：${gateLabel}` : ""}
+              {gateLabel && sourceLabel ? " · " : ""}
+              {sourceLabel ? `来源：${sourceLabel}` : ""}
+            </ActivityMeta>
+          ) : null}
+          {group.artifactPaths.length > 0 ? (
+            <ActivityMeta>
+              修改：{group.artifactPaths.join("、")}
+            </ActivityMeta>
+          ) : null}
+          <ActivityStepList>
+            {group.logs.map((log) => (
+              <ActivityStepItem key={log.id}>
+                <ActivityTitle>
+                  <span>•</span>
+                  <span>{log.name}</span>
+                  <span style={{ marginLeft: "auto" }}>{log.timeLabel}</span>
+                </ActivityTitle>
+                {log.inputSummary ? (
+                  <ActivityMeta>输入：{log.inputSummary}</ActivityMeta>
+                ) : null}
+                {log.outputSummary ? (
+                  <ActivityMeta>输出：{log.outputSummary}</ActivityMeta>
+                ) : null}
+              </ActivityStepItem>
+            ))}
+          </ActivityStepList>
+          <ActionRow>
+            {group.runId && onViewRunDetail ? (
+              <RunLinkButton
+                type="button"
+                onClick={() => onViewRunDetail(group.runId!)}
+              >
+                运行：{runLabel || group.runId}
+              </RunLinkButton>
+            ) : null}
+            {group.artifactPaths.map((artifactPath) => (
+              <React.Fragment key={`${group.key}-${artifactPath}`}>
+                <TinyButton
+                  type="button"
+                  aria-label={`定位活动产物路径-${artifactPath}`}
+                  onClick={() => {
+                    void handleRevealArtifactInFinder(artifactPath, group.sessionId || null);
+                  }}
+                >
+                  定位产物
+                </TinyButton>
+                <TinyButton
+                  type="button"
+                  aria-label={`打开活动产物路径-${artifactPath}`}
+                  onClick={() => {
+                    void handleOpenArtifactWithDefaultApp(artifactPath, group.sessionId || null);
+                  }}
+                >
+                  打开产物
+                </TinyButton>
+              </React.Fragment>
+            ))}
+          </ActionRow>
+        </ActivityItem>
+      );
+    },
+    [handleOpenArtifactWithDefaultApp, handleRevealArtifactInFinder, onViewRunDetail],
+  );
+
+  const activeRunStagesLabel = useMemo(() => {
+    if (runMetadataSummary.stages.length === 0) {
+      return null;
+    }
+    return runMetadataSummary.stages
+      .map((stage) => _formatStageLabelByKey(stage))
+      .join(" → ");
+  }, [runMetadataSummary.stages]);
 
   // ── 执行日志 entries（从 messages 解析）──
   interface ExecLogEntry {
@@ -2630,6 +2721,121 @@ function ThemeWorkbenchSidebarComponent({
                     ))
                   )}
                 </ActivityList>
+              ) : null}
+            </Section>
+
+            <Section>
+              <SectionTitle>
+                <span>活动日志</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <SectionBadge>{groupedActivityLogs.length}</SectionBadge>
+                  <button
+                    type="button"
+                    aria-label="切换活动日志"
+                    onClick={() => setShowActivityLogs((previous) => !previous)}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "hsl(var(--muted-foreground))",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {showActivityLogs ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  </button>
+                </span>
+              </SectionTitle>
+              {showActivityLogs ? (
+                <>
+                  <ActivityList className="custom-scrollbar">
+                    {groupedActivityLogs.length === 0 ? (
+                      <ActivityMeta>暂无活动日志</ActivityMeta>
+                    ) : (
+                      groupedActivityLogs.map((group) => renderActivityLogItem(group))
+                    )}
+                  </ActivityList>
+                  {activeRunDetailLoading ? (
+                    <ActivityMeta>运行详情加载中...</ActivityMeta>
+                  ) : activeRunDetail ? (
+                    <RunDetailPanel>
+                      <RunDetailTitle>运行详情</RunDetailTitle>
+                      <RunDetailRow>ID：{activeRunDetail.id}</RunDetailRow>
+                      <RunDetailRow>状态：{formatRunStatusLabel(activeRunDetail.status)}</RunDetailRow>
+                      {runMetadataSummary.workflow ? (
+                        <RunDetailRow>工作流：{runMetadataSummary.workflow}</RunDetailRow>
+                      ) : null}
+                      {runMetadataSummary.executionId ? (
+                        <RunDetailRow>执行ID：{runMetadataSummary.executionId}</RunDetailRow>
+                      ) : null}
+                      {runMetadataSummary.versionId ? (
+                        <RunDetailRow>版本ID：{runMetadataSummary.versionId}</RunDetailRow>
+                      ) : null}
+                      {activeRunStagesLabel ? (
+                        <RunDetailRow>阶段：{activeRunStagesLabel}</RunDetailRow>
+                      ) : null}
+                      <RunDetailActions>
+                        <RunDetailActionButton
+                          type="button"
+                          aria-label="复制运行ID"
+                          onClick={() => {
+                            void writeClipboardText(activeRunDetail.id);
+                          }}
+                        >
+                          复制运行ID
+                        </RunDetailActionButton>
+                        <RunDetailActionButton
+                          type="button"
+                          aria-label="复制运行元数据"
+                          onClick={() => {
+                            void writeClipboardText(runMetadataText);
+                          }}
+                        >
+                          复制运行元数据
+                        </RunDetailActionButton>
+                      </RunDetailActions>
+                      {runMetadataSummary.artifactPaths.length > 0 ? (
+                        <RunDetailArtifacts>
+                          {runMetadataSummary.artifactPaths.map((artifactPath) => (
+                            <RunDetailArtifactRow key={`run-detail-${artifactPath}`}>
+                              <RunDetailArtifactPath>
+                                {artifactPath}
+                              </RunDetailArtifactPath>
+                              <RunDetailActionButton
+                                type="button"
+                                aria-label={`复制产物路径-${artifactPath}`}
+                                onClick={() => {
+                                  void writeClipboardText(artifactPath);
+                                }}
+                              >
+                                复制路径
+                              </RunDetailActionButton>
+                              <RunDetailActionButton
+                                type="button"
+                                aria-label={`定位产物路径-${artifactPath}`}
+                                onClick={() => {
+                                  void handleRevealArtifactInFinder(artifactPath);
+                                }}
+                              >
+                                定位
+                              </RunDetailActionButton>
+                              <RunDetailActionButton
+                                type="button"
+                                aria-label={`打开产物路径-${artifactPath}`}
+                                onClick={() => {
+                                  void handleOpenArtifactWithDefaultApp(artifactPath);
+                                }}
+                              >
+                                打开
+                              </RunDetailActionButton>
+                            </RunDetailArtifactRow>
+                          ))}
+                        </RunDetailArtifacts>
+                      ) : null}
+                      <RunDetailCode>{runMetadataText}</RunDetailCode>
+                    </RunDetailPanel>
+                  ) : null}
+                </>
               ) : null}
             </Section>
           </>

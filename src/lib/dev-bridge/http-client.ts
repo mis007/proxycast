@@ -44,6 +44,10 @@ function isBridgeConnectionError(message: string): boolean {
   );
 }
 
+function isTestEnvironment(): boolean {
+  return Boolean(import.meta.env?.MODE === "test" || import.meta.env?.VITEST);
+}
+
 export function normalizeDevBridgeError(cmd: string, error: unknown): Error {
   const message = toErrorMessage(error);
 
@@ -68,6 +72,10 @@ export function normalizeDevBridgeError(cmd: string, error: unknown): Error {
  * @returns true 如果在 dev 模式且 Tauri 不可用
  */
 export function isDevBridgeAvailable(): boolean {
+  if (isTestEnvironment()) {
+    return false;
+  }
+
   // 检查是否在浏览器环境（非 Tauri webview）
   const isBrowser =
     typeof window !== "undefined" &&

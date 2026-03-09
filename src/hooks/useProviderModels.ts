@@ -42,6 +42,8 @@ interface FetchModelsResult {
   models: EnhancedModelMetadata[];
   source: "Api" | "LocalFallback";
   error: string | null;
+  request_url?: string | null;
+  diagnostic_hint?: string | null;
 }
 
 // ============================================================================

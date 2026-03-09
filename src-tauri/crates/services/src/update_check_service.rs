@@ -273,7 +273,6 @@ impl Default for UpdateCheckService {
 //         .show()
 //         .map_err(|e| format!("发送通知失败: {}", e))
 // }
-
 /// 更新检查服务状态包装器（用于 Tauri 状态管理）
 pub struct UpdateCheckServiceState(pub Arc<RwLock<UpdateCheckService>>);
 

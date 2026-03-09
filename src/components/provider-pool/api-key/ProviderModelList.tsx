@@ -58,6 +58,30 @@ interface FetchModelsResult {
   models: EnhancedModelMetadata[];
   source: "Api" | "LocalFallback";
   error: string | null;
+  request_url?: string | null;
+  diagnostic_hint?: string | null;
+}
+
+function buildApiDiagnosticLines(result: {
+  error: string | null;
+  request_url?: string | null;
+  diagnostic_hint?: string | null;
+}): string[] {
+  const lines: string[] = [];
+
+  if (result.error?.trim()) {
+    lines.push(result.error.trim());
+  }
+
+  if (result.request_url?.trim()) {
+    lines.push(`请求地址：${result.request_url.trim()}`);
+  }
+
+  if (result.diagnostic_hint?.trim()) {
+    lines.push(result.diagnostic_hint.trim());
+  }
+
+  return lines;
 }
 
 // ============================================================================
@@ -224,11 +248,17 @@ export const ProviderModelList: React.FC<ProviderModelListProps> = ({
     null,
   );
   const [apiError, setApiError] = useState<string | null>(null);
+  const [apiRequestUrl, setApiRequestUrl] = useState<string | null>(null);
+  const [apiDiagnosticHint, setApiDiagnosticHint] = useState<string | null>(
+    null,
+  );
 
   // 从 API 获取模型列表（自动获取 API Key）
   const handleRefreshFromApi = useCallback(async () => {
     setRefreshing(true);
     setApiError(null);
+    setApiRequestUrl(null);
+    setApiDiagnosticHint(null);
 
     try {
       const result = await invoke<FetchModelsResult>(
@@ -241,6 +271,8 @@ export const ProviderModelList: React.FC<ProviderModelListProps> = ({
       if (result && result.models) {
         setApiModels(result.models);
         setApiSource(result.source);
+        setApiRequestUrl(result.request_url ?? null);
+        setApiDiagnosticHint(result.diagnostic_hint ?? null);
         if (result.error) {
           setApiError(result.error);
         }
@@ -256,6 +288,11 @@ export const ProviderModelList: React.FC<ProviderModelListProps> = ({
 
   // 使用 API 模型或本地模型
   const displayModelsSource = apiModels ?? models;
+  const apiDiagnosticLines = buildApiDiagnosticLines({
+    error: apiError,
+    request_url: apiRequestUrl,
+    diagnostic_hint: apiDiagnosticHint,
+  });
 
   // 限制显示数量
   const displayModels = useMemo(() => {
@@ -345,7 +382,13 @@ export const ProviderModelList: React.FC<ProviderModelListProps> = ({
           )}
         </div>
         {apiError && (
-          <div className="text-xs text-amber-500 text-center">{apiError}</div>
+          <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-left text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+            {apiDiagnosticLines.map((line) => (
+              <div key={line} className="break-all leading-5">
+                {line}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -426,7 +469,13 @@ export const ProviderModelList: React.FC<ProviderModelListProps> = ({
 
       {/* API 错误提示 */}
       {apiError && (
-        <div className="text-xs text-amber-500 mb-2 px-1">{apiError}</div>
+        <div className="mb-2 rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+          {apiDiagnosticLines.map((line) => (
+            <div key={line} className="break-all leading-5">
+              {line}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* 模型列表 */}

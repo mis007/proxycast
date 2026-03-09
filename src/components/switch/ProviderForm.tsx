@@ -118,7 +118,7 @@ const presets: Record<AppType, ProviderPreset[]> = {
       websiteUrl: "https://www.volcengine.com/product/doubao",
       apiKeyUrl:
         "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
-      defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+      defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     },
     // 聚合服务
     {

@@ -38,7 +38,7 @@ jobs:
           - platform: macos-latest
             target: x86_64-apple-darwin
             name: macOS-x64
-          - platform: windows-latest
+          - platform: windows-2022
             target: x86_64-pc-windows-msvc
             name: Windows-x64
           - platform: ubuntu-22.04
@@ -182,7 +182,7 @@ jobs:
           args: --target ${{ matrix.target }}
 
       - name: Build Tauri app (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-2022'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -202,7 +202,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           # 默认不启用 voice feature（包含 whisper-rs，编译很慢）
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --config tauri.windows.conf.json
 
       - name: Build Tauri app (macOS with notarization, attempt 1)
         id: build_macos_primary

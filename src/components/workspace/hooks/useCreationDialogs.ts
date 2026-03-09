@@ -147,6 +147,38 @@ function parseCreationModeFromMetadata(metadata: unknown): CreationMode | null {
   return isCreationMode(mode) ? mode : null;
 }
 
+function parseContentTypeFromMetadata(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const record = metadata as Record<string, unknown>;
+  const creationIntent = record.creationIntent;
+  if (creationIntent && typeof creationIntent === "object") {
+    const contentType = (creationIntent as Record<string, unknown>).contentType;
+    if (typeof contentType === "string" && contentType.trim()) {
+      return contentType.trim();
+    }
+
+    const localizedContentType = (creationIntent as Record<string, unknown>)[
+      "输出体裁"
+    ];
+    if (
+      typeof localizedContentType === "string" &&
+      localizedContentType.trim()
+    ) {
+      return localizedContentType.trim();
+    }
+  }
+
+  const topLevelContentType = record.contentType;
+  if (typeof topLevelContentType === "string" && topLevelContentType.trim()) {
+    return topLevelContentType.trim();
+  }
+
+  return null;
+}
+
 function useWorkspaceProjectsRootLoader(
   setWorkspaceProjectsRoot: Dispatch<SetStateAction<string>>,
 ): void {
@@ -284,45 +316,89 @@ function useProjectPathConflictChecker({
   ]);
 }
 
-interface UseContentCreationModeLoaderParams {
+interface UseContentCreationMetadataLoaderParams {
   selectedContentId: string | null;
   contentCreationModes: Record<string, CreationMode>;
-  setContentCreationModes: Dispatch<SetStateAction<Record<string, CreationMode>>>;
+  setContentCreationModes: Dispatch<
+    SetStateAction<Record<string, CreationMode>>
+  >;
+  contentCreationTypes: Record<string, string>;
+  setContentCreationTypes: Dispatch<SetStateAction<Record<string, string>>>;
 }
 
-function useContentCreationModeLoader({
+function useContentCreationMetadataLoader({
   selectedContentId,
   contentCreationModes,
   setContentCreationModes,
-}: UseContentCreationModeLoaderParams): void {
+  contentCreationTypes,
+  setContentCreationTypes,
+}: UseContentCreationMetadataLoaderParams): void {
+  const attemptedContentIdsRef = useRef<Record<string, boolean>>({});
+
   useEffect(() => {
-    if (!selectedContentId || contentCreationModes[selectedContentId]) {
+    if (!selectedContentId) {
       return;
     }
 
+    if (
+      contentCreationModes[selectedContentId] &&
+      contentCreationTypes[selectedContentId]
+    ) {
+      attemptedContentIdsRef.current[selectedContentId] = true;
+      return;
+    }
+
+    if (attemptedContentIdsRef.current[selectedContentId]) {
+      return;
+    }
+
+    attemptedContentIdsRef.current[selectedContentId] = true;
+
     let mounted = true;
-    const loadCreationMode = async () => {
+    const loadCreationMetadata = async () => {
       try {
         const content = await getContent(selectedContentId);
         const mode = parseCreationModeFromMetadata(content?.metadata);
+        const contentType = parseContentTypeFromMetadata(content?.metadata);
 
         if (mounted && mode) {
-          setContentCreationModes((previous) => ({
-            ...previous,
-            [selectedContentId]: mode,
-          }));
+          setContentCreationModes((previous) =>
+            previous[selectedContentId] === mode
+              ? previous
+              : {
+                  ...previous,
+                  [selectedContentId]: mode,
+                },
+          );
+        }
+
+        if (mounted && contentType) {
+          setContentCreationTypes((previous) =>
+            previous[selectedContentId] === contentType
+              ? previous
+              : {
+                  ...previous,
+                  [selectedContentId]: contentType,
+                },
+          );
         }
       } catch (error) {
-        console.error("读取文稿创作模式失败:", error);
+        console.error("读取文稿创作元数据失败:", error);
       }
     };
 
-    void loadCreationMode();
+    void loadCreationMetadata();
 
     return () => {
       mounted = false;
     };
-  }, [contentCreationModes, selectedContentId, setContentCreationModes]);
+  }, [
+    contentCreationModes,
+    contentCreationTypes,
+    selectedContentId,
+    setContentCreationModes,
+    setContentCreationTypes,
+  ]);
 }
 
 export interface UseCreationDialogsParams {
@@ -389,16 +465,23 @@ export function useCreationDialogs({
   const [resolvedProjectPath, setResolvedProjectPath] = useState("");
   const [pathChecking, setPathChecking] = useState(false);
   const [pathConflictMessage, setPathConflictMessage] = useState("");
-  const [pendingInitialPromptsByContentId, setPendingInitialPromptsByContentId] =
-    useState<Record<string, string>>({});
-  const [pendingCreateConfirmationByProjectId, setPendingCreateConfirmationByProjectId] =
-    useState<Record<string, PendingCreateConfirmation>>({});
+  const [
+    pendingInitialPromptsByContentId,
+    setPendingInitialPromptsByContentId,
+  ] = useState<Record<string, string>>({});
+  const [
+    pendingCreateConfirmationByProjectId,
+    setPendingCreateConfirmationByProjectId,
+  ] = useState<Record<string, PendingCreateConfirmation>>({});
   const [contentCreationModes, setContentCreationModes] = useState<
     Record<string, CreationMode>
   >({});
-  const createConfirmationSubmittingProjectsRef = useRef<Record<string, boolean>>(
-    {},
-  );
+  const [contentCreationTypes, setContentCreationTypes] = useState<
+    Record<string, string>
+  >({});
+  const createConfirmationSubmittingProjectsRef = useRef<
+    Record<string, boolean>
+  >({});
   const initialCreateConfirmationAppliedRef = useRef(false);
 
   const resetProjectPathState = useCallback(() => {
@@ -412,17 +495,24 @@ export function useCreationDialogs({
       creationMode: createContentDialogState.selectedCreationMode,
       values: createContentDialogState.creationIntentValues,
     }),
-    [createContentDialogState.creationIntentValues, createContentDialogState.selectedCreationMode],
+    [
+      createContentDialogState.creationIntentValues,
+      createContentDialogState.selectedCreationMode,
+    ],
   );
 
   const currentCreationIntentFields = useMemo(
-    () => getCreationIntentFieldsSafe(createContentDialogState.selectedCreationMode),
+    () =>
+      getCreationIntentFieldsSafe(
+        createContentDialogState.selectedCreationMode,
+      ),
     [createContentDialogState.selectedCreationMode],
   );
 
   const currentIntentLength = useMemo(
     () =>
-      validateCreationIntent(creationIntentInput, minCreationIntentLength).length,
+      validateCreationIntent(creationIntentInput, minCreationIntentLength)
+        .length,
     [creationIntentInput, minCreationIntentLength],
   );
 
@@ -620,11 +710,15 @@ export function useCreationDialogs({
         if (!targetContentId) {
           onProjectCreated(projectId);
           await loadContents(projectId);
-          upsertPendingCreateConfirmation(projectId, "open_project_for_writing", {
-            initialUserPrompt: initialPrompt,
-            creationMode,
-            fallbackContentTitle: options?.fallbackContentTitle,
-          });
+          upsertPendingCreateConfirmation(
+            projectId,
+            "open_project_for_writing",
+            {
+              initialUserPrompt: initialPrompt,
+              creationMode,
+              fallbackContentTitle: options?.fallbackContentTitle,
+            },
+          );
           onEnterWorkspace("", { createEntryHome: true });
           return "";
         }
@@ -670,10 +764,14 @@ export function useCreationDialogs({
       return;
     }
     resetCreateContentDialogState();
-    upsertPendingCreateConfirmation(selectedProjectId, "workspace_create_entry", {
-      creationMode: defaultCreationMode,
-      preferredContentId: selectedContentId || undefined,
-    });
+    upsertPendingCreateConfirmation(
+      selectedProjectId,
+      "workspace_create_entry",
+      {
+        creationMode: defaultCreationMode,
+        preferredContentId: selectedContentId || undefined,
+      },
+    );
     onEnterWorkspace("", { createEntryHome: true });
   }, [
     defaultCreationMode,
@@ -689,10 +787,14 @@ export function useCreationDialogs({
       return;
     }
     resetCreateContentDialogState();
-    upsertPendingCreateConfirmation(selectedProjectId, "workspace_create_entry", {
-      creationMode: defaultCreationMode,
-      preferredContentId: selectedContentId || undefined,
-    });
+    upsertPendingCreateConfirmation(
+      selectedProjectId,
+      "workspace_create_entry",
+      {
+        creationMode: defaultCreationMode,
+        preferredContentId: selectedContentId || undefined,
+      },
+    );
     onEnterWorkspace("", { createEntryHome: true });
   }, [
     defaultCreationMode,
@@ -821,6 +923,15 @@ export function useCreationDialogs({
           ...previous,
           [created.id]: decision.creationMode,
         }));
+        const decisionContentType = parseContentTypeFromMetadata(
+          decision.metadata,
+        );
+        if (decisionContentType) {
+          setContentCreationTypes((previous) => ({
+            ...previous,
+            [created.id]: decisionContentType,
+          }));
+        }
 
         if (decision.initialUserPrompt) {
           setPendingInitialPromptsByContentId((previous) => ({
@@ -929,6 +1040,15 @@ export function useCreationDialogs({
         ...previous,
         [created.id]: createContentDialogState.selectedCreationMode,
       }));
+      const createdContentType = parseContentTypeFromMetadata(
+        creationIntentMetadata,
+      );
+      if (createdContentType) {
+        setContentCreationTypes((previous) => ({
+          ...previous,
+          [created.id]: createdContentType,
+        }));
+      }
       setPendingInitialPromptsByContentId((previous) => ({
         ...previous,
         [created.id]: initialUserPrompt,
@@ -985,10 +1105,12 @@ export function useCreationDialogs({
     setPathChecking,
     setPathConflictMessage,
   });
-  useContentCreationModeLoader({
+  useContentCreationMetadataLoader({
     selectedContentId,
     contentCreationModes,
     setContentCreationModes,
+    contentCreationTypes,
+    setContentCreationTypes,
   });
 
   useEffect(() => {
@@ -1046,6 +1168,7 @@ export function useCreationDialogs({
     pendingInitialPromptsByContentId,
     pendingCreateConfirmationByProjectId,
     contentCreationModes,
+    contentCreationTypes,
     resolvedProjectPath,
     pathChecking,
     pathConflictMessage,

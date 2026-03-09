@@ -93,7 +93,9 @@ export interface DocumentCanvasProps {
   /** 内容评审面板位置 */
   contentReviewPlacement?: "inline" | "external-rail";
   /** 文本风格化执行回调 */
-  onTextStylizeRun?: (payload: TextStylizeRunPayload) => Promise<string> | string;
+  onTextStylizeRun?: (
+    payload: TextStylizeRunPayload,
+  ) => Promise<string> | string;
 }
 
 /**
@@ -198,6 +200,8 @@ export interface DocumentToolbarProps {
   onImportDocument?: () => Promise<void> | void;
   /** 文本风格化动作 */
   onTextStylize?: () => void;
+  /** 文本风格化当前来源说明 */
+  textStylizeSourceLabel?: string;
   /** 内容评审动作 */
   onContentReview?: () => void;
   /** 内容评审是否已打开 */

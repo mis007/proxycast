@@ -6,12 +6,10 @@ import { Inputbar } from "./index";
 import type { Character } from "@/lib/api/memory";
 import type { Skill } from "@/lib/api/skills";
 
-const mockCharacterMention = vi.fn<
-  (props: {
-    characters?: Character[];
-    skills?: Skill[];
-  }) => React.ReactNode
->();
+const mockCharacterMention =
+  vi.fn<
+    (props: { characters?: Character[]; skills?: Skill[] }) => React.ReactNode
+  >();
 const mockInputbarCore = vi.fn(
   (props: {
     onToolClick?: (tool: string) => void;
@@ -34,7 +32,11 @@ const mockInputbarCore = vi.fn(
       <span data-testid="web-search-state">
         {props.activeTools?.web_search ? "on" : "off"}
       </span>
-      <button type="button" data-testid="send-btn" onClick={() => props.onSend?.()}>
+      <button
+        type="button"
+        data-testid="send-btn"
+        onClick={() => props.onSend?.()}
+      >
         发送
       </button>
       <div data-testid="right-extra">{props.rightExtra}</div>
@@ -57,10 +59,7 @@ vi.mock("./components/InputbarCore", () => ({
 }));
 
 vi.mock("./components/CharacterMention", () => ({
-  CharacterMention: (props: {
-    characters?: Character[];
-    skills?: Skill[];
-  }) => {
+  CharacterMention: (props: { characters?: Character[]; skills?: Skill[] }) => {
     mockCharacterMention(props);
     return <div data-testid="character-mention-stub" />;
   },
@@ -91,11 +90,15 @@ vi.mock("@/lib/dev-bridge", () => ({
 }));
 
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Select: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   SelectContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  SelectItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) => (
     <button type="button">{children}</button>
   ),
@@ -169,7 +172,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderInputbar(props?: Partial<React.ComponentProps<typeof Inputbar>>) {
+function renderInputbar(
+  props?: Partial<React.ComponentProps<typeof Inputbar>>,
+) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -198,11 +203,15 @@ describe("Inputbar", () => {
       await Promise.resolve();
     });
 
-    const mention = container.querySelector('[data-testid="character-mention-stub"]');
+    const mention = container.querySelector(
+      '[data-testid="character-mention-stub"]',
+    );
     expect(mention).toBeTruthy();
     expect(mockCharacterMention.mock.calls.length).toBeGreaterThan(0);
     const latestCall =
-      mockCharacterMention.mock.calls[mockCharacterMention.mock.calls.length - 1][0];
+      mockCharacterMention.mock.calls[
+        mockCharacterMention.mock.calls.length - 1
+      ][0];
     expect(latestCall.characters).toEqual([]);
     expect(latestCall.skills).toEqual([]);
   });
@@ -331,7 +340,7 @@ describe("Inputbar", () => {
     expect(latestCall.toolMode).toBe("attach-only");
     expect(latestCall.showTranslate).toBe(false);
     expect(latestCall.placeholder).toContain("试着输入任何指令");
-    expect(latestCall.rightExtra).toBeUndefined();
+    expect(latestCall.rightExtra).toBeDefined();
   });
 
   it("主题工作台在待启动状态下不应显示闸门条", async () => {
@@ -376,13 +385,15 @@ describe("Inputbar", () => {
     expect(container.textContent).not.toContain("当前闸门");
     expect(container.textContent).not.toContain("请选择优先推进的选题方向。");
 
-    const quickActionButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("生成 3 个选题"),
-    );
+    const quickActionButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("生成 3 个选题"));
     expect(quickActionButton).toBeTruthy();
 
     act(() => {
-      quickActionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      quickActionButton?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
 
     expect(setInput).toHaveBeenCalledWith(
@@ -438,9 +449,9 @@ describe("Inputbar", () => {
 
     expect(container.textContent).toContain("检索项目素材");
 
-    const collapseButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.getAttribute("aria-label") === "折叠待办列表",
-    );
+    const collapseButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.getAttribute("aria-label") === "折叠待办列表");
     expect(collapseButton).toBeTruthy();
 
     act(() => {
@@ -497,8 +508,9 @@ describe("Inputbar", () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('[data-testid="inputbar-core"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="inputbar-core"]'),
+    ).toBeTruthy();
     expect(container.textContent).not.toContain("正在生成中");
   });
-
 });

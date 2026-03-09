@@ -156,6 +156,25 @@ const defaultMocks: Record<string, any> = {
   },
   get_available_models: () => [],
   get_hint_routes: () => [],
+  get_windows_startup_diagnostics: () => ({
+    platform: "mock-web",
+    app_data_dir: null,
+    legacy_proxycast_dir: null,
+    db_path: null,
+    webview2_version: null,
+    current_exe: null,
+    current_dir: null,
+    resource_dir: null,
+    home_dir: null,
+    shell_env: null,
+    comspec_env: null,
+    resolved_terminal_shell: null,
+    installation_kind_guess: null,
+    checks: [],
+    has_blocking_issues: false,
+    has_warnings: false,
+    summary_message: null,
+  }),
 
   // 服务器相关
   get_server_status: () => ({
@@ -338,6 +357,15 @@ const defaultMocks: Record<string, any> = {
       complete_total: 0,
       remove_total: 0,
     },
+  }),
+  get_log_storage_diagnostics: () => ({
+    log_directory: "/tmp/proxycast/logs",
+    current_log_path: "/tmp/proxycast/logs/proxycast.log",
+    current_log_exists: true,
+    current_log_size_bytes: 1024,
+    in_memory_log_count: 0,
+    related_log_files: [],
+    raw_response_files: [],
   }),
   start_server: () => "Server started (mock)",
   stop_server: () => "Server stopped (mock)",
@@ -923,7 +951,17 @@ const defaultMocks: Record<string, any> = {
 
   // Log 相关
   get_logs: () => [],
+  get_persisted_logs_tail: () => [],
+  export_support_bundle: () => ({
+    bundle_path: "mock://ProxyCast-Support.zip",
+    output_directory: "mock://",
+    generated_at: new Date().toISOString(),
+    platform: "mock-web",
+    included_sections: ["meta/manifest.json"],
+    omitted_sections: ["config 内容", "数据库内容"],
+  }),
   clear_logs: () => ({}),
+  clear_diagnostic_log_history: () => ({}),
 
   // Test 相关
   test_api: () => ({
@@ -1116,10 +1154,24 @@ const defaultMocks: Record<string, any> = {
     updated_at: new Date().toISOString(),
   }),
   content_workflow_get_by_content: () => null,
+  content_workflow_create: () => null,
   content_get_theme_workbench_document_state: () => null,
 
   // Workspace 相关
   workspace_list: () => [],
+  workspace_get: (args: any) => ({
+    id: args?.id ?? "mock-workspace",
+    name: args?.id ?? "Mock Workspace",
+    workspaceType: "general",
+    rootPath: `/mock/workspace/${args?.id ?? "mock-workspace"}`,
+    isDefault: false,
+    settings: {},
+    isFavorite: false,
+    isArchived: false,
+    tags: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }),
   workspace_get_default: () => null,
   workspace_set_default: () => ({}),
   workspace_get_by_path: () => null,
@@ -1169,7 +1221,9 @@ export async function invoke<T = any>(
       return await invokeViaHttp<T>(cmd, args);
     } catch (error) {
       if (cmd in defaultMocks) {
-        console.warn(`[Mock] Bridge unavailable or unsupported, fallback to mock: ${cmd}`);
+        console.warn(
+          `[Mock] Bridge unavailable or unsupported, fallback to mock: ${cmd}`,
+        );
         return defaultMocks[cmd](args);
       }
       throw normalizeDevBridgeError(cmd, error);

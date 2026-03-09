@@ -121,6 +121,10 @@ brew install --cask proxycast
 
 从 [Releases](https://github.com/aiclientproxy/proxycast/releases) 下载对应平台安装包。
 
+- Windows 用户优先下载 `ProxyCast_*_x64-setup.exe`（NSIS 安装器）
+- 该安装器已内置 WebView2 Offline Installer，弱网/离线环境成功率更高
+- 如被 SmartScreen 拦截，属于未签名或签名信誉不足的 Windows 常见提示，不代表安装包必然损坏
+
 ---
 
 ## 🧭 适合谁

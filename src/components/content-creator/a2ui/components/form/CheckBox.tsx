@@ -5,6 +5,7 @@
 
 import type { CheckBoxComponent, A2UIFormData } from "../../types";
 import { resolveDynamicValue } from "../../parser";
+import { A2UI_FORM_TOKENS } from "../../taskFormTokens";
 
 interface CheckBoxRendererProps {
   component: CheckBoxComponent;
@@ -25,14 +26,14 @@ export function CheckBoxRenderer({
     Boolean(resolveDynamicValue(component.value, data, false));
 
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className={A2UI_FORM_TOKENS.checkboxRow}>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onFormChange(component.id, e.target.checked)}
-        className="w-4 h-4 rounded border-gray-300"
+        className={A2UI_FORM_TOKENS.checkboxInput}
       />
-      <span className="text-sm">{label}</span>
+      <span className={A2UI_FORM_TOKENS.checkboxText}>{label}</span>
     </label>
   );
 }

@@ -15,7 +15,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use parking_lot::RwLock;
@@ -58,7 +58,7 @@ impl BlockFile {
     /// - `Err(TerminalError)`: 创建失败
     ///
     /// _Requirements: 3.1, 3.3_
-    pub fn new(block_id: &str, base_dir: &PathBuf, max_size: usize) -> Result<Self, TerminalError> {
+    pub fn new(block_id: &str, base_dir: &Path, max_size: usize) -> Result<Self, TerminalError> {
         let file_path = base_dir.join(format!("{block_id}.block"));
 
         // 确保目录存在
@@ -82,6 +82,7 @@ impl BlockFile {
         // 打开或创建文件
         let file = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(&file_path)

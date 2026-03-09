@@ -1,4 +1,5 @@
 import { MaterialTab, PublishTab, SettingsTab, TemplateTab } from "@/components/projects/tabs";
+import { StyleGuidePanel } from "@/components/projects/memory/StyleGuidePanel";
 import type { ThemeWorkspaceRendererProps } from "@/features/themes/types";
 
 export function DefaultMaterialPanel({
@@ -17,6 +18,16 @@ export function DefaultTemplatePanel({
     return null;
   }
   return <TemplateTab projectId={projectId} />;
+}
+
+
+export function DefaultStylePanel({
+  projectId,
+}: ThemeWorkspaceRendererProps) {
+  if (!projectId) {
+    return null;
+  }
+  return <StyleGuidePanel projectId={projectId} />;
 }
 
 export function DefaultPublishPanel({

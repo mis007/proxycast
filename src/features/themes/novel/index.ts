@@ -2,6 +2,7 @@ import type { ThemeModule } from "@/features/themes/types";
 import {
   DefaultMaterialPanel,
   DefaultSettingsPanel,
+  DefaultStylePanel,
   DefaultTemplatePanel,
 } from "@/features/themes/shared/panelRenderers";
 import {
@@ -26,6 +27,7 @@ export const novelThemeModule: ThemeModule = {
       { key: "workflow", label: "流程" },
       { key: "material", label: "素材" },
       { key: "template", label: "排版" },
+      { key: "style", label: "风格" },
       { key: "publish", label: "发布" },
       { key: "settings", label: "设置" },
     ],
@@ -35,6 +37,7 @@ export const novelThemeModule: ThemeModule = {
     workflow: NovelWorkflowPanel,
     material: DefaultMaterialPanel,
     template: DefaultTemplatePanel,
+    style: DefaultStylePanel,
     publish: NovelPublishPanel,
     settings: DefaultSettingsPanel,
   },

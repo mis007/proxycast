@@ -8,6 +8,7 @@ export type ThemeWorkspaceView =
   | "workflow"
   | "material"
   | "template"
+  | "style"
   | "publish"
   | "settings";
 
@@ -72,6 +73,7 @@ export interface ThemePanelRenderers {
   workflow?: ComponentType<ThemeWorkspaceRendererProps>;
   material?: ComponentType<ThemeWorkspaceRendererProps>;
   template?: ComponentType<ThemeWorkspaceRendererProps>;
+  style?: ComponentType<ThemeWorkspaceRendererProps>;
   publish?: ComponentType<ThemeWorkspaceRendererProps>;
   settings?: ComponentType<ThemeWorkspaceRendererProps>;
 }

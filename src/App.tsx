@@ -18,10 +18,12 @@ import { SettingsPageV2 } from "./components/settings-v2";
 import { ToolsPage } from "./components/tools/ToolsPage";
 import { ResourcesPage } from "./components/resources";
 import { MemoryPage } from "./components/memory";
+import { StylePage } from "./components/style";
 import { AgentChatPage } from "./components/agent";
 import { PluginsPage } from "./components/plugins/PluginsPage";
 import { ImageGenPage } from "./components/image-gen";
 import { BatchPage } from "./components/batch";
+import { OpenClawPage } from "./components/openclaw";
 import { RecentImageInsertFloating } from "./components/image-gen/RecentImageInsertFloating";
 import { CreateProjectDialog } from "./components/projects/CreateProjectDialog";
 import { WorkbenchPage } from "./components/workspace";
@@ -51,10 +53,13 @@ import {
   getThemeWorkspacePage,
   isThemeWorkspacePage,
   LAST_THEME_WORKSPACE_PAGE_STORAGE_KEY,
+  MemoryPageParams,
+  OpenClawPageParams,
   Page,
   PageParams,
   ProjectDetailPageParams,
   SettingsPageParams,
+  StylePageParams,
   ThemeWorkspacePage,
   WorkspaceTheme,
 } from "./types/page";
@@ -107,6 +112,42 @@ const THEME_WORKSPACE_PAGES: ThemeWorkspacePage[] = [
   "workspace-novel",
 ];
 
+interface WindowsStartupDiagnostics {
+  platform: string;
+  app_data_dir?: string | null;
+  legacy_proxycast_dir?: string | null;
+  db_path?: string | null;
+  webview2_version?: string | null;
+  checks: Array<{
+    key: string;
+    status: string;
+    message: string;
+    detail?: string | null;
+  }>;
+  has_blocking_issues: boolean;
+  has_warnings: boolean;
+  summary_message?: string | null;
+}
+
+function isTauriDesktopEnvironment(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const tauri = (window as any).__TAURI__;
+  return !!(tauri?.core?.invoke || tauri?.invoke);
+}
+
+function isWindowsNavigatorPlatform(): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+  return /win/i.test(platform) || /windows/i.test(userAgent);
+}
+
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [currentPage, setCurrentPage] = useState<Page>("agent");
@@ -148,6 +189,16 @@ function AppContent() {
 
   const handleNavigate = useCallback(
     (page: Page, params?: PageParams) => {
+      if (
+        page === "memory" &&
+        (params as { section?: string } | undefined)?.section ===
+          "style-library"
+      ) {
+        setCurrentPage("style");
+        setPageParams({ section: "library" } as StylePageParams);
+        return;
+      }
+
       if (page === "workspace") {
         setCurrentPage("agent");
         setPageParams(
@@ -227,6 +278,10 @@ function AppContent() {
             ? { projectId: projectParams.projectId }
             : {}),
           workspaceViewMode,
+          workspaceOpenProjectStyleGuide:
+            projectParams?.openProjectStyleGuide ?? false,
+          workspaceOpenProjectStyleGuideSourceEntryId:
+            projectParams?.openProjectStyleGuideSourceEntryId,
         });
         return;
       }
@@ -327,6 +382,39 @@ function AppContent() {
   }, [registryError]);
 
   useEffect(() => {
+    if (!isTauriDesktopEnvironment() || !isWindowsNavigatorPlatform()) {
+      return;
+    }
+
+    void safeInvoke<WindowsStartupDiagnostics>(
+      "get_windows_startup_diagnostics",
+    )
+      .then((diagnostics) => {
+        if (!diagnostics.summary_message) {
+          return;
+        }
+
+        if (diagnostics.has_blocking_issues) {
+          toast.error("Windows 启动自检发现阻塞问题", {
+            description: diagnostics.summary_message,
+            duration: 12000,
+          });
+          return;
+        }
+
+        if (diagnostics.has_warnings) {
+          toast.warning("Windows 环境检测提示", {
+            description: diagnostics.summary_message,
+            duration: 8000,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn("[App] 获取 Windows 启动诊断失败:", error);
+      });
+  }, []);
+
+  useEffect(() => {
     void safeInvoke<{
       workspaceId: string;
       rootPath: string;
@@ -388,8 +476,19 @@ function AppContent() {
           theme={theme}
           viewMode={(pageParams as AgentPageParams).workspaceViewMode}
           resetAt={(pageParams as AgentPageParams).workspaceResetAt}
-          initialCreatePrompt={(pageParams as AgentPageParams).workspaceCreatePrompt}
-          initialCreateSource={(pageParams as AgentPageParams).workspaceCreateSource}
+          initialStyleGuideDialogOpen={
+            (pageParams as AgentPageParams).workspaceOpenProjectStyleGuide
+          }
+          initialStyleGuideSourceEntryId={
+            (pageParams as AgentPageParams)
+              .workspaceOpenProjectStyleGuideSourceEntryId
+          }
+          initialCreatePrompt={
+            (pageParams as AgentPageParams).workspaceCreatePrompt
+          }
+          initialCreateSource={
+            (pageParams as AgentPageParams).workspaceCreateSource
+          }
           initialCreateFallbackTitle={
             (pageParams as AgentPageParams).workspaceCreateFallbackTitle
           }
@@ -494,11 +593,42 @@ function AppContent() {
           style={{
             flex: 1,
             minHeight: 0,
+            display: currentPage === "style" ? "flex" : "none",
+            flexDirection: "column",
+          }}
+        >
+          <StylePage
+            onNavigate={handleNavigate}
+            pageParams={pageParams as StylePageParams}
+          />
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
             display: currentPage === "memory" ? "flex" : "none",
             flexDirection: "column",
           }}
         >
-          <MemoryPage onNavigate={handleNavigate} />
+          <MemoryPage
+            onNavigate={handleNavigate}
+            pageParams={pageParams as MemoryPageParams}
+          />
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: currentPage === "openclaw" ? "flex" : "none",
+            flexDirection: "column",
+          }}
+        >
+          <OpenClawPage
+            onNavigate={handleNavigate}
+            pageParams={pageParams as OpenClawPageParams}
+          />
         </div>
 
         <div
@@ -550,14 +680,19 @@ function AppContent() {
     !isThemeWorkspacePage(currentPage) &&
     !shouldHideSidebarForAgent;
 
-  const shouldAddMainContentGap = shouldShowAppSidebar && currentPage === "agent";
+  const shouldAddMainContentGap =
+    shouldShowAppSidebar && currentPage === "agent";
 
   return (
     <SoundProvider>
       <ComponentDebugProvider>
         <AppContainer>
           {shouldShowAppSidebar && (
-            <AppSidebar currentPage={currentPage} onNavigate={handleNavigate} />
+            <AppSidebar
+              currentPage={currentPage}
+              currentPageParams={pageParams}
+              onNavigate={handleNavigate}
+            />
           )}
           <MainContent $withSidebarGap={shouldAddMainContentGap}>
             {renderAllPages()}

@@ -1,28 +1,48 @@
-import type {
-  CrashReportingConfig,
-  LogEntry,
+import {
+  clearDiagnosticLogHistory,
+  getConfig,
+  type Config,
+  type CrashReportingConfig,
+  type LogStorageDiagnostics,
+  type LogEntry,
+  type ServerDiagnostics,
+  type WindowsStartupDiagnostics,
 } from "@/hooks/useTauri";
 import {
+  apiKeyProviderApi,
+  type ProviderWithKeysDisplay,
+} from "@/lib/api/apiKeyProvider";
+import { mcpApi, type McpServerInfo } from "@/lib/api/mcp";
+import {
+  getThemeWorkbenchDocumentState,
+  type ThemeWorkbenchDocumentState,
+} from "@/lib/api/project";
+import {
+  providerPoolApi,
+  type ProviderPoolOverview,
+} from "@/lib/api/providerPool";
+import { getActiveContentTarget } from "@/lib/activeContentTarget";
+import { getRuntimeAppVersion } from "@/lib/appVersion";
+import {
+  clearFrontendCrashBuffer,
+  getFrontendCrashBuffer,
+  type FrontendCrashBufferEntry,
+} from "@/lib/crashReporting";
+import {
+  clearInvokeErrorBuffer,
+  clearInvokeTraceBuffer,
   getInvokeErrorBuffer,
   getInvokeTraceBuffer,
   safeInvoke,
   type InvokeErrorBufferEntry,
   type InvokeTraceBufferEntry,
 } from "@/lib/dev-bridge";
-import { getRuntimeAppVersion } from "@/lib/appVersion";
+import { listTerminalSessions, type SessionMetadata } from "@/lib/terminal-api";
 import {
-  getFrontendCrashBuffer,
-  type FrontendCrashBufferEntry,
-} from "@/lib/crashReporting";
-import {
+  clearWorkspaceRepairHistory,
   getWorkspaceRepairHistory,
   type WorkspaceRepairRecord,
 } from "@/lib/workspaceHealthTelemetry";
-import { getActiveContentTarget } from "@/lib/activeContentTarget";
-import {
-  getThemeWorkbenchDocumentState,
-  type ThemeWorkbenchDocumentState,
-} from "@/lib/api/project";
 
 export interface CrashDiagnosticPayload {
   generated_at: string;
@@ -39,9 +59,105 @@ export interface CrashDiagnosticPayload {
   invoke_error_buffer?: InvokeErrorBufferEntry[];
   invoke_trace_buffer?: InvokeTraceBufferEntry[];
   persisted_log_tail?: LogEntry[];
+  server_diagnostics?: ServerDiagnostics | null;
+  log_storage_diagnostics?: LogStorageDiagnostics | null;
+  windows_startup_diagnostics?: WindowsStartupDiagnostics | null;
+  runtime_snapshot?: RuntimeDiagnosticSnapshot | null;
   workspace_repair_history?: WorkspaceRepairRecord[];
   theme_workbench_document_state?: ThemeWorkbenchDocumentState | null;
   diagnostic_collection_notes?: string[];
+}
+
+export interface RuntimeConfigSummary {
+  default_provider: string;
+  server_host: string;
+  server_port: number;
+  tls_enabled: boolean;
+  response_cache_enabled: boolean;
+  remote_management_allow_remote: boolean;
+  minimize_to_tray: boolean;
+  language: string;
+  proxy_configured: boolean;
+  gateway_tunnel_enabled: boolean;
+  crash_reporting_enabled: boolean;
+}
+
+export interface ProviderPoolProviderSummary {
+  provider_type: string;
+  total: number;
+  healthy: number;
+  unhealthy: number;
+  disabled: number;
+}
+
+export interface ProviderPoolDiagnosticSummary {
+  total_provider_types: number;
+  total_credentials: number;
+  healthy_credentials: number;
+  unhealthy_credentials: number;
+  disabled_credentials: number;
+  providers: ProviderPoolProviderSummary[];
+}
+
+export interface ApiKeyProviderEntrySummary {
+  id: string;
+  type: string;
+  enabled: boolean;
+  is_system: boolean;
+  api_key_count: number;
+  enabled_api_key_count: number;
+  custom_model_count: number;
+}
+
+export interface ApiKeyProviderDiagnosticSummary {
+  total_providers: number;
+  enabled_providers: number;
+  system_providers: number;
+  custom_providers: number;
+  total_api_keys: number;
+  enabled_api_keys: number;
+  disabled_api_keys: number;
+  providers: ApiKeyProviderEntrySummary[];
+}
+
+export interface McpServerEntrySummary {
+  name: string;
+  is_running: boolean;
+  enabled_proxycast: boolean;
+  enabled_claude: boolean;
+  enabled_codex: boolean;
+  enabled_gemini: boolean;
+}
+
+export interface McpDiagnosticSummary {
+  total_servers: number;
+  running_servers: number;
+  enabled_proxycast: number;
+  enabled_claude: number;
+  enabled_codex: number;
+  enabled_gemini: number;
+  servers: McpServerEntrySummary[];
+}
+
+export interface TerminalDiagnosticSummary {
+  total_sessions: number;
+  connecting_sessions: number;
+  running_sessions: number;
+  done_sessions: number;
+  error_sessions: number;
+}
+
+export interface RuntimeDiagnosticSnapshot {
+  config_summary?: RuntimeConfigSummary | null;
+  provider_pool_summary?: ProviderPoolDiagnosticSummary | null;
+  api_key_provider_summary?: ApiKeyProviderDiagnosticSummary | null;
+  mcp_summary?: McpDiagnosticSummary | null;
+  terminal_summary?: TerminalDiagnosticSummary | null;
+}
+
+export interface RuntimeDiagnosticCollectionResult {
+  runtimeSnapshot: RuntimeDiagnosticSnapshot | null;
+  collectionNotes: string[];
 }
 
 export type DesktopPlatform = "macos" | "windows" | "linux" | "unknown";
@@ -67,6 +183,12 @@ export interface OpenDownloadDirectoryResult {
   openedPath: string;
 }
 
+export const CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT = [
+  "确认清空旧诊断信息吗？",
+  "这会删除本地崩溃缓存、调用轨迹、Workspace 修复记录，以及历史日志文件与原始响应文件。",
+  "此操作不可恢复。",
+].join("\n");
+
 export const DEFAULT_CRASH_REPORTING_CONFIG: CrashReportingConfig = {
   enabled: true,
   dsn: null,
@@ -82,8 +204,7 @@ export function normalizeCrashReportingConfig(
     enabled: config?.enabled ?? DEFAULT_CRASH_REPORTING_CONFIG.enabled,
     dsn: config?.dsn ?? DEFAULT_CRASH_REPORTING_CONFIG.dsn,
     environment:
-      config?.environment?.trim() ||
-      DEFAULT_CRASH_REPORTING_CONFIG.environment,
+      config?.environment?.trim() || DEFAULT_CRASH_REPORTING_CONFIG.environment,
     sample_rate:
       typeof config?.sample_rate === "number" &&
       Number.isFinite(config.sample_rate)
@@ -124,6 +245,349 @@ interface BuildCrashDiagnosticPayloadParams {
   maxPersistedLogs?: number;
   maxWorkspaceRepairs?: number;
   themeWorkbenchDocumentState?: ThemeWorkbenchDocumentState | null;
+  serverDiagnostics?: ServerDiagnostics | null;
+  logStorageDiagnostics?: LogStorageDiagnostics | null;
+  windowsStartupDiagnostics?: WindowsStartupDiagnostics | null;
+  runtimeSnapshot?: RuntimeDiagnosticSnapshot | null;
+}
+
+function buildRuntimeConfigSummary(config: Config): RuntimeConfigSummary {
+  return {
+    default_provider: config.default_provider,
+    server_host: config.server.host,
+    server_port: config.server.port,
+    tls_enabled: Boolean(config.server.tls?.enable),
+    response_cache_enabled: Boolean(config.server.response_cache?.enabled),
+    remote_management_allow_remote: Boolean(
+      config.remote_management?.allow_remote,
+    ),
+    minimize_to_tray: Boolean(config.minimize_to_tray),
+    language: config.language || "unknown",
+    proxy_configured: Boolean(config.proxy_url?.trim()),
+    gateway_tunnel_enabled: Boolean(config.gateway?.tunnel?.enabled),
+    crash_reporting_enabled: Boolean(
+      config.crash_reporting?.enabled ?? DEFAULT_CRASH_REPORTING_CONFIG.enabled,
+    ),
+  };
+}
+
+function buildProviderPoolSummary(
+  overviews: ProviderPoolOverview[],
+): ProviderPoolDiagnosticSummary {
+  const providers = overviews.map((overview) => ({
+    provider_type: overview.provider_type,
+    total: overview.stats.total,
+    healthy: overview.stats.healthy,
+    unhealthy: overview.stats.unhealthy,
+    disabled: overview.stats.disabled,
+  }));
+
+  return {
+    total_provider_types: providers.length,
+    total_credentials: providers.reduce((sum, item) => sum + item.total, 0),
+    healthy_credentials: providers.reduce((sum, item) => sum + item.healthy, 0),
+    unhealthy_credentials: providers.reduce(
+      (sum, item) => sum + item.unhealthy,
+      0,
+    ),
+    disabled_credentials: providers.reduce(
+      (sum, item) => sum + item.disabled,
+      0,
+    ),
+    providers,
+  };
+}
+
+function buildApiKeyProviderSummary(
+  providers: ProviderWithKeysDisplay[],
+): ApiKeyProviderDiagnosticSummary {
+  const providerSummaries = providers.map((provider) => {
+    const enabledApiKeyCount = provider.api_keys.filter(
+      (item) => item.enabled,
+    ).length;
+    return {
+      id: provider.id,
+      type: provider.type,
+      enabled: provider.enabled,
+      is_system: provider.is_system,
+      api_key_count: provider.api_keys.length,
+      enabled_api_key_count: enabledApiKeyCount,
+      custom_model_count: provider.custom_models?.length ?? 0,
+    };
+  });
+
+  const totalApiKeys = providerSummaries.reduce(
+    (sum, item) => sum + item.api_key_count,
+    0,
+  );
+  const enabledApiKeys = providerSummaries.reduce(
+    (sum, item) => sum + item.enabled_api_key_count,
+    0,
+  );
+
+  return {
+    total_providers: providerSummaries.length,
+    enabled_providers: providerSummaries.filter((item) => item.enabled).length,
+    system_providers: providerSummaries.filter((item) => item.is_system).length,
+    custom_providers: providerSummaries.filter((item) => !item.is_system)
+      .length,
+    total_api_keys: totalApiKeys,
+    enabled_api_keys: enabledApiKeys,
+    disabled_api_keys: totalApiKeys - enabledApiKeys,
+    providers: providerSummaries,
+  };
+}
+
+function buildMcpSummary(servers: McpServerInfo[]): McpDiagnosticSummary {
+  const serverSummaries = servers.map((server) => ({
+    name: server.name,
+    is_running: server.is_running,
+    enabled_proxycast: server.enabled_proxycast,
+    enabled_claude: server.enabled_claude,
+    enabled_codex: server.enabled_codex,
+    enabled_gemini: server.enabled_gemini,
+  }));
+
+  return {
+    total_servers: serverSummaries.length,
+    running_servers: serverSummaries.filter((item) => item.is_running).length,
+    enabled_proxycast: serverSummaries.filter((item) => item.enabled_proxycast)
+      .length,
+    enabled_claude: serverSummaries.filter((item) => item.enabled_claude)
+      .length,
+    enabled_codex: serverSummaries.filter((item) => item.enabled_codex).length,
+    enabled_gemini: serverSummaries.filter((item) => item.enabled_gemini)
+      .length,
+    servers: serverSummaries,
+  };
+}
+
+function buildTerminalSummary(
+  sessions: SessionMetadata[],
+): TerminalDiagnosticSummary {
+  return {
+    total_sessions: sessions.length,
+    connecting_sessions: sessions.filter((item) => item.status === "connecting")
+      .length,
+    running_sessions: sessions.filter((item) => item.status === "running")
+      .length,
+    done_sessions: sessions.filter((item) => item.status === "done").length,
+    error_sessions: sessions.filter((item) => item.status === "error").length,
+  };
+}
+
+function normalizeDiagnosticErrorMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const compactMessage = rawMessage.replace(/\s+/g, " ").trim();
+  if (!compactMessage) {
+    return "未知错误";
+  }
+  if (compactMessage.length <= 160) {
+    return compactMessage;
+  }
+  return `${compactMessage.slice(0, 157)}...`;
+}
+
+function buildCollectionFailureNote(
+  fieldName: string,
+  commandName: string,
+  error: unknown,
+): string {
+  return `${fieldName}（${commandName}）未采集到：${normalizeDiagnosticErrorMessage(error)}。`;
+}
+
+function hasRuntimeSnapshotData(snapshot: RuntimeDiagnosticSnapshot): boolean {
+  return Boolean(
+    snapshot.config_summary ||
+      snapshot.provider_pool_summary ||
+      snapshot.api_key_provider_summary ||
+      snapshot.mcp_summary ||
+      snapshot.terminal_summary,
+  );
+}
+
+export async function collectRuntimeSnapshotForDiagnostic(
+  config?: Config | null,
+): Promise<RuntimeDiagnosticCollectionResult> {
+  const configTask = config ? Promise.resolve(config) : getConfig();
+  const [
+    configResult,
+    providerPoolResult,
+    apiKeyProviderResult,
+    mcpResult,
+    terminalResult,
+  ] = await Promise.allSettled([
+    configTask,
+    providerPoolApi.getOverview(),
+    apiKeyProviderApi.getProviders(),
+    mcpApi.listServersWithStatus(),
+    listTerminalSessions(),
+  ]);
+
+  const snapshot: RuntimeDiagnosticSnapshot = {};
+  const collectionNotes: string[] = [];
+
+  if (configResult.status === "fulfilled") {
+    snapshot.config_summary = buildRuntimeConfigSummary(configResult.value);
+  } else {
+    snapshot.config_summary = null;
+    collectionNotes.push(
+      buildCollectionFailureNote(
+        "runtime_snapshot.config_summary",
+        "get_config",
+        configResult.reason,
+      ),
+    );
+  }
+
+  if (providerPoolResult.status === "fulfilled") {
+    snapshot.provider_pool_summary = buildProviderPoolSummary(
+      providerPoolResult.value,
+    );
+  } else {
+    snapshot.provider_pool_summary = null;
+    collectionNotes.push(
+      buildCollectionFailureNote(
+        "runtime_snapshot.provider_pool_summary",
+        "get_provider_pool_overview",
+        providerPoolResult.reason,
+      ),
+    );
+  }
+
+  if (apiKeyProviderResult.status === "fulfilled") {
+    snapshot.api_key_provider_summary = buildApiKeyProviderSummary(
+      apiKeyProviderResult.value,
+    );
+  } else {
+    snapshot.api_key_provider_summary = null;
+    collectionNotes.push(
+      buildCollectionFailureNote(
+        "runtime_snapshot.api_key_provider_summary",
+        "get_api_key_providers",
+        apiKeyProviderResult.reason,
+      ),
+    );
+  }
+
+  if (mcpResult.status === "fulfilled") {
+    snapshot.mcp_summary = buildMcpSummary(mcpResult.value);
+  } else {
+    snapshot.mcp_summary = null;
+    collectionNotes.push(
+      buildCollectionFailureNote(
+        "runtime_snapshot.mcp_summary",
+        "mcp_list_servers_with_status",
+        mcpResult.reason,
+      ),
+    );
+  }
+
+  if (terminalResult.status === "fulfilled") {
+    snapshot.terminal_summary = buildTerminalSummary(terminalResult.value);
+  } else {
+    snapshot.terminal_summary = null;
+    collectionNotes.push(
+      buildCollectionFailureNote(
+        "runtime_snapshot.terminal_summary",
+        "terminal_list_sessions",
+        terminalResult.reason,
+      ),
+    );
+  }
+
+  return {
+    runtimeSnapshot: hasRuntimeSnapshotData(snapshot) ? snapshot : null,
+    collectionNotes,
+  };
+}
+
+function buildAutoCollectionNotes(params: {
+  frontendCrashBuffer: FrontendCrashBufferEntry[];
+  invokeErrorBuffer: InvokeErrorBufferEntry[];
+  invokeTraceBuffer: InvokeTraceBufferEntry[];
+  persistedLogTail: LogEntry[];
+  platform: string;
+  serverDiagnostics?: ServerDiagnostics | null;
+  logStorageDiagnostics?: LogStorageDiagnostics | null;
+  windowsStartupDiagnostics?: WindowsStartupDiagnostics | null;
+  runtimeSnapshot?: RuntimeDiagnosticSnapshot | null;
+}): string[] {
+  const notes: string[] = [];
+
+  if (params.frontendCrashBuffer.length === 0) {
+    notes.push(
+      "frontend_crash_buffer 为空：当前没有检测到未捕获前端异常；已被界面正常处理的业务报错不会出现在这里。",
+    );
+  }
+
+  if (
+    params.invokeErrorBuffer.length <= 1 &&
+    params.invokeTraceBuffer.length > 0
+  ) {
+    notes.push(
+      "invoke_error_buffer 只记录失败调用；更多上下文请结合 invoke_trace_buffer 查看最近成功/失败命令轨迹。",
+    );
+  }
+
+  if (params.persistedLogTail.length < 20) {
+    notes.push(
+      `persisted_log_tail 当前仅收集到 ${params.persistedLogTail.length} 行；这通常表示本次会话内写入业务日志较少。`,
+    );
+  }
+
+  if (!params.serverDiagnostics) {
+    notes.push(
+      "server_diagnostics 未采集到：若后端命令失败或服务尚未初始化，需结合 persisted_log_tail 与 invoke_trace_buffer 一起排查。",
+    );
+  }
+
+  if (!params.logStorageDiagnostics?.current_log_path) {
+    notes.push(
+      "log_storage_diagnostics 未提供当前日志文件路径：可能是文件日志关闭、初始化失败或当前运行环境不支持。",
+    );
+  } else if (
+    (params.logStorageDiagnostics.related_log_files?.length ?? 0) > 1
+  ) {
+    notes.push(
+      `已检测到 ${params.logStorageDiagnostics.related_log_files.length} 个关联日志文件；persisted_log_tail 已按时间顺序合并最近日志上下文。`,
+    );
+  }
+
+  if (!params.runtimeSnapshot) {
+    notes.push(
+      "runtime_snapshot 未采集到：本次导出仍可用于分析日志与调用轨迹，但无法反映配置、凭证池、MCP 与终端运行态。",
+    );
+  } else if (
+    (params.runtimeSnapshot.provider_pool_summary?.total_credentials ?? 0) ===
+      0 &&
+    (params.runtimeSnapshot.api_key_provider_summary?.total_api_keys ?? 0) === 0
+  ) {
+    notes.push(
+      "运行时快照显示 Provider Pool 凭证数与 API Key 数都为 0；首次安装或初始化未完成时，很多操作不会继续产生更多下游错误与日志。",
+    );
+  }
+
+  if (detectDesktopPlatform(params.platform, "") === "windows") {
+    if (!params.windowsStartupDiagnostics) {
+      notes.push(
+        "windows_startup_diagnostics 未采集到：当前无法判断 WebView2、终端默认 Shell、安装目录与资源目录是否异常。",
+      );
+    } else {
+      if (params.windowsStartupDiagnostics.summary_message) {
+        notes.push(
+          `Windows 启动自检提示：${params.windowsStartupDiagnostics.summary_message}`,
+        );
+      }
+      if (params.windowsStartupDiagnostics.shell_env?.trim().startsWith("/")) {
+        notes.push(
+          `检测到 Unix 风格 SHELL 环境变量：${params.windowsStartupDiagnostics.shell_env}；Windows 初装环境里这很容易诱发 /bin/bash 相关启动失败。`,
+        );
+      }
+    }
+  }
+
+  return notes;
 }
 
 export function buildCrashDiagnosticPayload(
@@ -143,7 +607,27 @@ export function buildCrashDiagnosticPayload(
     maxPersistedLogs = 200,
     maxWorkspaceRepairs = 50,
     themeWorkbenchDocumentState = null,
+    serverDiagnostics = null,
+    logStorageDiagnostics = null,
+    windowsStartupDiagnostics = null,
+    runtimeSnapshot = null,
   } = params;
+
+  const frontendCrashBuffer = getFrontendCrashBuffer(maxCrashLogs);
+  const invokeErrorBuffer = getInvokeErrorBuffer(maxInvokeErrors);
+  const invokeTraceBuffer = getInvokeTraceBuffer(maxInvokeTraces);
+  const persistedTail = persistedLogTail.slice(-maxPersistedLogs);
+  const autoCollectionNotes = buildAutoCollectionNotes({
+    frontendCrashBuffer,
+    invokeErrorBuffer,
+    invokeTraceBuffer,
+    persistedLogTail: persistedTail,
+    platform,
+    serverDiagnostics,
+    logStorageDiagnostics,
+    windowsStartupDiagnostics,
+    runtimeSnapshot,
+  });
 
   return {
     generated_at: new Date().toISOString(),
@@ -161,14 +645,22 @@ export function buildCrashDiagnosticPayload(
       dsn: maskCrashReportingDsn(crashConfig.dsn),
     },
     frontend_crash_logs: pickFrontendCrashLogs(logs, maxCrashLogs),
-    frontend_crash_buffer: getFrontendCrashBuffer(maxCrashLogs),
-    invoke_error_buffer: getInvokeErrorBuffer(maxInvokeErrors),
-    invoke_trace_buffer: getInvokeTraceBuffer(maxInvokeTraces),
-    persisted_log_tail: persistedLogTail.slice(-maxPersistedLogs),
+    frontend_crash_buffer: frontendCrashBuffer,
+    invoke_error_buffer: invokeErrorBuffer,
+    invoke_trace_buffer: invokeTraceBuffer,
+    persisted_log_tail: persistedTail,
+    server_diagnostics: serverDiagnostics,
+    log_storage_diagnostics: logStorageDiagnostics,
+    windows_startup_diagnostics: windowsStartupDiagnostics,
+    runtime_snapshot: runtimeSnapshot,
     workspace_repair_history: getWorkspaceRepairHistory(maxWorkspaceRepairs),
     theme_workbench_document_state: themeWorkbenchDocumentState,
-    diagnostic_collection_notes: collectionNotes.filter((item) =>
-      typeof item === "string" && item.trim().length > 0
+    diagnostic_collection_notes: Array.from(
+      new Set(
+        [...autoCollectionNotes, ...collectionNotes].filter(
+          (item) => typeof item === "string" && item.trim().length > 0,
+        ),
+      ),
     ),
   };
 }
@@ -184,6 +676,22 @@ export async function collectThemeWorkbenchDocumentStateForDiagnostic(): Promise
   } catch (error) {
     console.warn("[crashDiagnostic] 获取主题工作台文稿状态失败:", error);
     return null;
+  }
+}
+
+export async function clearCrashDiagnosticHistory(): Promise<void> {
+  clearFrontendCrashBuffer();
+  clearInvokeErrorBuffer();
+  clearInvokeTraceBuffer();
+  clearWorkspaceRepairHistory();
+
+  try {
+    await clearDiagnosticLogHistory();
+  } catch (error) {
+    console.error("[crashDiagnostic] 清空诊断日志历史失败:", error);
+    throw new Error(
+      "本地诊断缓存已清空，但历史日志文件清理失败，请重试或稍后重新导出诊断信息确认",
+    );
   }
 }
 
@@ -271,16 +779,55 @@ ${json}
 `;
 }
 
+function formatOptionalSummaryValue(
+  value: number | string | null | undefined,
+): string {
+  return value == null ? "未采集" : String(value);
+}
+
+function countStartupChecks(
+  diagnostics: WindowsStartupDiagnostics | null | undefined,
+  status: "ok" | "warning" | "error",
+): number {
+  return (
+    diagnostics?.checks.filter((item) => item.status === status).length ?? 0
+  );
+}
+
 function buildDiagnosticSummary(payload: CrashDiagnosticPayload): string {
   const crashLogCount = payload.frontend_crash_logs.length;
   const localCrashCount = payload.frontend_crash_buffer?.length ?? 0;
   const invokeErrorCount = payload.invoke_error_buffer?.length ?? 0;
   const invokeTraceCount = payload.invoke_trace_buffer?.length ?? 0;
   const persistedLogCount = payload.persisted_log_tail?.length ?? 0;
+  const relatedLogFileCount =
+    payload.log_storage_diagnostics?.related_log_files?.length ?? 0;
+  const rawResponseFileCount =
+    payload.log_storage_diagnostics?.raw_response_files?.length ?? 0;
   const workspaceRepairCount = payload.workspace_repair_history?.length ?? 0;
-  const versionCount = payload.theme_workbench_document_state?.version_count ?? 0;
+  const versionCount =
+    payload.theme_workbench_document_state?.version_count ?? 0;
   const dsnConfigured = payload.crash_reporting.dsn ? "是" : "否";
-  return [
+  const serverDiagnosticsCollected = payload.server_diagnostics ? "是" : "否";
+  const runtimeSnapshotCollected = payload.runtime_snapshot ? "是" : "否";
+  const isWindowsPayload =
+    detectDesktopPlatform(payload.platform, payload.user_agent) === "windows";
+  const windowsStartupDiagnostics = payload.windows_startup_diagnostics;
+  const windowsStartupCollected = windowsStartupDiagnostics ? "是" : "否";
+  const windowsStartupErrorCount = countStartupChecks(
+    windowsStartupDiagnostics,
+    "error",
+  );
+  const windowsStartupWarningCount = countStartupChecks(
+    windowsStartupDiagnostics,
+    "warning",
+  );
+  const providerPoolSummary = payload.runtime_snapshot?.provider_pool_summary;
+  const apiKeyProviderSummary =
+    payload.runtime_snapshot?.api_key_provider_summary;
+  const mcpSummary = payload.runtime_snapshot?.mcp_summary;
+  const terminalSummary = payload.runtime_snapshot?.terminal_summary;
+  const summaryLines = [
     `- 版本：${payload.app_version}`,
     `- 平台：${payload.platform}（${payload.runtime}）`,
     `- 语言/时区：${payload.locale} / ${payload.timezone}`,
@@ -290,14 +837,51 @@ function buildDiagnosticSummary(payload: CrashDiagnosticPayload): string {
     `- 命令调用失败缓存条数：${invokeErrorCount}`,
     `- 最近调用轨迹条数：${invokeTraceCount}`,
     `- 持久化日志尾部行数：${persistedLogCount}`,
+    `- 服务端诊断已采集：${serverDiagnosticsCollected}`,
+    `- 运行时快照已采集：${runtimeSnapshotCollected}`,
+    `- Provider Pool 凭证总数：${formatOptionalSummaryValue(providerPoolSummary?.total_credentials)}`,
+    `- API Key Provider / Key 数：${
+      apiKeyProviderSummary
+        ? `${apiKeyProviderSummary.total_providers} / ${apiKeyProviderSummary.total_api_keys}`
+        : "未采集"
+    }`,
+    `- MCP 服务器数 / 运行中数：${
+      mcpSummary
+        ? `${mcpSummary.total_servers} / ${mcpSummary.running_servers}`
+        : "未采集"
+    }`,
+    `- 终端会话数：${formatOptionalSummaryValue(terminalSummary?.total_sessions)}`,
+    `- 关联日志文件数：${relatedLogFileCount}`,
+    `- 原始响应文件数：${rawResponseFileCount}`,
     `- Workspace 自动修复记录条数：${workspaceRepairCount}`,
     `- 主题工作台文稿版本数：${versionCount}`,
     `- 崩溃上报已启用：${payload.crash_reporting.enabled ? "是" : "否"}（DSN 已配置：${dsnConfigured}）`,
-  ].join("\n");
+  ];
+
+  if (isWindowsPayload) {
+    summaryLines.splice(
+      11,
+      0,
+      `- Windows 启动自检已采集：${windowsStartupCollected}`,
+      `- Windows 启动阻塞 / 警告：${
+        windowsStartupDiagnostics
+          ? `${windowsStartupErrorCount} / ${windowsStartupWarningCount}`
+          : "未采集"
+      }`,
+      `- Windows 终端默认 Shell：${formatOptionalSummaryValue(
+        windowsStartupDiagnostics?.resolved_terminal_shell,
+      )}`,
+    );
+  }
+
+  return summaryLines.join("\n");
 }
 
 function copyTextWithExecCommand(text: string): boolean {
-  if (typeof document === "undefined" || typeof document.execCommand !== "function") {
+  if (
+    typeof document === "undefined" ||
+    typeof document.execCommand !== "function"
+  ) {
     return false;
   }
 
@@ -485,7 +1069,9 @@ export async function openCrashDiagnosticDownloadDirectory(): Promise<OpenDownlo
     }
   }
 
-  throw new Error(`无法自动打开下载目录，请手动前往 ${getDefaultDownloadDirectoryHint()}`);
+  throw new Error(
+    `无法自动打开下载目录，请手动前往 ${getDefaultDownloadDirectoryHint()}`,
+  );
 }
 
 async function copyTextViaTauriClipboard(text: string): Promise<boolean> {
@@ -501,11 +1087,7 @@ async function copyTextViaTauriClipboard(text: string): Promise<boolean> {
     if (typeof result === "boolean") {
       return result;
     }
-    if (
-      typeof result === "object" &&
-      result !== null &&
-      "success" in result
-    ) {
+    if (typeof result === "object" && result !== null && "success" in result) {
       return Boolean((result as { success?: boolean }).success);
     }
     return Boolean(result);
@@ -517,7 +1099,8 @@ async function copyTextViaTauriClipboard(text: string): Promise<boolean> {
 function isTauriRuntime(): boolean {
   return Boolean(
     typeof window !== "undefined" &&
-      ((window as any).__TAURI__?.core?.invoke || (window as any).__TAURI__?.invoke),
+      ((window as any).__TAURI__?.core?.invoke ||
+        (window as any).__TAURI__?.invoke),
   );
 }
 
@@ -550,7 +1133,9 @@ export function sanitizeDiagnosticSceneTag(
   return normalized || undefined;
 }
 
-function inferDiagnosticSceneTag(payload: CrashDiagnosticPayload): string | undefined {
+function inferDiagnosticSceneTag(
+  payload: CrashDiagnosticPayload,
+): string | undefined {
   const notes = payload.diagnostic_collection_notes ?? [];
   const joined = notes.join(" ").toLowerCase();
   if (joined.includes("workspace") && joined.includes("不存在")) {
@@ -595,9 +1180,7 @@ function buildDownloadDirectoryCandidates(
   if (homeDir) {
     const hasTrailingDelimiter =
       homeDir.endsWith("/") || homeDir.endsWith("\\");
-    const base = hasTrailingDelimiter
-      ? homeDir.slice(0, -1)
-      : homeDir;
+    const base = hasTrailingDelimiter ? homeDir.slice(0, -1) : homeDir;
     pushCandidate(`${base}${delimiter}Downloads`);
     if (platform === "windows") {
       pushCandidate(`${base}\\downloads`);

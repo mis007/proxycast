@@ -8,9 +8,12 @@ import type {
   ProjectMemory,
   Character,
   WorldBuilding,
-  StyleGuide,
   OutlineNode,
 } from "@/lib/api/memory";
+import {
+  buildStylePromptFromGuide,
+  hasStyleGuideContent,
+} from "@/lib/style-guide";
 
 /**
  * 生成角色提示词
@@ -20,29 +23,28 @@ function generateCharactersPrompt(characters: Character[]): string {
 
   let prompt = "### 角色设定\n\n";
 
-  // 主要角色
-  const mainCharacters = characters.filter((c) => c.is_main);
-  const sideCharacters = characters.filter((c) => !c.is_main);
+  const mainCharacters = characters.filter((character) => character.is_main);
+  const sideCharacters = characters.filter((character) => !character.is_main);
 
   if (mainCharacters.length > 0) {
     prompt += "**主要角色：**\n";
-    mainCharacters.forEach((char) => {
-      prompt += `- **${char.name}**`;
-      if (char.aliases.length > 0) {
-        prompt += `（${char.aliases.join("、")}）`;
+    mainCharacters.forEach((character) => {
+      prompt += `- **${character.name}**`;
+      if (character.aliases.length > 0) {
+        prompt += `（${character.aliases.join("、")}）`;
       }
       prompt += "\n";
-      if (char.description) {
-        prompt += `  - 简介：${char.description}\n`;
+      if (character.description) {
+        prompt += `  - 简介：${character.description}\n`;
       }
-      if (char.personality) {
-        prompt += `  - 性格：${char.personality}\n`;
+      if (character.personality) {
+        prompt += `  - 性格：${character.personality}\n`;
       }
-      if (char.background) {
-        prompt += `  - 背景：${char.background}\n`;
+      if (character.background) {
+        prompt += `  - 背景：${character.background}\n`;
       }
-      if (char.appearance) {
-        prompt += `  - 外貌：${char.appearance}\n`;
+      if (character.appearance) {
+        prompt += `  - 外貌：${character.appearance}\n`;
       }
     });
     prompt += "\n";
@@ -50,10 +52,10 @@ function generateCharactersPrompt(characters: Character[]): string {
 
   if (sideCharacters.length > 0) {
     prompt += "**次要角色：**\n";
-    sideCharacters.forEach((char) => {
-      prompt += `- **${char.name}**`;
-      if (char.description) {
-        prompt += `：${char.description}`;
+    sideCharacters.forEach((character) => {
+      prompt += `- **${character.name}**`;
+      if (character.description) {
+        prompt += `：${character.description}`;
       }
       prompt += "\n";
     });
@@ -89,47 +91,16 @@ function generateWorldBuildingPrompt(worldBuilding: WorldBuilding): string {
 }
 
 /**
- * 生成风格指南提示词
- */
-function generateStyleGuidePrompt(styleGuide: StyleGuide): string {
-  let prompt = "### 写作风格\n\n";
-
-  if (styleGuide.style) {
-    prompt += `**风格：** ${styleGuide.style}\n\n`;
-  }
-
-  if (styleGuide.tone) {
-    prompt += `**语调：** ${styleGuide.tone}\n\n`;
-  }
-
-  if (styleGuide.forbidden_words.length > 0) {
-    prompt += `**禁用词汇：** ${styleGuide.forbidden_words.join("、")}\n\n`;
-  }
-
-  if (styleGuide.preferred_words.length > 0) {
-    prompt += `**推荐词汇：** ${styleGuide.preferred_words.join("、")}\n\n`;
-  }
-
-  if (styleGuide.examples) {
-    prompt += `**示例：**\n${styleGuide.examples}\n\n`;
-  }
-
-  return prompt;
-}
-
-/**
  * 生成大纲提示词
  */
 function generateOutlinePrompt(outline: OutlineNode[]): string {
   if (outline.length === 0) return "";
 
   let prompt = "### 故事大纲\n\n";
+  const sortedOutline = [...outline].sort((left, right) => left.order - right.order);
+  const rootNodes = sortedOutline.filter((node) => !node.parent_id);
 
-  // 按 order 排序并构建层级结构
-  const sortedOutline = [...outline].sort((a, b) => a.order - b.order);
-  const rootNodes = sortedOutline.filter((n) => !n.parent_id);
-
-  const renderNode = (node: OutlineNode, level: number = 0): string => {
+  const renderNode = (node: OutlineNode, level = 0): string => {
     const indent = "  ".repeat(level);
     let result = `${indent}- **${node.title}**`;
     if (node.content) {
@@ -137,8 +108,7 @@ function generateOutlinePrompt(outline: OutlineNode[]): string {
     }
     result += "\n";
 
-    // 查找子节点
-    const children = sortedOutline.filter((n) => n.parent_id === node.id);
+    const children = sortedOutline.filter((candidate) => candidate.parent_id === node.id);
     children.forEach((child) => {
       result += renderNode(child, level + 1);
     });
@@ -159,27 +129,26 @@ function generateOutlinePrompt(outline: OutlineNode[]): string {
 export function generateProjectMemoryPrompt(memory: ProjectMemory): string {
   let prompt = "## 项目背景\n\n";
 
-  // 角色
   if (memory.characters.length > 0) {
     prompt += generateCharactersPrompt(memory.characters);
   }
 
-  // 世界观
   if (memory.world_building?.description) {
     prompt += generateWorldBuildingPrompt(memory.world_building);
   }
 
-  // 风格指南
-  if (memory.style_guide?.style) {
-    prompt += generateStyleGuidePrompt(memory.style_guide);
+  if (hasStyleGuideContent(memory.style_guide)) {
+    const stylePrompt = buildStylePromptFromGuide(memory.style_guide);
+    if (stylePrompt) {
+      prompt += `${stylePrompt}\n\n`;
+    }
   }
 
-  // 大纲
   if (memory.outline.length > 0) {
     prompt += generateOutlinePrompt(memory.outline);
   }
 
-  return prompt;
+  return prompt.trim();
 }
 
 /**

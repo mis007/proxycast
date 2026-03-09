@@ -20,8 +20,11 @@ import {
   saveConfig,
   reloadCredentials,
   testApi,
+  exportSupportBundle,
+  revealInFinder,
   ServerStatus,
   ServerDiagnostics,
+  SupportBundleExportResult,
   Config,
   TestResult,
   getDefaultProvider,
@@ -47,6 +50,8 @@ interface FetchModelsResult {
   models: EnhancedModelMetadata[];
   source: "Api" | "LocalFallback";
   error: string | null;
+  request_url?: string | null;
+  diagnostic_hint?: string | null;
 }
 
 interface TestState {
@@ -154,9 +159,14 @@ interface AvailableProvider {
 
 export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
   const [status, setStatus] = useState<ServerStatus | null>(null);
-  const [diagnostics, setDiagnostics] = useState<ServerDiagnostics | null>(null);
+  const [diagnostics, setDiagnostics] = useState<ServerDiagnostics | null>(
+    null,
+  );
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
+  const [supportBundleLoading, setSupportBundleLoading] = useState(false);
+  const [supportBundleResult, setSupportBundleResult] =
+    useState<SupportBundleExportResult | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
   const [_error, setError] = useState<string | null>(null);
@@ -194,6 +204,13 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
     }
   }, [message]);
 
+  const canExportSupportBundle =
+    typeof window !== "undefined" &&
+    Boolean(
+      (window as any).__TAURI__?.core?.invoke ||
+        (window as any).__TAURI__?.invoke,
+    );
+
   const fetchStatus = async () => {
     try {
       const s = await getServerStatus();
@@ -226,6 +243,33 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
       setMessage({ type: "error", text: `复制失败: ${errMsg}` });
+    }
+  };
+
+  const handleExportSupportBundle = async () => {
+    setSupportBundleLoading(true);
+    try {
+      const result = await exportSupportBundle();
+      setSupportBundleResult(result);
+      setMessage({
+        type: "success",
+        text: `支持包已导出到：${result.bundle_path}`,
+      });
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setMessage({ type: "error", text: `导出支持包失败: ${errMsg}` });
+    } finally {
+      setSupportBundleLoading(false);
+    }
+  };
+
+  const handleRevealSupportBundle = async () => {
+    if (!supportBundleResult?.bundle_path) return;
+    try {
+      await revealInFinder(supportBundleResult.bundle_path);
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setMessage({ type: "error", text: `打开支持包目录失败: ${errMsg}` });
     }
   };
 
@@ -1568,7 +1612,7 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
                 <p className="text-xs text-muted-foreground">
                   诊断接口（`/health?full=true` / `/cache` / `/stats`）
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     onClick={fetchDiagnostics}
                     disabled={diagnosticsLoading}
@@ -1583,11 +1627,36 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
                   >
                     {diagnosticsCopied ? "已复制" : "复制 JSON"}
                   </button>
+                  {canExportSupportBundle ? (
+                    <>
+                      <button
+                        onClick={handleExportSupportBundle}
+                        disabled={supportBundleLoading}
+                        className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                      >
+                        {supportBundleLoading ? "导出中..." : "导出支持包"}
+                      </button>
+                      <button
+                        onClick={handleRevealSupportBundle}
+                        disabled={!supportBundleResult?.bundle_path}
+                        className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                      >
+                        打开目录
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
               <pre className="rounded bg-muted/40 p-2 text-xs overflow-auto max-h-48">
                 {diagnosticsJson || "点击“拉取诊断”获取当前服务诊断 JSON。"}
               </pre>
+              <div className="text-xs text-muted-foreground break-all">
+                {canExportSupportBundle
+                  ? supportBundleResult?.bundle_path
+                    ? `最近一次支持包：${supportBundleResult.bundle_path}`
+                    : "支持包会默认导出到桌面；若桌面不可用，则回退到下载目录或系统临时目录。"
+                  : "支持包导出仅在桌面端可用。"}
+              </div>
             </div>
           </div>
 

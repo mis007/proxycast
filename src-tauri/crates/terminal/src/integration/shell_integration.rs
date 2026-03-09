@@ -30,7 +30,7 @@ use crate::error::TerminalError;
 use crate::events::event_names;
 
 /// Shell 类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ShellType {
     /// Bash shell
@@ -42,6 +42,7 @@ pub enum ShellType {
     /// PowerShell
     Pwsh,
     /// 未知 Shell
+    #[default]
     Unknown,
 }
 
@@ -74,14 +75,8 @@ impl ShellType {
     }
 }
 
-impl Default for ShellType {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
 /// Shell 集成状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum ShellIntegrationStatus {
     /// 就绪状态（等待用户输入）
@@ -89,13 +84,8 @@ pub enum ShellIntegrationStatus {
     /// 正在执行命令
     RunningCommand,
     /// 未知状态
+    #[default]
     Unknown,
-}
-
-impl Default for ShellIntegrationStatus {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 /// 命令执行信息

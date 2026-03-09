@@ -67,8 +67,10 @@ export const WORKSPACE_PAGE_THEME_MAP: Record<
 
 export type Page =
   | "provider-pool"
+  | "openclaw"
   | "api-server"
   | "agent"
+  | "style"
   | "workspace"
   | ThemeWorkspacePage
   | "image-gen"
@@ -113,6 +115,19 @@ export type WorkspaceViewMode =
   | "workspace"
   | "project-detail";
 
+export type OpenClawSubpage =
+  | "install"
+  | "installing"
+  | "configure"
+  | "runtime"
+  | "restarting"
+  | "uninstalling"
+  | "dashboard";
+
+export interface OpenClawPageParams {
+  subpage?: OpenClawSubpage;
+}
+
 /**
  * Agent 页面参数
  * 用于从项目入口跳转到创作界面时传递项目上下文
@@ -135,9 +150,16 @@ export interface AgentPageParams {
   /** 进入主题工作台时，预填并触发“创建前确认”提示词 */
   workspaceCreatePrompt?: string;
   /** 创建确认来源（用于策略路由与埋点） */
-  workspaceCreateSource?: "workspace_prompt" | "quick_create" | "project_created";
+  workspaceCreateSource?:
+    | "workspace_prompt"
+    | "quick_create"
+    | "project_created";
   /** 创建确认建议标题（可选） */
   workspaceCreateFallbackTitle?: string;
+  /** 进入工作台后立即打开项目风格策略 */
+  workspaceOpenProjectStyleGuide?: boolean;
+  /** 打开项目风格策略时，高亮的来源风格资产 ID */
+  workspaceOpenProjectStyleGuideSourceEntryId?: string;
 }
 
 /**
@@ -146,6 +168,8 @@ export interface AgentPageParams {
 export interface ProjectDetailPageParams {
   projectId: string;
   workspaceTheme?: WorkspaceTheme;
+  openProjectStyleGuide?: boolean;
+  openProjectStyleGuideSourceEntryId?: string;
 }
 
 /**
@@ -155,6 +179,24 @@ export interface SettingsPageParams {
   tab?: SettingsTabs;
 }
 
+export type MemoryPageSection =
+  | "home"
+  | "identity"
+  | "context"
+  | "preference"
+  | "experience"
+  | "activity";
+
+export interface MemoryPageParams {
+  section?: MemoryPageSection;
+}
+
+export type StylePageSection = "overview" | "library";
+
+export interface StylePageParams {
+  section?: StylePageSection;
+}
+
 /**
  * 页面参数联合类型
  */
@@ -162,4 +204,7 @@ export type PageParams =
   | AgentPageParams
   | ProjectDetailPageParams
   | SettingsPageParams
+  | OpenClawPageParams
+  | MemoryPageParams
+  | StylePageParams
   | Record<string, unknown>;

@@ -106,7 +106,11 @@ vi.mock("@/features/themes/video", () => ({
         { key: "settings", label: "设置" },
       ],
     },
-    primaryWorkspaceRenderer: ({ projectId }: { projectId?: string | null }) => (
+    primaryWorkspaceRenderer: ({
+      projectId,
+    }: {
+      projectId?: string | null;
+    }) => (
       <div data-testid="video-theme-workspace">
         <div data-testid="video-canvas">video:{projectId ?? "none"}</div>
       </div>
@@ -134,7 +138,9 @@ vi.mock("@/lib/api/project", () => ({
   updateContent: mockUpdateContent,
   getWorkspaceProjectsRoot: vi.fn(async () => "/tmp/workspace"),
   getProjectByRootPath: vi.fn(async () => null),
-  resolveProjectRootPath: vi.fn(async (name: string) => `/tmp/workspace/${name}`),
+  resolveProjectRootPath: vi.fn(
+    async (name: string) => `/tmp/workspace/${name}`,
+  ),
   getCreateProjectErrorMessage: vi.fn((message: string) => message),
   extractErrorMessage: vi.fn(() => "mock-error"),
   formatRelativeTime: vi.fn(() => "刚刚"),
@@ -165,9 +171,7 @@ import { WorkbenchPage } from "./WorkbenchPage";
 
 const mountedRoots: MountedRoot[] = [];
 
-function renderPage(
-  props: Partial<ComponentProps<typeof WorkbenchPage>> = {},
-) {
+function renderPage(props: Partial<ComponentProps<typeof WorkbenchPage>> = {}) {
   return mountHarness(
     WorkbenchPage,
     { theme: "social-media", ...props },
@@ -335,11 +339,15 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     await flushEffects(6);
 
     expect(mockCreateContent).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("创建前确认");
+    expect(container.textContent).toContain("补充信息");
     expect(
-      container.querySelector("[data-testid='workspace-create-confirmation-card']"),
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
     ).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
     expect(findButtonByTitle(container, "折叠能力面板")).toBeDefined();
     expect(container.textContent).not.toContain("选择创作模式");
     expect(container.textContent).not.toContain("填写创作意图");
@@ -354,7 +362,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickButtonByText(container, "社媒项目A");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='agent-chat-page']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).toBeNull();
     expectProjectManagementLandingVisible(container);
     expect(container.textContent).toContain("当前项目：社媒项目A");
   });
@@ -362,8 +372,14 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
   it("作业模式存在文稿时应优先打开已有内容，而不是停留在新建首页", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='agent-chat-page']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workspace-create-confirmation-card']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
+    ).toBeNull();
   });
 
   it("作业模式默认收起左侧栏", async () => {
@@ -381,21 +397,38 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickButtonByText(container, "社媒项目A");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='agent-chat-page']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workspace-create-confirmation-card']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
+    ).toBeNull();
   });
 
   it("点击创作首页应优先显示创建确认入口，避免中间闪现对话内容", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='agent-chat-page']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).not.toBeNull();
 
     clickButtonByText(container, "创作首页", { exact: true });
     await flushEffects();
 
-    expect(container.textContent).toContain("请先发起创建确认");
-    expect(container.querySelector("[data-testid='workspace-create-confirmation-card']")).toBeNull();
-    expect(container.querySelector("[data-testid='agent-chat-page']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workspace-create-entry-home']"),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("当前没有待处理任务");
+    expect(
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
+    ).toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).toBeNull();
   });
 
   it("工作区点击项目管理后回到项目管理态", async () => {
@@ -420,25 +453,42 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
   it("创作首页右侧栏应默认展开，并可切换后操作文字/视觉/音频区关键表单", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
     expect(findButtonByTitle(container, "折叠能力面板")).toBeDefined();
 
     clickButtonByTitle(container, "折叠能力面板");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-collapsed']")).not.toBeNull();
     expect(
-      container.querySelector("[data-testid='workbench-right-rail-collapsed-expand']"),
+      container.querySelector("[data-testid='workbench-right-rail-collapsed']"),
     ).not.toBeNull();
     expect(
-      container.querySelectorAll("[data-testid^='workbench-right-rail-collapsed-action-']").length,
+      container.querySelector(
+        "[data-testid='workbench-right-rail-collapsed-expand']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelectorAll(
+        "[data-testid^='workbench-right-rail-collapsed-action-']",
+      ).length,
     ).toBeGreaterThan(0);
 
-    clickByTestId(container, "workbench-right-rail-collapsed-action-search-material");
+    clickByTestId(
+      container,
+      "workbench-right-rail-collapsed-action-search-material",
+    );
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-search-material-panel']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-search-material-panel']",
+      ),
+    ).not.toBeNull();
     expect(container.textContent).toContain("文字多搜索");
     expect(container.textContent).not.toContain("Aibo");
     expect(container.textContent).toContain("资源类型");
@@ -454,13 +504,23 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickButtonByText(container, "取消");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-search-material-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-search-material-panel']",
+      ),
+    ).toBeNull();
 
     clickByTestId(container, "workbench-right-rail-action-generate-title");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-title-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-search-material-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-title-panel']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-search-material-panel']",
+      ),
+    ).toBeNull();
     expect(container.textContent).toContain("要求");
     expect(container.textContent).toContain("一键生成");
     expect(container.textContent).toContain("取消");
@@ -473,13 +533,19 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickButtonByText(container, "取消");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-title-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-title-panel']"),
+    ).toBeNull();
 
     clickByTestId(container, "workbench-right-rail-action-generate-image");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-image-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-title-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-image-panel']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-title-panel']"),
+    ).toBeNull();
     expect(container.textContent).toContain("模型");
     expect(container.textContent).toContain("尺寸");
     expect(container.textContent).toContain("提示词");
@@ -492,8 +558,12 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-cover");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-cover-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-image-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-cover-panel']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-image-panel']"),
+    ).toBeNull();
     expect(container.textContent).toContain("投放平台");
     expect(container.textContent).toContain("生成数量");
     expect(container.textContent).toContain("封面描述");
@@ -511,8 +581,14 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-storyboard");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-storyboard-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-cover-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-storyboard-panel']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-cover-panel']"),
+    ).toBeNull();
     expect(container.textContent).toContain("生成分镜");
     expect(container.textContent).toContain("一键生成");
     expectElementBefore(
@@ -526,11 +602,22 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
       "button[data-testid='workbench-right-rail-action-generate-video-assets']",
     );
 
-    clickByTestId(container, "workbench-right-rail-action-generate-video-assets");
+    clickByTestId(
+      container,
+      "workbench-right-rail-action-generate-video-assets",
+    );
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-video-assets-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-storyboard-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-video-assets-panel']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-storyboard-panel']",
+      ),
+    ).toBeNull();
     expect(container.textContent).toContain("模型");
     expect(container.textContent).toContain("版本");
     expect(container.textContent).toContain("比例");
@@ -550,8 +637,16 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-ai-video");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-ai-video-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-video-assets-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-ai-video-panel']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-video-assets-panel']",
+      ),
+    ).toBeNull();
     expect(container.textContent).toContain("脚本内容");
     expectElementBefore(
       container,
@@ -562,8 +657,16 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-voiceover");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-voiceover-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-ai-video-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-voiceover-panel']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-ai-video-panel']",
+      ),
+    ).toBeNull();
     expect(container.textContent).toContain("语速");
     expect(container.textContent).toContain("选择音色");
     expectElementBefore(
@@ -575,16 +678,28 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-voice-tone-trigger");
     await flushEffects();
 
-    expect(document.body.querySelector("[data-testid='workbench-voice-tone-dialog']")).not.toBeNull();
-    expect(document.body.querySelector("input[placeholder='搜索音色']")).not.toBeNull();
+    expect(
+      document.body.querySelector(
+        "[data-testid='workbench-voice-tone-dialog']",
+      ),
+    ).not.toBeNull();
+    expect(
+      document.body.querySelector("input[placeholder='搜索音色']"),
+    ).not.toBeNull();
     expect(document.body.textContent).toContain("素材库");
     expect(document.body.textContent).toContain("高冷御姐");
 
     clickByTestId(container, "workbench-right-rail-action-generate-bgm");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-bgm-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-voiceover-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-bgm-panel']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-voiceover-panel']",
+      ),
+    ).toBeNull();
     expect(container.textContent).toContain("时长");
     expect(container.textContent).toContain("提示词");
     expectElementBefore(
@@ -601,8 +716,12 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-sfx");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-sfx-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-bgm-panel']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-sfx-panel']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-bgm-panel']"),
+    ).toBeNull();
     expect(container.textContent).toContain("时长");
     expect(container.textContent).toContain("提示词");
     expect(container.textContent).toContain("10s");
@@ -620,8 +739,14 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-right-rail-action-generate-podcast");
     await flushEffects();
 
-    expect(container.querySelector("[data-testid='workbench-generate-podcast-panel']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='workbench-generate-sfx-panel']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[data-testid='workbench-generate-podcast-panel']",
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-generate-sfx-panel']"),
+    ).toBeNull();
     expect(container.textContent).toContain("播音音色");
     expect(container.textContent).toContain("模式");
     expect(container.textContent).toContain("深度模式");
@@ -644,8 +769,14 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     clickByTestId(container, "workbench-podcast-voice-trigger");
     await flushEffects();
 
-    expect(document.body.querySelector("[data-testid='workbench-podcast-voice-dialog']")).not.toBeNull();
-    expect(document.body.querySelector("input[placeholder='搜索音色']")).not.toBeNull();
+    expect(
+      document.body.querySelector(
+        "[data-testid='workbench-podcast-voice-dialog']",
+      ),
+    ).not.toBeNull();
+    expect(
+      document.body.querySelector("input[placeholder='搜索音色']"),
+    ).not.toBeNull();
     expect(document.body.textContent).toContain("选择模式");
     expect(document.body.textContent).toContain("双人");
     expect(document.body.textContent).toContain("单人");
@@ -655,7 +786,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
   it("右侧栏生成标题提交应先进入确认，确认后再创建文稿", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
 
     clickByTestId(container, "workbench-right-rail-action-generate-title");
     await flushEffects();
@@ -668,18 +801,26 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
 
     expect(mockCreateContent).not.toHaveBeenCalled();
     expect(
-      container.querySelector("[data-testid='workspace-create-confirmation-card']"),
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
     ).not.toBeNull();
-    expect(container.textContent).toContain("请输出面向企业 CTO 的 Agent 趋势标题");
+    expect(container.textContent).toContain(
+      "请输出面向企业 CTO 的 Agent 趋势标题",
+    );
 
-    clickButtonByText(container, "确认生成");
-    clickButtonByText(container, "确认生成");
+    clickButtonByText(container, "新写一篇内容");
+    await flushEffects();
+    clickButtonByText(container, "开始处理");
+    clickButtonByText(container, "开始处理");
     await flushEffects(8);
 
     expect(mockCreateContent).toHaveBeenCalledTimes(1);
     const requestPayload = mockCreateContent.mock.calls[0]?.[0];
     expect(requestPayload?.project_id).toBe("project-1");
-    expect(requestPayload?.metadata?.createConfirmation?.source).toBe("workspace_prompt");
+    expect(requestPayload?.metadata?.createConfirmation?.source).toBe(
+      "workspace_prompt",
+    );
 
     const latestAgentChatProps = mockAgentChatPage.mock.calls.at(-1)?.[0] as
       | {
@@ -707,7 +848,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     try {
       const { container } = await enterDefaultWorkspace();
 
-      expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-right-rail-expanded']",
+        ),
+      ).not.toBeNull();
 
       clickByTestId(container, "workbench-right-rail-action-generate-image");
       await flushEffects();
@@ -725,13 +870,19 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
         string,
         { body?: unknown },
       ];
-      expect(endpoint).toBe("https://new-api.example.com/v1/images/generations");
+      expect(endpoint).toBe(
+        "https://new-api.example.com/v1/images/generations",
+      );
       const body = JSON.parse(String(requestInit.body));
       expect(body.model).toBe("gpt-image-1");
       expect(body.prompt).toContain("赛博城市夜景");
       expect(body.size).toBe("1792x1024");
       expect(container.textContent).toContain("图片生成成功");
-      expect(container.querySelector("[data-testid='workbench-generated-output-image']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-generated-output-image']",
+        ),
+      ).not.toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -751,7 +902,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     try {
       const { container } = await enterDefaultWorkspace();
 
-      expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-right-rail-expanded']",
+        ),
+      ).not.toBeNull();
 
       clickByTestId(container, "workbench-right-rail-action-generate-cover");
       await flushEffects();
@@ -769,7 +924,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
         string,
         { body?: unknown },
       ];
-      expect(endpoint).toBe("https://new-api.example.com/v1/images/generations");
+      expect(endpoint).toBe(
+        "https://new-api.example.com/v1/images/generations",
+      );
       const body = JSON.parse(String(requestInit.body));
       expect(body.model).toBe("gpt-image-1");
       expect(body.prompt).toContain("B站平台封面图");
@@ -792,9 +949,16 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     try {
       const { container } = await enterDefaultWorkspace();
 
-      expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-right-rail-expanded']",
+        ),
+      ).not.toBeNull();
 
-      clickByTestId(container, "workbench-right-rail-action-generate-voiceover");
+      clickByTestId(
+        container,
+        "workbench-right-rail-action-generate-voiceover",
+      );
       await flushEffects();
 
       const promptField = findInputByPlaceholder(container, "请输入提示词");
@@ -836,7 +1000,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     try {
       const { container } = await enterDefaultWorkspace();
 
-      expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-right-rail-expanded']",
+        ),
+      ).not.toBeNull();
 
       clickByTestId(container, "workbench-right-rail-action-generate-bgm");
       await flushEffects();
@@ -861,7 +1029,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
       expect(body.prompt).toContain("纯背景音乐");
       expect(body.duration).toBe(30);
       expect(container.textContent).toContain("BGM 生成成功");
-      expect(container.querySelector("[data-testid='workbench-generated-output-audio']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-generated-output-audio']",
+        ),
+      ).not.toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -881,7 +1053,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     try {
       const { container } = await enterDefaultWorkspace();
 
-      expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-right-rail-expanded']",
+        ),
+      ).not.toBeNull();
 
       clickByTestId(container, "workbench-right-rail-action-generate-sfx");
       await flushEffects();
@@ -906,7 +1082,11 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
       expect(body.prompt).toContain("短音效");
       expect(body.duration).toBe(10);
       expect(container.textContent).toContain("音效生成成功");
-      expect(container.querySelector("[data-testid='workbench-generated-output-audio']")).not.toBeNull();
+      expect(
+        container.querySelector(
+          "[data-testid='workbench-generated-output-audio']",
+        ),
+      ).not.toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -915,9 +1095,14 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
   it("右侧栏生成视频素材提交应按所选模型创建视频任务", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
 
-    clickByTestId(container, "workbench-right-rail-action-generate-video-assets");
+    clickByTestId(
+      container,
+      "workbench-right-rail-action-generate-video-assets",
+    );
     await flushEffects();
 
     const promptField = findInputByPlaceholder(container, "请输入提示词");
@@ -939,7 +1124,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
   it("右侧栏生成视频(非AI画面)提交应按所选模型创建视频任务", async () => {
     const { container } = await enterDefaultWorkspace();
 
-    expect(container.querySelector("[data-testid='workbench-right-rail-expanded']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
 
     clickByTestId(container, "workbench-right-rail-action-generate-ai-video");
     await flushEffects();
@@ -968,7 +1155,7 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     expect(chat?.getAttribute("data-hide-topbar")).toBe("true");
   });
 
-  it.skip("视频主题在作业模式渲染主题工作区而非对话工作区", async () => {
+  it.skip("视频主题在作业模式渲染主题工作区与独立右栏，而非对话工作区", async () => {
     mockListProjects.mockResolvedValueOnce([
       createWorkspaceProjectFixture({
         id: "video-project-1",
@@ -988,8 +1175,16 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     expect(
       container.querySelector("[data-testid='video-theme-workspace']"),
     ).not.toBeNull();
-    expect(container.querySelector("[data-testid='video-canvas']")).not.toBeNull();
-    expect(container.querySelector("[data-testid='agent-chat-page']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='video-canvas']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='agent-chat-page']"),
+    ).toBeNull();
+    expect(
+      container.querySelector("[data-testid='workbench-right-rail-expanded']"),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("短视频 · 引导模式");
   });
 
   it("切换到非创作视图时左侧显示紧凑提示并可返回创作视图", async () => {
@@ -1058,7 +1253,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     fillTextInput(projectNameInput, "新项目B");
     await flushEffects();
 
-    const createButton = findButtonByText(document, "创建项目", { exact: true });
+    const createButton = findButtonByText(document, "创建项目", {
+      exact: true,
+    });
     expect(createButton).toBeDefined();
     clickButtonByText(document, "创建项目", { exact: true });
     await flushEffects(5);
@@ -1069,7 +1266,9 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
 
     expect(container.textContent).toContain("新项目B");
     expect(
-      container.querySelector("[data-testid='workspace-create-confirmation-card']"),
+      container.querySelector(
+        "[data-testid='workspace-create-confirmation-card']",
+      ),
     ).not.toBeNull();
   });
 });

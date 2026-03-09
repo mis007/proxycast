@@ -375,25 +375,40 @@ pub async fn handle_command(
                 .clamp(20, 1000);
 
             let logs = state.logs.read().await;
-            let entries = logs.get_logs();
-            let limit = entries.len().min(requested);
-            let recent: Vec<_> = entries
-                .into_iter()
-                .rev()
-                .take(limit)
-                .map(|e| {
-                    serde_json::json!({
-                        "timestamp": e.timestamp,
-                        "level": e.level,
-                        "message": e.message,
-                    })
-                })
-                .collect();
-            Ok(serde_json::to_value(recent)?)
+            let entries = crate::app::commands::read_persisted_logs_tail_from_path(
+                logs.get_log_file_path(),
+                requested,
+            )?;
+            Ok(serde_json::to_value(entries)?)
+        }
+
+        "get_log_storage_diagnostics" => {
+            let logs = state.logs.read().await;
+            let diagnostics = crate::app::commands::get_log_storage_diagnostics_from_path(
+                logs.get_log_file_path(),
+                logs.get_logs().len(),
+            );
+            Ok(serde_json::to_value(diagnostics)?)
+        }
+
+        "get_windows_startup_diagnostics" => {
+            let app_handle = state
+                .app_handle
+                .as_ref()
+                .ok_or_else(|| "Dev Bridge 未持有 AppHandle".to_string())?;
+            let diagnostics = crate::commands::windows_startup_cmd::collect_windows_startup_diagnostics(app_handle);
+            Ok(serde_json::to_value(diagnostics)?)
         }
 
         "clear_logs" => {
             state.logs.write().await.clear();
+            Ok(serde_json::json!({ "success": true }))
+        }
+
+        "clear_diagnostic_log_history" => {
+            let log_file_path = { state.logs.read().await.get_log_file_path() };
+            state.logs.write().await.clear();
+            crate::app::commands::clear_diagnostic_log_artifacts_from_path(log_file_path)?;
             Ok(serde_json::json!({ "success": true }))
         }
 
@@ -1397,6 +1412,7 @@ mod tests {
         let config = Config::default();
 
         DevBridgeState {
+            app_handle: None,
             server: Arc::new(RwLock::new(proxycast_server::ServerState::new(
                 config.clone(),
             ))),

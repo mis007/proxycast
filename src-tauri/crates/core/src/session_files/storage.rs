@@ -461,6 +461,9 @@ mod tests {
         let resolved = storage
             .resolve_file_path("test-session-5", "demo.md")
             .unwrap();
-        assert!(resolved.ends_with("/test-session-5/files/demo.md"));
+        let expected_suffix = std::path::Path::new("test-session-5")
+            .join("files")
+            .join("demo.md");
+        assert!(std::path::Path::new(&resolved).ends_with(&expected_suffix));
     }
 }

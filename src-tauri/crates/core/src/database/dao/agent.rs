@@ -7,6 +7,8 @@ use crate::agent::types::{
 };
 use rusqlite::{params, Connection};
 
+const JSON_RECURSION_LIMIT: usize = 50;
+
 /// 解析消息内容 JSON，支持多种格式
 ///
 /// 支持的格式：
@@ -75,17 +77,25 @@ fn dedupe_preserve_order(items: Vec<String>) -> Vec<String> {
     deduped
 }
 
-fn collect_text_candidates(value: &serde_json::Value, target: &mut Vec<String>) {
+fn collect_text_candidates_with_depth(
+    value: &serde_json::Value,
+    target: &mut Vec<String>,
+    depth: usize,
+) {
+    if depth >= JSON_RECURSION_LIMIT {
+        return;
+    }
+
     match value {
         serde_json::Value::String(text) => push_non_empty(target, Some(text)),
         serde_json::Value::Array(items) => {
             for item in items {
-                collect_text_candidates(item, target);
+                collect_text_candidates_with_depth(item, target, depth + 1);
             }
         }
         serde_json::Value::Object(obj) => {
             if let Some(content) = obj.get("content") {
-                collect_text_candidates(content, target);
+                collect_text_candidates_with_depth(content, target, depth + 1);
             }
 
             for key in ["text", "output", "stdout", "stderr", "message"] {
@@ -93,7 +103,7 @@ fn collect_text_candidates(value: &serde_json::Value, target: &mut Vec<String>) 
             }
 
             if let Some(value) = obj.get("value") {
-                collect_text_candidates(value, target);
+                collect_text_candidates_with_depth(value, target, depth + 1);
             }
 
             push_non_empty(target, obj.get("error").and_then(|v| v.as_str()));
@@ -103,11 +113,22 @@ fn collect_text_candidates(value: &serde_json::Value, target: &mut Vec<String>) 
 }
 
 fn extract_tool_response_text(value: &serde_json::Value) -> Option<String> {
+    extract_tool_response_text_with_depth(value, 0)
+}
+
+fn extract_tool_response_text_with_depth(
+    value: &serde_json::Value,
+    depth: usize,
+) -> Option<String> {
+    if depth >= JSON_RECURSION_LIMIT {
+        return None;
+    }
+
     match value {
         serde_json::Value::Array(items) => {
             let mut segments = Vec::new();
             for item in items {
-                if let Some(text) = extract_tool_response_text(item) {
+                if let Some(text) = extract_tool_response_text_with_depth(item, depth + 1) {
                     push_non_empty(&mut segments, Some(&text));
                 }
             }
@@ -141,11 +162,11 @@ fn extract_tool_response_text(value: &serde_json::Value) -> Option<String> {
                 .or_else(|| obj.get("toolResponse"))
                 .or_else(|| obj.get("tool_response"))
             {
-                collect_text_candidates(inner, &mut segments);
+                collect_text_candidates_with_depth(inner, &mut segments, depth + 1);
             }
 
             if let Some(tool_result) = obj.get("toolResult").or_else(|| obj.get("tool_result")) {
-                collect_text_candidates(tool_result, &mut segments);
+                collect_text_candidates_with_depth(tool_result, &mut segments, depth + 1);
             }
 
             push_non_empty(&mut segments, obj.get("output").and_then(|v| v.as_str()));
@@ -163,6 +184,17 @@ fn extract_tool_response_text(value: &serde_json::Value) -> Option<String> {
 }
 
 fn parse_content_parts_from_json(value: &serde_json::Value) -> Vec<ContentPart> {
+    parse_content_parts_from_json_with_depth(value, 0)
+}
+
+fn parse_content_parts_from_json_with_depth(
+    value: &serde_json::Value,
+    depth: usize,
+) -> Vec<ContentPart> {
+    if depth >= JSON_RECURSION_LIMIT {
+        return Vec::new();
+    }
+
     match value {
         serde_json::Value::Array(items) => items
             .iter()
@@ -670,7 +702,7 @@ impl AgentDao {
 mod tests {
     use crate::agent::types::MessageContent;
 
-    use super::{parse_message_content, parse_tool_calls};
+    use super::{parse_message_content, parse_tool_calls, JSON_RECURSION_LIMIT};
 
     #[test]
     fn parse_tool_calls_should_compat_with_legacy_missing_type() {
@@ -749,5 +781,23 @@ mod tests {
         let tool_response = r#"[{"type":"toolResponse","id":"call_2","toolResult":{"status":"error","error":"-32603: Tool not found"}}]"#;
         let parsed = parse_message_content(tool_response);
         assert_eq!(parsed.as_text(), "-32603: Tool not found");
+    }
+
+    #[test]
+    fn parse_message_content_should_stop_on_excessive_depth() {
+        let mut nested = serde_json::json!({ "text": "不会到达" });
+        for _ in 0..(JSON_RECURSION_LIMIT + 10) {
+            nested = serde_json::json!({ "value": nested });
+        }
+
+        let payload = serde_json::json!([
+            {
+                "type": "toolResponse",
+                "toolResult": nested
+            }
+        ]);
+
+        let parsed = parse_message_content(&payload.to_string());
+        assert_eq!(parsed.as_text(), "");
     }
 }

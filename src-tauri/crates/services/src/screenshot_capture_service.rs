@@ -2,7 +2,7 @@
 //!
 //! 提供跨平台的屏幕截图功能，支持交互式区域选择
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, error, info};
 
 #[cfg(target_os = "macos")]
@@ -90,7 +90,7 @@ pub async fn start_capture() -> Result<PathBuf, CaptureError> {
 
 /// macOS 截图实现
 #[cfg(target_os = "macos")]
-async fn capture_macos(output_path: &PathBuf) -> Result<(), CaptureError> {
+async fn capture_macos(output_path: &Path) -> Result<(), CaptureError> {
     use std::process::Command;
 
     debug!("使用 macOS screencapture 命令");

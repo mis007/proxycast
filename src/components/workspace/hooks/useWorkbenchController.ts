@@ -196,6 +196,9 @@ export function useWorkbenchController({
   const panelRenderers = themeModule.panelRenderers;
   const isAgentChatWorkspace =
     themeModule.capabilities.workspaceKind === "agent-chat";
+  const shouldRenderWorkspaceRightRailInWorkspace =
+    themeModule.capabilities.workspaceKind === "video-canvas" ||
+    (isAgentChatWorkspace && !PrimaryWorkspaceRenderer);
 
   const {
     projects,
@@ -253,6 +256,7 @@ export function useWorkbenchController({
     setLeftSidebarCollapsed,
     isAgentChatWorkspace,
     hasPrimaryWorkspaceRenderer: Boolean(PrimaryWorkspaceRenderer),
+    shouldRenderWorkspaceRightRailInWorkspace,
   });
   const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(
     null,
@@ -339,6 +343,7 @@ export function useWorkbenchController({
     pendingInitialPromptsByContentId,
     pendingCreateConfirmationByProjectId,
     contentCreationModes,
+    contentCreationTypes,
     resolvedProjectPath,
     pathChecking,
     pathConflictMessage,
@@ -585,6 +590,7 @@ export function useWorkbenchController({
     pendingInitialPromptsByContentId,
     pendingCreateConfirmation,
     contentCreationModes,
+    contentCreationTypes,
     resolvedProjectPath,
     pathChecking,
     pathConflictMessage,

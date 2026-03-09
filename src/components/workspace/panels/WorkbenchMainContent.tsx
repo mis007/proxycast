@@ -15,12 +15,12 @@ import type { Project } from "@/lib/api/project";
 import { AgentChatPage } from "@/components/agent";
 import type { WorkflowProgressSnapshot } from "@/components/agent/chat";
 import type { CreationMode } from "@/components/content-creator/types";
-import { A2UIRenderer } from "@/components/content-creator/a2ui/components";
 import type { A2UIFormData } from "@/components/content-creator/a2ui/types";
 import {
   buildCreateConfirmationA2UI,
   type PendingCreateConfirmation,
 } from "@/components/workspace/utils/createConfirmationPolicy";
+import { WorkbenchCreateEntryHome } from "./WorkbenchCreateEntryHome";
 
 type ThemeWorkspaceRenderer = ComponentType<ThemeWorkspaceRendererProps> | null | undefined;
 
@@ -104,7 +104,7 @@ export function WorkbenchMainContent({
             <div>
               <h2 className="text-base font-medium">统一创作工作区</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                左侧选择项目后，可直接进入创作、流程、发布与设置
+                左侧选择项目后，可直接进入创作、风格、流程、发布与设置
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -193,45 +193,14 @@ export function WorkbenchMainContent({
 
   if (activeWorkspaceView === "create" && showCreateContentEntryHome) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="border-b px-3 py-2 bg-muted/20 text-xs text-muted-foreground">
-          当前项目暂无文稿。请先确认创建意图，提交后才会生成新文稿。
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4">
-          {createConfirmationResponse ? (
-            <div
-              className="mx-auto w-full max-w-3xl rounded-lg border bg-card p-4"
-              data-testid="workspace-create-confirmation-card"
-            >
-              <A2UIRenderer
-                response={createConfirmationResponse}
-                onSubmit={(formData) => {
-                  void onSubmitCreateConfirmation?.(formData);
-                }}
-              />
-              {pendingCreateConfirmation?.initialUserPrompt ? (
-                <div className="mt-4 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                  已附带提示词：{pendingCreateConfirmation.initialUserPrompt}
-                </div>
-              ) : null}
-              <div className="mt-4 flex justify-end">
-                <Button variant="ghost" onClick={onCancelCreateConfirmation}>
-                  稍后再说
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full rounded-lg border border-dashed flex flex-col items-center justify-center gap-3 text-muted-foreground">
-              <Sparkles className="h-8 w-8 opacity-60" />
-              <p className="text-sm">请先发起创建确认，再生成新文稿</p>
-              <Button variant="outline" onClick={onOpenCreateContentDialog}>
-                <Plus className="h-4 w-4 mr-1" />
-                发起创建确认
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <WorkbenchCreateEntryHome
+        projectName={selectedProject?.name}
+        pendingCreateConfirmation={pendingCreateConfirmation}
+        createConfirmationResponse={createConfirmationResponse}
+        onOpenCreateContentDialog={onOpenCreateContentDialog}
+        onSubmitCreateConfirmation={onSubmitCreateConfirmation}
+        onCancelCreateConfirmation={onCancelCreateConfirmation}
+      />
     );
   }
 

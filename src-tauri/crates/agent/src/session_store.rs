@@ -146,23 +146,11 @@ pub fn get_session_sync(db: &DbConnection, session_id: &str) -> Result<SessionDe
         .map(|message| convert_agent_message(&message))
         .collect();
 
-    // 测试序列化
-    let test_content = vec![
-        TauriMessageContent::Text {
-            text: "Hello".to_string(),
-        },
-        TauriMessageContent::Thinking {
-            text: "Thinking...".to_string(),
-        },
-    ];
-    if let Ok(json) = serde_json::to_string(&test_content) {
-        tracing::info!("[SessionStore] 测试序列化: {}", json);
-    }
-
-    // 调试日志:序列化后的 JSON
-    if let Ok(json) = serde_json::to_string_pretty(&tauri_messages) {
-        tracing::debug!("[SessionStore] 序列化消息 JSON:\n{}", json);
-    }
+    tracing::debug!(
+        "[SessionStore] 会话消息转换完成: session_id={}, messages_count={}",
+        session_id,
+        tauri_messages.len()
+    );
 
     Ok(SessionDetail {
         id: session.id,
@@ -334,9 +322,9 @@ fn convert_agent_message(message: &AgentMessage) -> TauriMessage {
 
     // 调试日志
     tracing::debug!(
-        "[SessionStore] 转换消息: role={}, content={:?}",
+        "[SessionStore] 转换消息: role={}, content_items={}",
         result.role,
-        result.content
+        result.content.len()
     );
 
     result

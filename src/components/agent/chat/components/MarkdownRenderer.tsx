@@ -7,11 +7,12 @@ import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import styled from "styled-components";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { parseA2UIJson } from "@/components/content-creator/a2ui/parser";
-import { A2UIRenderer } from "@/components/content-creator/a2ui/components";
 import type { A2UIFormData } from "@/components/content-creator/a2ui/types";
+import { CHAT_A2UI_TASK_CARD_PRESET } from "@/components/content-creator/a2ui/taskCardPresets";
 import { ArtifactPlaceholder } from "./ArtifactPlaceholder";
+import { A2UITaskCard, A2UITaskLoadingCard } from "./A2UITaskCard";
 
 // Custom styles for markdown content to match Cherry Studio
 const MarkdownContainer = styled.div`
@@ -223,41 +224,6 @@ const CopyButton = styled.button`
   }
 `;
 
-// A2UI 加载状态样式
-const A2UILoadingContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: linear-gradient(
-    135deg,
-    hsl(var(--primary) / 0.05) 0%,
-    hsl(var(--primary) / 0.1) 100%
-  );
-  border: 1px solid hsl(var(--primary) / 0.2);
-  border-radius: 12px;
-  margin: 12px 0;
-`;
-
-const A2UILoadingSpinner = styled.div`
-  animation: spin 1s linear infinite;
-  color: hsl(var(--primary));
-
-  @keyframes spin {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-`;
-
-const A2UILoadingText = styled.span`
-  font-size: 14px;
-  color: hsl(var(--muted-foreground));
-`;
-
 interface MarkdownRendererProps {
   content: string;
   /** A2UI 表单提交回调 */
@@ -419,21 +385,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(
                   if (parsed) {
                     // 解析成功，直接渲染 A2UI 组件（不包裹在 pre 中）
                     return (
-                      <A2UIRenderer
+                      <A2UITaskCard
                         response={parsed}
                         onSubmit={onA2UISubmit}
-                        className="my-3"
+                        preset={CHAT_A2UI_TASK_CARD_PRESET}
                       />
                     );
                   } else {
                     // 解析失败（可能是流式输出中，JSON 还不完整）
                     return (
-                      <A2UILoadingContainer>
-                        <A2UILoadingSpinner>
-                          <Loader2 size={20} />
-                        </A2UILoadingSpinner>
-                        <A2UILoadingText>表单加载中...</A2UILoadingText>
-                      </A2UILoadingContainer>
+                      <A2UITaskLoadingCard
+                        preset={CHAT_A2UI_TASK_CARD_PRESET}
+                        subtitle="正在解析结构化问题，请稍等。"
+                      />
                     );
                   }
                 }

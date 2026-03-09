@@ -15,6 +15,12 @@ use super::bootstrap::{self, AppStates};
 use super::commands as app_commands;
 use super::types::{AppState, TrayManagerState};
 
+const MAIN_WINDOW_LABEL: &str = "main";
+
+fn should_minimize_to_tray(window_label: &str, minimize_to_tray: bool) -> bool {
+    minimize_to_tray && window_label == MAIN_WINDOW_LABEL
+}
+
 /// 运行 Tauri 应用
 ///
 /// 这是应用的主入口点，负责：
@@ -171,10 +177,12 @@ pub fn run() {
         .manage(proxycast_gateway::discord::DiscordGatewayState::default())
         .manage(proxycast_gateway::feishu::FeishuGatewayState::default())
         .manage(gateway_tunnel_state)
+        .manage(crate::services::openclaw_service::OpenClawServiceState::default())
         .manage(commands::telegram_remote_cmd::TelegramRemoteState::default())
         .on_window_event(move |window, event| {
             // 处理窗口关闭事件
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let window_label = window.label().to_string();
                 // 获取配置，检查是否启用最小化到托盘
                 let app_handle = window.app_handle();
                 if let Some(app_state) = app_handle.try_state::<AppState>() {
@@ -184,7 +192,7 @@ pub fn run() {
                         state.config.minimize_to_tray
                     });
 
-                    if minimize_to_tray {
+                    if should_minimize_to_tray(&window_label, minimize_to_tray) {
                         // 阻止默认关闭行为
                         api.prevent_close();
                         // 隐藏窗口而不是关闭
@@ -206,6 +214,11 @@ pub fn run() {
                 if let Err(e) = main_window.show() {
                     tracing::warn!("[启动] 主窗口显示失败: {}", e);
                 }
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                crate::commands::windows_startup_cmd::maybe_show_windows_startup_notice(&app.handle());
             }
 
             // TODO: 重新实现 TerminalTool 和 TermScrollbackTool 的 AppHandle 设置
@@ -276,6 +289,7 @@ pub fn run() {
 
             #[cfg(debug_assertions)]
             {
+                let app_handle = app.handle().clone();
                 let server_state = state_clone.clone();
                 let logs = logs_clone.clone();
                 let db = Some(db_clone.clone());
@@ -288,6 +302,7 @@ pub fn run() {
 
                 tauri::async_runtime::spawn(async move {
                     match crate::dev_bridge::DevBridgeServer::start(
+                        app_handle,
                         server_state,
                         logs,
                         db,
@@ -920,7 +935,10 @@ pub fn run() {
             // Log commands (from app::commands)
             app_commands::get_logs,
             app_commands::get_persisted_logs_tail,
+            app_commands::get_log_storage_diagnostics,
+            app_commands::export_support_bundle,
             app_commands::clear_logs,
+            app_commands::clear_diagnostic_log_history,
             app_commands::report_frontend_crash,
             // API test commands (from app::commands)
             app_commands::test_api,
@@ -959,6 +977,23 @@ pub fn run() {
             commands::config_cmd::open_auth_dir,
             commands::config_cmd::check_for_updates,
             commands::config_cmd::download_update,
+            // OpenClaw commands
+            commands::openclaw_cmd::openclaw_check_installed,
+            commands::openclaw_cmd::openclaw_check_node_version,
+            commands::openclaw_cmd::openclaw_check_git_available,
+            commands::openclaw_cmd::openclaw_get_node_download_url,
+            commands::openclaw_cmd::openclaw_get_git_download_url,
+            commands::openclaw_cmd::openclaw_install,
+            commands::openclaw_cmd::openclaw_uninstall,
+            commands::openclaw_cmd::openclaw_start_gateway,
+            commands::openclaw_cmd::openclaw_stop_gateway,
+            commands::openclaw_cmd::openclaw_restart_gateway,
+            commands::openclaw_cmd::openclaw_get_status,
+            commands::openclaw_cmd::openclaw_check_health,
+            commands::openclaw_cmd::openclaw_get_dashboard_url,
+            commands::openclaw_cmd::openclaw_get_channels,
+            commands::openclaw_cmd::openclaw_sync_provider_config,
+            commands::openclaw_cmd::openclaw_install_event,
             // MCP commands
             commands::mcp_cmd::get_mcp_servers,
             commands::mcp_cmd::add_mcp_server,
@@ -1211,6 +1246,7 @@ pub fn run() {
             commands::machine_id_cmd::copy_machine_id_to_clipboard,
             commands::machine_id_cmd::paste_machine_id_from_clipboard,
             commands::machine_id_cmd::get_system_info,
+            commands::windows_startup_cmd::get_windows_startup_diagnostics,
             // Kiro Local commands
             commands::kiro_local::switch_kiro_to_local,
             commands::kiro_local::get_kiro_fingerprint_info,
@@ -1674,4 +1710,16 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_minimize_to_tray;
+
+    #[test]
+    fn should_only_minimize_main_window_to_tray() {
+        assert!(should_minimize_to_tray("main", true));
+        assert!(!should_minimize_to_tray("openclaw-dashboard", true));
+        assert!(!should_minimize_to_tray("main", false));
+    }
 }

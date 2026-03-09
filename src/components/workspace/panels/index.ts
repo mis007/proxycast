@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 export { WorkbenchLeftSidebar } from "./WorkbenchLeftSidebar";
 export type { WorkbenchLeftSidebarProps } from "./WorkbenchLeftSidebar";
 export { WorkbenchRightRail } from "./WorkbenchRightRail";
-export type { WorkbenchRightRailProps } from "./WorkbenchRightRail";
+export type { WorkbenchRightRailProps } from "./workbenchRightRailContracts";
 export { WorkbenchMainContent } from "./WorkbenchMainContent";
 export type { WorkbenchMainContentProps } from "./WorkbenchMainContent";
 

@@ -14,6 +14,7 @@ import React, {
 } from "react";
 import styled from "styled-components";
 import { invoke } from "@tauri-apps/api/core";
+import { getStyleGuide, type StyleGuide } from "@/lib/api/memory";
 import type {
   AutoContinueSettings,
   ContentReviewExpert,
@@ -59,6 +60,10 @@ import {
 } from "./utils/autoContinueSettings";
 import { logRenderPerf } from "@/lib/perfDebug";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
+import {
+  buildTextStylizePrompt,
+  resolveTextStylizeSourceLabel,
+} from "@/lib/style-guide";
 
 interface WebImageSearchResponse {
   total: number;
@@ -173,6 +178,8 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = memo(
     const [toastMessage, setToastMessage] = useState("");
     const [showToast, setShowToast] = useState(false);
     const [autoInsertLoading, setAutoInsertLoading] = useState(false);
+    const [projectStyleGuide, setProjectStyleGuide] =
+      useState<StyleGuide | null>(null);
 
     // Undo/Redo 历史栈
     const undoStackRef = useRef<string[]>([]);
@@ -192,6 +199,32 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = memo(
       setCanUndo(undoStackRef.current.length > 0);
       setCanRedo(false);
     }, []);
+
+    useEffect(() => {
+      if (!projectId) {
+        setProjectStyleGuide(null);
+        return;
+      }
+
+      let disposed = false;
+
+      getStyleGuide(projectId)
+        .then((nextStyleGuide) => {
+          if (!disposed) {
+            setProjectStyleGuide(nextStyleGuide);
+          }
+        })
+        .catch((error) => {
+          console.warn("[DocumentCanvas] 加载项目风格失败:", error);
+          if (!disposed) {
+            setProjectStyleGuide(null);
+          }
+        });
+
+      return () => {
+        disposed = true;
+      };
+    }, [projectId]);
 
     const handleUndo = useCallback(() => {
       if (undoStackRef.current.length === 0) return;
@@ -875,26 +908,32 @@ CONTENT`,
       }
 
       try {
-        showMessage("✨ 正在进行文本风格化...");
+        const latestProjectStyleGuide = projectId
+          ? await getStyleGuide(projectId).catch((error) => {
+              console.warn("[DocumentCanvas] 刷新项目风格失败:", error);
+              return projectStyleGuide;
+            })
+          : null;
 
-        const prompt = `请对以下文本进行风格化优化，使其更加生动、有吸引力，同时保持原意不变。
+        if (projectId) {
+          setProjectStyleGuide(latestProjectStyleGuide);
+        }
 
-优化要求：
-1. 增强文字的表现力和感染力
-2. 使用更生动的词汇和修辞手法
-3. 优化句式结构，使其更流畅
-4. 保持原文的核心观点和信息
-5. 适当添加情感色彩，但不要过度夸张
-6. 输出纯文本，不要使用 Markdown 格式
+        const styleSourceLabel = resolveTextStylizeSourceLabel({
+          projectId,
+          projectStyleGuide: latestProjectStyleGuide,
+        });
+        showMessage(
+          styleSourceLabel === "项目默认风格"
+            ? "✨ 正在根据项目默认风格进行文本风格化..."
+            : "✨ 正在进行文本风格化...",
+        );
 
-当前平台：${state.platform}
-
-原始文本：
-<<<CONTENT
-${baseContent}
-CONTENT
-
-请直接输出优化后的文本，不要添加任何说明或注释。`;
+        const prompt = buildTextStylizePrompt({
+          content: baseContent,
+          platform: state.platform,
+          projectStyleGuide: latestProjectStyleGuide,
+        });
 
         const result = await onTextStylizeRun({
           prompt,
@@ -916,10 +955,21 @@ CONTENT
     }, [
       onTextStylizeRun,
       editingContent,
+      projectId,
+      projectStyleGuide,
       state.platform,
       resolvedThinkingEnabled,
       showMessage,
     ]);
+
+    const textStylizeSourceLabel = useMemo(
+      () =>
+        resolveTextStylizeSourceLabel({
+          projectId,
+          projectStyleGuide,
+        }),
+      [projectId, projectStyleGuide],
+    );
 
     const handleCloseContentReview = useCallback(() => {
       setContentReviewOpen(false);
@@ -1061,6 +1111,7 @@ CONTENT
             onAddImage={onAddImage}
             onImportDocument={onImportDocument}
             onTextStylize={handleTextStylize}
+            textStylizeSourceLabel={textStylizeSourceLabel}
             onContentReview={handleContentReview}
             contentReviewActive={contentReviewOpen}
             onUndo={handleUndo}

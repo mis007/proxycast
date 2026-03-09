@@ -1,17 +1,77 @@
 use anyhow::{anyhow, Context, Result};
+use parking_lot::{Mutex, RwLock};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 use proxycast_core::models::{AppType, Skill, SkillMetadata, SkillRepo, SkillState};
 
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
+const REMOTE_SKILLS_CACHE_TTL: Duration = Duration::from_secs(300);
+const REMOTE_SKILLS_ERROR_CACHE_TTL: Duration = Duration::from_secs(120);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RepoCacheKey {
+    owner: String,
+    name: String,
+    branch: String,
+}
+
+impl From<&SkillRepo> for RepoCacheKey {
+    fn from(value: &SkillRepo) -> Self {
+        Self {
+            owner: value.owner.clone(),
+            name: value.name.clone(),
+            branch: value.branch.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum RepoCacheValue {
+    Skills(Vec<Skill>),
+    Error(String),
+}
+
+#[derive(Debug, Clone)]
+struct RepoCacheEntry {
+    value: RepoCacheValue,
+    fetched_at: Instant,
+}
+
+impl RepoCacheEntry {
+    fn success(skills: Vec<Skill>) -> Self {
+        Self {
+            value: RepoCacheValue::Skills(skills),
+            fetched_at: Instant::now(),
+        }
+    }
+
+    fn error(message: String) -> Self {
+        Self {
+            value: RepoCacheValue::Error(message),
+            fetched_at: Instant::now(),
+        }
+    }
+
+    fn is_fresh(&self) -> bool {
+        let ttl = match self.value {
+            RepoCacheValue::Skills(_) => REMOTE_SKILLS_CACHE_TTL,
+            RepoCacheValue::Error(_) => REMOTE_SKILLS_ERROR_CACHE_TTL,
+        };
+
+        self.fetched_at.elapsed() < ttl
+    }
+}
 
 pub struct SkillService {
     client: Client,
+    repo_cache: RwLock<HashMap<RepoCacheKey, RepoCacheEntry>>,
+    inflight_fetches: Mutex<HashMap<RepoCacheKey, Arc<tokio::sync::Notify>>>,
 }
 
 impl SkillService {
@@ -21,7 +81,11 @@ impl SkillService {
             .build()
             .context("Failed to create HTTP client")?;
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            repo_cache: RwLock::new(HashMap::new()),
+            inflight_fetches: Mutex::new(HashMap::new()),
+        })
     }
 
     /// 获取技能安装目录
@@ -51,14 +115,18 @@ impl SkillService {
         let enabled_repos: Vec<_> = repos.iter().filter(|r| r.enabled).collect();
 
         for repo in enabled_repos {
-            match timeout(
-                DOWNLOAD_TIMEOUT,
-                self.fetch_skills_from_repo(repo, app_type, installed_states),
-            )
-            .await
-            {
-                Ok(Ok(skills)) => {
-                    for skill in skills {
+            match timeout(DOWNLOAD_TIMEOUT, self.fetch_skills_from_repo_cached(repo)).await {
+                Ok(Ok(remote_skills)) => {
+                    for mut skill in remote_skills {
+                        let app_key = format!(
+                            "{}:{}",
+                            app_type.to_string().to_lowercase(),
+                            skill.directory
+                        );
+                        skill.installed = installed_states
+                            .get(&app_key)
+                            .map(|state| state.installed)
+                            .unwrap_or(false);
                         all_skills.insert(skill.key.clone(), skill);
                     }
                 }
@@ -130,19 +198,109 @@ impl SkillService {
         Ok(skills)
     }
 
+    async fn fetch_skills_from_repo_cached(&self, repo: &SkillRepo) -> Result<Vec<Skill>> {
+        let cache_key = RepoCacheKey::from(repo);
+
+        if let Some(cached) = self.read_cached_repo_result(&cache_key) {
+            return cached;
+        }
+
+        let (notify, is_leader) = {
+            let mut inflight = self.inflight_fetches.lock();
+            if let Some(existing) = inflight.get(&cache_key) {
+                (existing.clone(), false)
+            } else {
+                let notify = Arc::new(tokio::sync::Notify::new());
+                inflight.insert(cache_key.clone(), notify.clone());
+                (notify, true)
+            }
+        };
+
+        if !is_leader {
+            notify.notified().await;
+            if let Some(cached) = self.read_cached_repo_result(&cache_key) {
+                return cached;
+            }
+            return Err(anyhow!(
+                "技能仓库缓存同步失败: {}/{}@{}",
+                repo.owner,
+                repo.name,
+                repo.branch
+            ));
+        }
+
+        let result = self
+            .fetch_skills_from_repo_uncached(repo)
+            .await
+            .map_err(|error| error.to_string());
+
+        {
+            let mut cache = self.repo_cache.write();
+            let entry = match &result {
+                Ok(skills) => RepoCacheEntry::success(skills.clone()),
+                Err(error) => RepoCacheEntry::error(error.clone()),
+            };
+            cache.insert(cache_key.clone(), entry);
+        }
+
+        self.inflight_fetches.lock().remove(&cache_key);
+        notify.notify_waiters();
+
+        result.map_err(|error| anyhow!(error))
+    }
+
+    fn read_cached_repo_result(&self, cache_key: &RepoCacheKey) -> Option<Result<Vec<Skill>>> {
+        let cached = self.repo_cache.read().get(cache_key).cloned()?;
+        if !cached.is_fresh() {
+            self.repo_cache.write().remove(cache_key);
+            return None;
+        }
+
+        Some(match cached.value {
+            RepoCacheValue::Skills(skills) => Ok(skills),
+            RepoCacheValue::Error(error) => Err(anyhow!(error)),
+        })
+    }
+
     /// 从仓库获取技能列表
-    async fn fetch_skills_from_repo(
-        &self,
-        repo: &SkillRepo,
-        app_type: &AppType,
-        installed_states: &HashMap<String, SkillState>,
-    ) -> Result<Vec<Skill>> {
+    async fn fetch_skills_from_repo_uncached(&self, repo: &SkillRepo) -> Result<Vec<Skill>> {
+        let mut last_error = None;
+
+        for branch in Self::build_branch_candidates(&repo.branch) {
+            match self.fetch_skills_from_branch(repo, &branch).await {
+                Ok(skills) => return Ok(skills),
+                Err(error) => {
+                    if branch != repo.branch {
+                        tracing::warn!(
+                            "[SkillService] 仓库 {}/{} 分支 {} 不可用，回退 {} 仍失败: {}",
+                            repo.owner,
+                            repo.name,
+                            repo.branch,
+                            branch,
+                            error
+                        );
+                    }
+                    last_error = Some(error);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            anyhow!(
+                "Failed to fetch skills from {}/{}@{}",
+                repo.owner,
+                repo.name,
+                repo.branch
+            )
+        }))
+    }
+
+    async fn fetch_skills_from_branch(&self, repo: &SkillRepo, branch: &str) -> Result<Vec<Skill>> {
         let zip_url = format!(
             "https://github.com/{}/{}/archive/refs/heads/{}.zip",
-            repo.owner, repo.name, repo.branch
+            repo.owner, repo.name, branch
         );
 
-        // 下载 ZIP
         let response = self
             .client
             .get(&zip_url)
@@ -155,8 +313,6 @@ impl SkillService {
         }
 
         let bytes = response.bytes().await.context("Failed to read response")?;
-
-        // 解压并扫描
         let cursor = std::io::Cursor::new(bytes);
         let mut archive = zip::ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
 
@@ -176,7 +332,6 @@ impl SkillService {
                     .unwrap_or("unknown")
                     .to_string();
 
-                // 读取并解析 SKILL.md
                 let mut content = String::new();
                 use std::io::Read;
                 file.read_to_string(&mut content)
@@ -185,21 +340,16 @@ impl SkillService {
                 let metadata = self.parse_skill_metadata_from_content(&content)?;
                 let name = metadata.name.unwrap_or_else(|| directory.clone());
                 let description = metadata.description.unwrap_or_default();
-
                 let key = format!("{repo_key_prefix}{directory}");
-                let app_key = format!("{}:{}", app_type.to_string().to_lowercase(), directory);
-                let installed = installed_states
-                    .get(&app_key)
-                    .map(|state| state.installed)
-                    .unwrap_or(false);
-
-                let readme_url = Some(format!(
-                    "https://github.com/{}/{}/blob/{}/{}/SKILL.md",
-                    repo.owner,
-                    repo.name,
-                    repo.branch,
-                    path.parent().unwrap().to_str().unwrap_or("")
-                ));
+                let readme_url = path.parent().map(|parent| {
+                    format!(
+                        "https://github.com/{}/{}/blob/{}/{}/SKILL.md",
+                        repo.owner,
+                        repo.name,
+                        branch,
+                        parent.to_str().unwrap_or("")
+                    )
+                });
 
                 skills.push(Skill {
                     key,
@@ -207,15 +357,26 @@ impl SkillService {
                     description,
                     directory,
                     readme_url,
-                    installed,
+                    installed: false,
                     repo_owner: Some(repo.owner.clone()),
                     repo_name: Some(repo.name.clone()),
-                    repo_branch: Some(repo.branch.clone()),
+                    repo_branch: Some(branch.to_string()),
                 });
             }
         }
 
         Ok(skills)
+    }
+
+    fn build_branch_candidates(branch: &str) -> Vec<String> {
+        let normalized = branch.trim();
+        if normalized.eq_ignore_ascii_case("main") {
+            vec!["main".to_string(), "master".to_string()]
+        } else if normalized.eq_ignore_ascii_case("master") {
+            vec!["master".to_string(), "main".to_string()]
+        } else {
+            vec![normalized.to_string()]
+        }
     }
 
     /// 安装技能
@@ -360,5 +521,26 @@ impl SkillService {
             serde_yaml::from_str(front_matter).context("Failed to parse YAML front matter")?;
 
         Ok(meta)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SkillService;
+
+    #[test]
+    fn build_branch_candidates_should_include_main_master_fallback() {
+        assert_eq!(
+            SkillService::build_branch_candidates("main"),
+            vec!["main".to_string(), "master".to_string()]
+        );
+        assert_eq!(
+            SkillService::build_branch_candidates("master"),
+            vec!["master".to_string(), "main".to_string()]
+        );
+        assert_eq!(
+            SkillService::build_branch_candidates("release"),
+            vec!["release".to_string()]
+        );
     }
 }

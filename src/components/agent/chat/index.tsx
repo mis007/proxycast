@@ -22,10 +22,7 @@ import { PanelLeftOpen } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { safeListen } from "@/lib/dev-bridge";
-import {
-  uploadImageToSession,
-  importDocument,
-} from "@/lib/api/session-files";
+import { uploadImageToSession, importDocument } from "@/lib/api/session-files";
 import {
   useAgentChatUnified,
   useThemeContextWorkspace,
@@ -35,6 +32,7 @@ import type { SidebarActivityLog } from "./hooks/useThemeContextWorkspace";
 import type { TopicBranchStatus } from "./hooks/useTopicBranchBoard";
 import { useSessionFiles } from "./hooks/useSessionFiles";
 import { useContentSync } from "./hooks/useContentSync";
+import { getDefaultGuidePromptByTheme } from "./utils/defaultGuidePrompt";
 import { ChatNavbar } from "./components/ChatNavbar";
 import { ChatSidebar } from "./components/ChatSidebar";
 import {
@@ -43,6 +41,7 @@ import {
 } from "./components/ThemeWorkbenchSidebar";
 import { MessageList } from "./components/MessageList";
 import { Inputbar } from "./components/Inputbar";
+import { RuntimeStyleControlBar } from "./components/RuntimeStyleControlBar";
 import { EmptyState } from "./components/EmptyState";
 import type { CreationMode } from "./components/types";
 import { type TaskFile } from "./components/TaskFiles";
@@ -148,6 +147,10 @@ import type {
 import type { A2UIFormData } from "@/components/content-creator/a2ui/types";
 import { getFileToStepMap } from "./utils/workflowMapping";
 import { normalizeProjectId } from "./utils/topicProjectResolution";
+import {
+  extractStyleActionContent,
+  resolveStyleActionFileName,
+} from "./utils/styleRuntime";
 import { resolveTopicSwitchProject } from "./utils/topicProjectSwitch";
 import {
   loadChatToolPreferences,
@@ -160,6 +163,14 @@ import {
 } from "./utils/taskFileCanvasSync";
 import { parseSkillSlashCommand } from "./hooks/skillCommand";
 import { subscribeDocumentEditorFocus } from "@/lib/documentEditorFocusEvents";
+import {
+  DEFAULT_STYLE_PROFILE,
+  buildRuntimeStyleOverridePrompt,
+  buildStyleAuditPrompt,
+  buildStyleRewritePrompt,
+  getStyleProfileFromGuide,
+  type RuntimeStyleSelection,
+} from "@/lib/style-guide";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 
 const SUPPORTED_ENTRY_THEMES: ThemeType[] = [
@@ -319,7 +330,7 @@ interface HandleSendObserver {
 
 interface HandleSendOptions {
   skipThemeSkillPrefix?: boolean;
-  purpose?: "content_review" | "text_stylize";
+  purpose?: "content_review" | "text_stylize" | "style_rewrite" | "style_audit";
   observer?: HandleSendObserver;
 }
 
@@ -1330,7 +1341,7 @@ function buildThemeWorkbenchWorkflowSteps(
       const item = queueItems[0];
       const sourceRef = item.source_ref?.trim();
       const workflowSteps = sourceRef
-        ? (skillDetailMap[sourceRef]?.workflow_steps || [])
+        ? skillDetailMap[sourceRef]?.workflow_steps || []
         : [];
       if (workflowSteps.length > 0) {
         const latestAssistantContent =
@@ -1689,6 +1700,37 @@ export function AgentChatPage({
   const [projectMemory, setProjectMemory] = useState<ProjectMemory | null>(
     null,
   );
+  const [runtimeStyleSelection, setRuntimeStyleSelection] =
+    useState<RuntimeStyleSelection>({
+      presetId: "project-default",
+      strength: DEFAULT_STYLE_PROFILE.simulationStrength,
+      customNotes: "",
+      source: "project-default",
+      sourceLabel: undefined,
+      sourceProfile: null,
+    });
+
+  useEffect(() => {
+    setRuntimeStyleSelection((previous) => {
+      if (
+        previous.presetId !== "project-default" ||
+        previous.customNotes.trim()
+      ) {
+        return previous;
+      }
+
+      const nextStrength =
+        getStyleProfileFromGuide(projectMemory?.style_guide)
+          ?.simulationStrength || DEFAULT_STYLE_PROFILE.simulationStrength;
+
+      return previous.strength === nextStrength
+        ? previous
+        : {
+            ...previous,
+            strength: nextStrength,
+          };
+    });
+  }, [projectMemory?.style_guide]);
 
   // 主动 workspace 健康检查失败标记（区别于 workspacePathMissing 发送失败场景）
   const [workspaceHealthError, setWorkspaceHealthError] = useState(false);
@@ -1702,9 +1744,7 @@ export function AgentChatPage({
   const [skills, setSkills] = useState<Skill[]>([]);
 
   // Workbench Store（用于主题工作台右侧面板状态同步）
-  const pendingSkillKey = useWorkbenchStore(
-    (state) => state.pendingSkillKey,
-  );
+  const pendingSkillKey = useWorkbenchStore((state) => state.pendingSkillKey);
   const clearThemeSkillsRailState = useWorkbenchStore(
     (state) => state.clearThemeSkillsRailState,
   );
@@ -1726,6 +1766,14 @@ export function AgentChatPage({
 
   // 工作流状态（仅在内容创作模式下使用）
   const mappedTheme = activeTheme as ThemeType;
+
+  useEffect(() => {
+    setRuntimeStyleSelection({
+      presetId: "project-default",
+      strength: DEFAULT_STYLE_PROFILE.simulationStrength,
+      customNotes: "",
+    });
+  }, [mappedTheme, projectId]);
   const { steps, currentStepIndex, goToStep, completeStep } = useWorkflow(
     mappedTheme,
     creationMode,
@@ -1855,7 +1903,9 @@ export function AgentChatPage({
           : rawBody;
 
         if (rawBody && sanitizedBody !== rawBody) {
-          setInitialContentLoadError("当前文稿未生成有效主稿，请重新生成或稍后重试");
+          setInitialContentLoadError(
+            "当前文稿未生成有效主稿，请重新生成或稍后重试",
+          );
         } else {
           setInitialContentLoadError(null);
         }
@@ -1886,7 +1936,9 @@ export function AgentChatPage({
             initialState = backendApplied.state;
             setDocumentVersionStatusMap(backendApplied.statusMap);
           } else {
-            const persisted = readPersistedThemeWorkbenchDocument(content.metadata);
+            const persisted = readPersistedThemeWorkbenchDocument(
+              content.metadata,
+            );
             if (persisted) {
               const restoredVersions = persisted.versions.map((version) =>
                 version.id === persisted.currentVersionId
@@ -2008,6 +2060,32 @@ export function AgentChatPage({
       });
   }, [project, projectId]);
 
+  const runtimeStylePrompt = useMemo(
+    () =>
+      buildRuntimeStyleOverridePrompt({
+        projectStyleGuide: projectMemory?.style_guide,
+        selection: runtimeStyleSelection,
+        activeTheme: mappedTheme,
+      }),
+    [mappedTheme, projectMemory?.style_guide, runtimeStyleSelection],
+  );
+
+  const runtimeStyleMessagePrompt = useMemo(() => {
+    const projectDefaultStrength =
+      getStyleProfileFromGuide(projectMemory?.style_guide)
+        ?.simulationStrength || DEFAULT_STYLE_PROFILE.simulationStrength;
+    const hasPresetOverride =
+      runtimeStyleSelection.presetId !== "project-default" ||
+      runtimeStyleSelection.source === "library";
+    const hasCustomNotes = runtimeStyleSelection.customNotes.trim().length > 0;
+    const hasStrengthOverride =
+      runtimeStyleSelection.strength !== projectDefaultStrength;
+
+    return hasPresetOverride || hasCustomNotes || hasStrengthOverride
+      ? runtimeStylePrompt
+      : "";
+  }, [projectMemory?.style_guide, runtimeStylePrompt, runtimeStyleSelection]);
+
   // 生成系统提示词（包含项目 Memory）
   const systemPrompt = useMemo(() => {
     let prompt = "";
@@ -2025,7 +2103,7 @@ export function AgentChatPage({
     }
 
     return prompt || undefined;
-  }, [isContentCreationMode, mappedTheme, creationMode, projectMemory]);
+  }, [creationMode, isContentCreationMode, mappedTheme, projectMemory]);
 
   // 使用 Agent Chat Hook（传递系统提示词）
   const {
@@ -2316,7 +2394,6 @@ export function AgentChatPage({
     }
     return null;
   }, [messages]);
-
 
   const a2uiSubmissionNotice = useMemo(() => {
     if (pendingA2UIForm) {
@@ -2750,7 +2827,6 @@ export function AgentChatPage({
     [contextWorkspace],
   );
 
-
   useEffect(() => {
     if (!isThemeWorkbench || !selectedThemeWorkbenchRunId) {
       setThemeWorkbenchRunDetailLoading(false);
@@ -2996,6 +3072,7 @@ export function AgentChatPage({
   const restoredFilesSessionId = useRef<string | null>(null);
   // 用于追踪是否已触发过 AI 引导
   const hasTriggeredGuide = useRef(false);
+  const consumedInitialPromptRef = useRef<string | null>(null);
 
   // 当 sessionMeta 加载完成时，恢复主题和创建模式
   useEffect(() => {
@@ -3116,6 +3193,7 @@ export function AgentChatPage({
     restoredMetaSessionId.current = null;
     restoredFilesSessionId.current = null;
     hasTriggeredGuide.current = false;
+    consumedInitialPromptRef.current = null;
   }, []);
 
   const runTopicSwitch = useCallback(
@@ -3321,7 +3399,8 @@ export function AgentChatPage({
           msg.role === "assistant" &&
           !msg.isThinking &&
           msg.content &&
-          msg.purpose !== "content_review",
+          msg.purpose !== "content_review" &&
+          msg.purpose !== "style_audit",
       );
 
     if (!lastAssistantMsg) return;
@@ -3454,6 +3533,10 @@ export function AgentChatPage({
         text = `[角色上下文]\n${characterContext}\n\n[用户输入]\n${text}`;
       }
 
+      if (!sendOptions?.purpose && runtimeStyleMessagePrompt) {
+        text = `[本次任务风格要求]\n${runtimeStyleMessagePrompt}\n\n[用户输入]\n${text}`;
+      }
+
       setInput("");
       setMentionedCharacters([]); // 清空引用的角色
 
@@ -3554,6 +3637,7 @@ export function AgentChatPage({
       projectId,
       providerModels,
       providerType,
+      runtimeStyleMessagePrompt,
       sendMessage,
       sessionId,
       setModel,
@@ -3674,12 +3758,7 @@ export function AgentChatPage({
     const command = `/${pendingSkillKey}`;
     console.log("[AgentChatPage] 执行技能命令:", command);
     handleSend([], false, false, command);
-  }, [
-    pendingSkillKey,
-    isThemeWorkbench,
-    consumePendingSkill,
-    handleSend,
-  ]);
+  }, [pendingSkillKey, isThemeWorkbench, consumePendingSkill, handleSend]);
 
   const handleClearMessages = useCallback(() => {
     clearMessages();
@@ -3768,63 +3847,60 @@ export function AgentChatPage({
     [setTopicStatus],
   );
 
-  const handleAddImage = useCallback(
-    async () => {
-      try {
-        const selected = await openDialog({
-          multiple: false,
-          filters: [
-            {
-              name: "图片",
-              extensions: ["jpg", "jpeg", "png", "gif", "webp"],
-            },
-          ],
-        });
+  const handleAddImage = useCallback(async () => {
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        filters: [
+          {
+            name: "图片",
+            extensions: ["jpg", "jpeg", "png", "gif", "webp"],
+          },
+        ],
+      });
 
-        if (!selected) {
-          return;
-        }
-
-        const filePath = selected;
-        if (!filePath) {
-          toast.error("未选择文件");
-          return;
-        }
-
-        if (!sessionId) {
-          toast.error("会话未就绪");
-          return;
-        }
-
-        toast.info("正在上传图片...");
-
-        // 上传图片到会话
-        const imageUrl = await uploadImageToSession(sessionId, filePath);
-
-        // 插入图片到文档
-        setCanvasState((previous) => {
-          if (!previous || previous.type !== "document") {
-            toast.error("当前不在文档编辑模式");
-            return previous;
-          }
-
-          const fileName = filePath.split(/[\\/]/).pop() || "image";
-          const imageMarkdown = `\n\n![${fileName}](${imageUrl})\n\n`;
-
-          return {
-            ...previous,
-            content: previous.content + imageMarkdown,
-          };
-        });
-
-        toast.success("图片已添加");
-      } catch (error) {
-        console.error("添加图片失败:", error);
-        toast.error(error instanceof Error ? error.message : "添加图片失败");
+      if (!selected) {
+        return;
       }
-    },
-    [sessionId, setCanvasState],
-  );
+
+      const filePath = selected;
+      if (!filePath) {
+        toast.error("未选择文件");
+        return;
+      }
+
+      if (!sessionId) {
+        toast.error("会话未就绪");
+        return;
+      }
+
+      toast.info("正在上传图片...");
+
+      // 上传图片到会话
+      const imageUrl = await uploadImageToSession(sessionId, filePath);
+
+      // 插入图片到文档
+      setCanvasState((previous) => {
+        if (!previous || previous.type !== "document") {
+          toast.error("当前不在文档编辑模式");
+          return previous;
+        }
+
+        const fileName = filePath.split(/[\\/]/).pop() || "image";
+        const imageMarkdown = `\n\n![${fileName}](${imageUrl})\n\n`;
+
+        return {
+          ...previous,
+          content: previous.content + imageMarkdown,
+        };
+      });
+
+      toast.success("图片已添加");
+    } catch (error) {
+      console.error("添加图片失败:", error);
+      toast.error(error instanceof Error ? error.message : "添加图片失败");
+    }
+  }, [sessionId, setCanvasState]);
 
   const handleImportDocument = useCallback(async () => {
     try {
@@ -3903,6 +3979,7 @@ export function AgentChatPage({
     restoredMetaSessionId.current = null;
     restoredFilesSessionId.current = null;
     hasTriggeredGuide.current = false;
+    consumedInitialPromptRef.current = null;
 
     if (!externalProjectId) {
       setInternalProjectId(null);
@@ -4765,6 +4842,10 @@ export function AgentChatPage({
     // - 尚未触发过引导
     const canvasEmpty = isCanvasStateEmpty(canvasState);
     const pendingInitialPrompt = (initialUserPrompt || "").trim();
+    const defaultGuidePrompt =
+      contentId && canvasEmpty && !isThemeWorkbench
+        ? getDefaultGuidePromptByTheme(mappedTheme)
+        : undefined;
 
     if (
       contentId &&
@@ -4772,10 +4853,13 @@ export function AgentChatPage({
       project &&
       systemPrompt &&
       !isSending &&
-      canvasEmpty &&
-      !hasTriggeredGuide.current
+      canvasEmpty
     ) {
       if (pendingInitialPrompt) {
+        if (consumedInitialPromptRef.current === pendingInitialPrompt) {
+          return;
+        }
+        consumedInitialPromptRef.current = pendingInitialPrompt;
         hasTriggeredGuide.current = true;
         console.log("[AgentChatPage] 自动发送首条创作意图消息");
         void (async () => {
@@ -4790,19 +4874,41 @@ export function AgentChatPage({
         return;
       }
 
+      if (hasTriggeredGuide.current) {
+        return;
+      }
+
+      if (defaultGuidePrompt) {
+        hasTriggeredGuide.current = true;
+        setInput((previous) => previous.trim() || defaultGuidePrompt);
+        return;
+      }
+
       if (isThemeWorkbench) {
         hasTriggeredGuide.current = true;
         console.log("[AgentChatPage] 主题工作台：触发 AI 引导，创建后端工作流");
         // 同步创建后端工作流（不阻塞触发）
         void (async () => {
           try {
-            const { contentWorkflowApi } = await import("@/lib/api/content-workflow");
-            const themeForApi = mappedTheme as import("@/lib/api/content-workflow").ThemeType;
-            const modeForApi = (creationMode as import("@/lib/api/content-workflow").CreationMode) ?? "guided";
-            await contentWorkflowApi.create(contentId!, themeForApi, modeForApi);
+            const { contentWorkflowApi } = await import(
+              "@/lib/api/content-workflow"
+            );
+            const themeForApi =
+              mappedTheme as import("@/lib/api/content-workflow").ThemeType;
+            const modeForApi =
+              (creationMode as import("@/lib/api/content-workflow").CreationMode) ??
+              "guided";
+            await contentWorkflowApi.create(
+              contentId!,
+              themeForApi,
+              modeForApi,
+            );
             console.log("[AgentChatPage] 后端工作流创建成功");
           } catch (e) {
-            console.warn("[AgentChatPage] 后端工作流创建失败（不影响主流程）:", e);
+            console.warn(
+              "[AgentChatPage] 后端工作流创建失败（不影响主流程）:",
+              e,
+            );
           }
         })();
         triggerAIGuideRef.current();
@@ -4824,6 +4930,7 @@ export function AgentChatPage({
     isSending,
     canvasState,
     initialUserPrompt,
+    setInput,
     isThemeWorkbench,
     handleSend,
     chatToolPreferences,
@@ -4833,6 +4940,7 @@ export function AgentChatPage({
   // 当 contentId 变化时重置引导状态
   useEffect(() => {
     hasTriggeredGuide.current = false;
+    consumedInitialPromptRef.current = null;
   }, [contentId]);
 
   // 当 contentId 变化且是主题工作台时，尝试从后端恢复工作流
@@ -4841,7 +4949,9 @@ export function AgentChatPage({
 
     void (async () => {
       try {
-        const { contentWorkflowApi } = await import("@/lib/api/content-workflow");
+        const { contentWorkflowApi } = await import(
+          "@/lib/api/content-workflow"
+        );
         const workflow = await contentWorkflowApi.getByContent(contentId);
         if (workflow) {
           const completedCount = workflow.steps.filter(
@@ -4861,7 +4971,9 @@ export function AgentChatPage({
   // 监听封面图重新生成成功事件，将占位 URL 替换为真实图片 URL
   useEffect(() => {
     const handler = (e: Event) => {
-      const { placeholder, imageUrl } = (e as CustomEvent<CoverImageReplacedDetail>).detail;
+      const { placeholder, imageUrl } = (
+        e as CustomEvent<CoverImageReplacedDetail>
+      ).detail;
       if (!placeholder || !imageUrl) return;
       setCanvasState((prev) => {
         if (!prev || prev.type !== "document") return prev;
@@ -4871,7 +4983,8 @@ export function AgentChatPage({
       });
     };
     window.addEventListener(COVER_IMAGE_REPLACED_EVENT, handler);
-    return () => window.removeEventListener(COVER_IMAGE_REPLACED_EVENT, handler);
+    return () =>
+      window.removeEventListener(COVER_IMAGE_REPLACED_EVENT, handler);
   }, []);
 
   // 主题工作台始终使用聊天布局与浮层输入，不走旧 EmptyState 输入流程
@@ -5095,6 +5208,115 @@ export function AgentChatPage({
       : undefined;
   }, [selectedFileId, visibleTaskFiles]);
 
+  const styleActionContent = useMemo(
+    () =>
+      extractStyleActionContent({
+        activeTheme: mappedTheme,
+        generalCanvasState,
+        resolvedCanvasState,
+        taskFiles: visibleTaskFiles,
+        selectedFileId: visibleSelectedFileId,
+      }),
+    [
+      generalCanvasState,
+      mappedTheme,
+      resolvedCanvasState,
+      visibleSelectedFileId,
+      visibleTaskFiles,
+    ],
+  );
+
+  const styleActionFileName = useMemo(
+    () =>
+      resolveStyleActionFileName({
+        activeTheme: mappedTheme,
+        generalCanvasState,
+        resolvedCanvasState,
+        taskFiles: visibleTaskFiles,
+        selectedFileId: visibleSelectedFileId,
+      }),
+    [
+      generalCanvasState,
+      mappedTheme,
+      resolvedCanvasState,
+      visibleSelectedFileId,
+      visibleTaskFiles,
+    ],
+  );
+
+  const styleActionsDisabled =
+    !projectId || !runtimeStylePrompt || !styleActionContent.trim();
+
+  const handleRunStyleRewrite = useCallback(() => {
+    if (!styleActionContent.trim()) {
+      toast.error("当前画布还没有可重写的正文内容");
+      return;
+    }
+
+    if (!runtimeStylePrompt) {
+      toast.error("请先选择项目默认风格或任务风格");
+      return;
+    }
+
+    void handleSend(
+      [],
+      chatToolPreferences.webSearch,
+      chatToolPreferences.thinking,
+      buildStyleRewritePrompt({
+        content: styleActionContent,
+        stylePrompt: runtimeStylePrompt,
+        fileName: styleActionFileName,
+      }),
+      undefined,
+      undefined,
+      {
+        skipThemeSkillPrefix: true,
+        purpose: "style_rewrite",
+      },
+    );
+  }, [
+    chatToolPreferences.thinking,
+    chatToolPreferences.webSearch,
+    handleSend,
+    runtimeStylePrompt,
+    styleActionContent,
+    styleActionFileName,
+  ]);
+
+  const handleRunStyleAudit = useCallback(() => {
+    if (!styleActionContent.trim()) {
+      toast.error("当前画布还没有可检查的正文内容");
+      return;
+    }
+
+    if (!runtimeStylePrompt) {
+      toast.error("请先选择项目默认风格或任务风格");
+      return;
+    }
+
+    void handleSend(
+      [],
+      chatToolPreferences.webSearch,
+      chatToolPreferences.thinking,
+      buildStyleAuditPrompt({
+        content: styleActionContent,
+        stylePrompt: runtimeStylePrompt,
+      }),
+      undefined,
+      undefined,
+      {
+        skipThemeSkillPrefix: true,
+        purpose: "style_audit",
+      },
+    );
+  }, [
+    chatToolPreferences.thinking,
+    chatToolPreferences.webSearch,
+    handleSend,
+    runtimeStylePrompt,
+    styleActionContent,
+  ]);
+
   const inputbarNode = useMemo(
     () => (
       <Inputbar
@@ -5189,6 +5411,19 @@ export function AgentChatPage({
                 onStepClick={goToStep}
               />
             )}
+
+          {isContentCreationMode && projectId ? (
+            <RuntimeStyleControlBar
+              projectId={projectId}
+              activeTheme={mappedTheme}
+              projectStyleGuide={projectMemory?.style_guide}
+              selection={runtimeStyleSelection}
+              onSelectionChange={setRuntimeStyleSelection}
+              onRewrite={handleRunStyleRewrite}
+              onAudit={handleRunStyleAudit}
+              actionsDisabled={styleActionsDisabled}
+            />
+          ) : null}
 
           {showChatLayout ? (
             <ChatContent>
@@ -5349,7 +5584,9 @@ export function AgentChatPage({
       lockTheme,
       messages,
       model,
+      projectId,
       projectMemory?.characters,
+      projectMemory?.style_guide,
       providerType,
       setCreationMode,
       setExecutionStrategy,
@@ -5360,6 +5597,11 @@ export function AgentChatPage({
       shouldCollapseCodeBlocks,
       selectedText,
       showChatLayout,
+      handleRunStyleAudit,
+      handleRunStyleRewrite,
+      mappedTheme,
+      runtimeStyleSelection,
+      styleActionsDisabled,
       skills,
       steps,
       workspaceHealthError,
@@ -5422,13 +5664,13 @@ export function AgentChatPage({
     }
 
     const shouldShowCanvasLoadingState =
-      ((!canvasState &&
+      (!canvasState &&
         (shouldBootstrapCanvasOnEntry ||
           isInitialContentLoading ||
           Boolean(initialContentLoadError))) ||
-        (resolvedCanvasState?.type === "document" &&
-          !resolvedCanvasState.content.trim() &&
-          (isInitialContentLoading || Boolean(initialContentLoadError))));
+      (resolvedCanvasState?.type === "document" &&
+        !resolvedCanvasState.content.trim() &&
+        (isInitialContentLoading || Boolean(initialContentLoadError)));
 
     if (shouldShowCanvasLoadingState) {
       return (

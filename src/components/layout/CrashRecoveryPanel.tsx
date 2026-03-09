@@ -1,13 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, Download, FolderOpen, RefreshCw } from "lucide-react";
 import {
-  getConfig,
-  getLogs,
-  getPersistedLogsTail,
-} from "@/hooks/useTauri";
+  AlertTriangle,
+  Download,
+  FolderOpen,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
+import { getConfig, getLogs, getPersistedLogsTail } from "@/hooks/useTauri";
 import {
   buildCrashDiagnosticPayload,
+  clearCrashDiagnosticHistory,
   collectThemeWorkbenchDocumentStateForDiagnostic,
+  CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT,
   copyCrashDiagnosticJsonToClipboard,
   copyCrashDiagnosticToClipboard,
   exportCrashDiagnosticToJson,
@@ -72,30 +76,33 @@ export function CrashRecoveryPanel({
       notes.push(`boundary_error: ${error.message}`);
     }
     if (error?.stack) {
-      notes.push(`boundary_error_stack: ${error.stack.split("\n").slice(0, 5).join(" | ")}`);
+      notes.push(
+        `boundary_error_stack: ${error.stack.split("\n").slice(0, 5).join(" | ")}`,
+      );
     }
     if (stackPreview) {
       notes.push(`boundary_component_stack: ${stackPreview}`);
     }
 
-    const [config, logs, persistedLogs, themeWorkbenchDocumentState] = await Promise.all([
-      getConfig().catch(() => {
-        notes.push("get_config_failed");
-        return null;
-      }),
-      getLogs().catch(() => {
-        notes.push("get_logs_failed");
-        return [];
-      }),
-      getPersistedLogsTail(250).catch(() => {
-        notes.push("get_persisted_logs_tail_failed");
-        return [];
-      }),
-      collectThemeWorkbenchDocumentStateForDiagnostic().catch(() => {
-        notes.push("get_theme_workbench_document_state_failed");
-        return null;
-      }),
-    ]);
+    const [config, logs, persistedLogs, themeWorkbenchDocumentState] =
+      await Promise.all([
+        getConfig().catch(() => {
+          notes.push("get_config_failed");
+          return null;
+        }),
+        getLogs().catch(() => {
+          notes.push("get_logs_failed");
+          return [];
+        }),
+        getPersistedLogsTail(250).catch(() => {
+          notes.push("get_persisted_logs_tail_failed");
+          return [];
+        }),
+        collectThemeWorkbenchDocumentStateForDiagnostic().catch(() => {
+          notes.push("get_theme_workbench_document_state_failed");
+          return null;
+        }),
+      ]);
 
     return buildCrashDiagnosticPayload({
       crashConfig: normalizeCrashReportingConfig(config?.crash_reporting),
@@ -113,7 +120,9 @@ export function CrashRecoveryPanel({
 
   const runAction = useCallback(
     async (
-      action: (payload: Awaited<ReturnType<typeof buildPayload>>) => Promise<void> | void,
+      action: (
+        payload: Awaited<ReturnType<typeof buildPayload>>,
+      ) => Promise<void> | void,
       successText: string,
     ) => {
       setBusy(true);
@@ -128,7 +137,10 @@ export function CrashRecoveryPanel({
         setShowClipboardGuide(denied);
         setMessage({
           type: "error",
-          text: actionError instanceof Error ? actionError.message : "生成诊断信息失败",
+          text:
+            actionError instanceof Error
+              ? actionError.message
+              : "生成诊断信息失败",
         });
       } finally {
         setBusy(false);
@@ -172,7 +184,10 @@ export function CrashRecoveryPanel({
 
   const handleSelectNewDirectory = useCallback(async () => {
     if (!oldWorkspacePath) {
-      setMessage({ type: "error", text: "无法从错误信息中提取 workspace 路径" });
+      setMessage({
+        type: "error",
+        text: "无法从错误信息中提取 workspace 路径",
+      });
       return;
     }
     setBusy(true);
@@ -187,14 +202,20 @@ export function CrashRecoveryPanel({
         { rootPath: oldWorkspacePath },
       );
       if (!workspace) {
-        setMessage({ type: "error", text: `未找到路径为 ${oldWorkspacePath} 的 workspace` });
+        setMessage({
+          type: "error",
+          text: `未找到路径为 ${oldWorkspacePath} 的 workspace`,
+        });
         return;
       }
       await invoke("workspace_update", {
         id: workspace.id,
         request: { rootPath: newPath },
       });
-      setMessage({ type: "success", text: `Workspace 路径已更新为：${newPath}` });
+      setMessage({
+        type: "success",
+        text: `Workspace 路径已更新为：${newPath}`,
+      });
       onRetry();
     } catch (err) {
       setMessage({
@@ -207,17 +228,41 @@ export function CrashRecoveryPanel({
   }, [oldWorkspacePath, onRetry]);
 
   const handleOpenDownloadDirectory = useCallback(() => {
-    void runAction(
-      async () => {
-        const result = await openCrashDiagnosticDownloadDirectory();
-        setMessage({
-          type: "success",
-          text: `已打开下载目录：${result.openedPath}`,
-        });
-      },
-      "已打开下载目录",
-    );
+    void runAction(async () => {
+      const result = await openCrashDiagnosticDownloadDirectory();
+      setMessage({
+        type: "success",
+        text: `已打开下载目录：${result.openedPath}`,
+      });
+    }, "已打开下载目录");
   }, [runAction]);
+
+  const handleClearDiagnosticHistory = useCallback(async () => {
+    const confirmed =
+      typeof window === "undefined" ||
+      window.confirm(CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT);
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    setShowClipboardGuide(false);
+    try {
+      await clearCrashDiagnosticHistory();
+      setMessage({
+        type: "success",
+        text: "已清空旧诊断信息，后续复制将只包含新的诊断数据",
+      });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "清空旧诊断信息失败",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-background px-6">
@@ -227,7 +272,9 @@ export function CrashRecoveryPanel({
             <AlertTriangle className="h-5 w-5 text-rose-500" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold">应用发生错误，已进入恢复模式</h2>
+            <h2 className="text-lg font-semibold">
+              应用发生错误，已进入恢复模式
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               建议先复制或导出诊断信息，再点击“重试恢复”继续使用。
             </p>
@@ -253,7 +300,9 @@ export function CrashRecoveryPanel({
           </div>
         )}
 
-        {showClipboardGuide && <ClipboardPermissionGuideCard className="mb-4" />}
+        {showClipboardGuide && (
+          <ClipboardPermissionGuideCard className="mb-4" />
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           {sceneTag === "workspace-path-missing" ? (
@@ -270,6 +319,18 @@ export function CrashRecoveryPanel({
               重新选择目录
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => void handleClearDiagnosticHistory()}
+            disabled={busy}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 transition-colors dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300",
+              busy && "cursor-not-allowed opacity-50",
+            )}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            清空旧诊断信息
+          </button>
           <button
             type="button"
             onClick={handleCopyTemplate}

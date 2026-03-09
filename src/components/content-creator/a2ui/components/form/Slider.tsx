@@ -5,6 +5,7 @@
 
 import type { SliderComponent, A2UIFormData } from "../../types";
 import { resolveDynamicValue } from "../../parser";
+import { A2UI_FORM_TOKENS } from "../../taskFormTokens";
 
 interface SliderRendererProps {
   component: SliderComponent;
@@ -27,11 +28,11 @@ export function SliderRenderer({
     (resolveDynamicValue(component.value, data, component.min) as number);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        {label && <label className="text-sm font-medium">{label}</label>}
+    <div className={A2UI_FORM_TOKENS.fieldStack}>
+      <div className={A2UI_FORM_TOKENS.sliderRow}>
+        {label && <label className={A2UI_FORM_TOKENS.fieldLabel}>{label}</label>}
         {component.showValue !== false && (
-          <span className="text-sm text-muted-foreground">{value}</span>
+          <span className={A2UI_FORM_TOKENS.sliderValue}>{value}</span>
         )}
       </div>
       <input
@@ -41,10 +42,10 @@ export function SliderRenderer({
         step={component.step || 1}
         value={value}
         onChange={(e) => onFormChange(component.id, Number(e.target.value))}
-        className="w-full"
+        className={A2UI_FORM_TOKENS.sliderInput}
       />
       {component.marks && (
-        <div className="flex justify-between text-xs text-muted-foreground">
+        <div className={A2UI_FORM_TOKENS.sliderMarks}>
           {component.marks.map((mark) => (
             <span key={mark.value}>{mark.label}</span>
           ))}

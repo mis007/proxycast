@@ -4,6 +4,7 @@
  * @module components/workspace/WorkbenchPage
  */
 
+import { useEffect, useState } from "react";
 import type { ProjectType } from "@/lib/api/project";
 import type {
   Page,
@@ -27,6 +28,8 @@ export interface WorkbenchPageProps {
   theme: WorkspaceTheme;
   viewMode?: WorkspaceViewMode;
   resetAt?: number;
+  initialStyleGuideDialogOpen?: boolean;
+  initialStyleGuideSourceEntryId?: string;
   initialCreatePrompt?: string;
   initialCreateSource?: "workspace_prompt" | "quick_create" | "project_created";
   initialCreateFallbackTitle?: string;
@@ -39,10 +42,16 @@ export function WorkbenchPage({
   theme,
   viewMode: initialViewMode,
   resetAt,
+  initialStyleGuideDialogOpen = false,
+  initialStyleGuideSourceEntryId,
   initialCreatePrompt,
   initialCreateSource,
   initialCreateFallbackTitle,
 }: WorkbenchPageProps) {
+  const [pendingStyleGuideDialogOpen, setPendingStyleGuideDialogOpen] =
+    useState(initialStyleGuideDialogOpen);
+  const [pendingStyleGuideSourceEntryId, setPendingStyleGuideSourceEntryId] =
+    useState<string | null>(initialStyleGuideSourceEntryId ?? null);
   const {
     themeModule,
     leftSidebarCollapsed,
@@ -71,6 +80,7 @@ export function WorkbenchPage({
     pendingInitialPromptsByContentId,
     pendingCreateConfirmation,
     contentCreationModes,
+    contentCreationTypes,
     resolvedProjectPath,
     pathChecking,
     pathConflictMessage,
@@ -113,6 +123,21 @@ export function WorkbenchPage({
     initialCreateSource,
     initialCreateFallbackTitle,
   });
+
+  useEffect(() => {
+    setPendingStyleGuideDialogOpen(initialStyleGuideDialogOpen);
+  }, [initialStyleGuideDialogOpen]);
+
+  useEffect(() => {
+    setPendingStyleGuideSourceEntryId(initialStyleGuideSourceEntryId ?? null);
+  }, [initialStyleGuideSourceEntryId]);
+
+  const selectedContentCreationMode = selectedContentId
+    ? contentCreationModes[selectedContentId]
+    : undefined;
+  const selectedContentCreationType = selectedContentId
+    ? contentCreationTypes[selectedContentId]
+    : undefined;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -203,6 +228,17 @@ export function WorkbenchPage({
             shouldRender={shouldRenderWorkspaceRightRail}
             isCreateWorkspaceView={isCreateWorkspaceView}
             projectId={selectedProjectId}
+            theme={theme}
+            creationMode={selectedContentCreationMode}
+            creationType={selectedContentCreationType}
+            initialStyleGuideDialogOpen={pendingStyleGuideDialogOpen}
+            onInitialStyleGuideDialogConsumed={() =>
+              setPendingStyleGuideDialogOpen(false)
+            }
+            initialStyleGuideSourceEntryId={pendingStyleGuideSourceEntryId}
+            onInitialStyleGuideSourceEntryConsumed={() =>
+              setPendingStyleGuideSourceEntryId(null)
+            }
             onBackToCreateView={() => handleSwitchWorkspaceView("create")}
             onCreateContentFromPrompt={handleCreateContentFromWorkspacePrompt}
           />
@@ -228,7 +264,6 @@ export function WorkbenchPage({
           void handleCreateProject();
         }}
       />
-
     </div>
   );
 }

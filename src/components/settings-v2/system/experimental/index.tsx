@@ -19,7 +19,10 @@ import {
   saveConfig,
   type Config,
   getLogs,
+  getLogStorageDiagnostics,
   getPersistedLogsTail,
+  getServerDiagnostics,
+  getWindowsStartupDiagnostics,
   type CrashReportingConfig,
   type ToolCallingConfig,
 } from "@/hooks/useTauri";
@@ -34,6 +37,7 @@ import {
 import { applyCrashReportingSettings } from "@/lib/crashReporting";
 import {
   buildCrashDiagnosticPayload,
+  collectRuntimeSnapshotForDiagnostic,
   collectThemeWorkbenchDocumentStateForDiagnostic,
   copyCrashDiagnosticJsonToClipboard,
   copyCrashDiagnosticToClipboard,
@@ -333,16 +337,33 @@ export function ExperimentalSettings() {
   }, [crashConfig, persistCrashConfig]);
 
   const buildDiagnosticPayload = useCallback(async () => {
-    const [logs, persistedLogs, themeWorkbenchDocumentState] = await Promise.all([
+    const [
+      logs,
+      persistedLogs,
+      themeWorkbenchDocumentState,
+      serverDiagnostics,
+      logStorageDiagnostics,
+      windowsStartupDiagnostics,
+      runtimeSnapshotResult,
+    ] = await Promise.all([
       getLogs(),
       getPersistedLogsTail(200),
       collectThemeWorkbenchDocumentStateForDiagnostic(),
+      getServerDiagnostics().catch(() => null),
+      getLogStorageDiagnostics().catch(() => null),
+      getWindowsStartupDiagnostics().catch(() => null),
+      collectRuntimeSnapshotForDiagnostic(),
     ]);
     return buildCrashDiagnosticPayload({
       crashConfig,
       logs,
       persistedLogTail: persistedLogs,
+      collectionNotes: runtimeSnapshotResult.collectionNotes,
       themeWorkbenchDocumentState,
+      serverDiagnostics,
+      logStorageDiagnostics,
+      windowsStartupDiagnostics,
+      runtimeSnapshot: runtimeSnapshotResult.runtimeSnapshot,
       appVersion: import.meta.env.VITE_APP_VERSION,
       platform: navigator.platform,
       userAgent: navigator.userAgent,

@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// 创作主题类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum ThemeType {
     /// 通用对话
+    #[default]
     General,
     /// 知识探索
     Knowledge,
@@ -31,12 +32,6 @@ pub enum ThemeType {
     Music,
     /// 视频脚本
     Video,
-}
-
-impl Default for ThemeType {
-    fn default() -> Self {
-        Self::General
-    }
 }
 
 /// 创作模式

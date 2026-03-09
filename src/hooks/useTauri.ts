@@ -115,6 +115,60 @@ export interface ServerDiagnostics {
   idempotency: IdempotencyDiagnostics;
 }
 
+export interface LogArtifactEntry {
+  file_name: string;
+  path: string;
+  size_bytes: number;
+  modified_at?: string;
+  compressed: boolean;
+}
+
+export interface LogStorageDiagnostics {
+  log_directory?: string;
+  current_log_path?: string;
+  current_log_exists: boolean;
+  current_log_size_bytes?: number;
+  in_memory_log_count: number;
+  related_log_files: LogArtifactEntry[];
+  raw_response_files: LogArtifactEntry[];
+}
+
+export interface SupportBundleExportResult {
+  bundle_path: string;
+  output_directory: string;
+  generated_at: string;
+  platform: string;
+  included_sections: string[];
+  omitted_sections: string[];
+}
+
+export interface WindowsStartupCheck {
+  key: string;
+  status: "ok" | "warning" | "error";
+  message: string;
+  detail?: string | null;
+}
+
+export interface WindowsStartupDiagnostics {
+  platform: string;
+  app_data_dir?: string | null;
+  legacy_proxycast_dir?: string | null;
+  db_path?: string | null;
+  webview2_version?: string | null;
+  current_exe?: string | null;
+  current_dir?: string | null;
+  resource_dir?: string | null;
+  home_dir?: string | null;
+  shell_env?: string | null;
+  comspec_env?: string | null;
+  resolved_terminal_shell?: string | null;
+  installation_kind_guess?: string | null;
+  checks: WindowsStartupCheck[];
+  has_blocking_issues: boolean;
+  has_warnings: boolean;
+  summary_message?: string | null;
+}
+
 // TLS Configuration
 export interface TlsConfig {
   enable: boolean;
@@ -991,6 +1045,22 @@ export async function getServerDiagnostics(): Promise<ServerDiagnostics> {
   return safeInvoke("get_server_diagnostics");
 }
 
+export async function getLogStorageDiagnostics(): Promise<LogStorageDiagnostics> {
+  return safeInvoke("get_log_storage_diagnostics");
+}
+
+export async function exportSupportBundle(): Promise<SupportBundleExportResult> {
+  return safeInvoke("export_support_bundle");
+}
+
+export async function revealInFinder(path: string): Promise<void> {
+  return safeInvoke("reveal_in_finder", { path });
+}
+
+export async function getWindowsStartupDiagnostics(): Promise<WindowsStartupDiagnostics> {
+  return safeInvoke("get_windows_startup_diagnostics");
+}
+
 export async function gatewayChannelStart(params?: {
   channel?: "telegram" | "feishu" | "discord";
   accountId?: string;
@@ -1213,6 +1283,10 @@ export async function clearLogs(): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+export async function clearDiagnosticLogHistory(): Promise<void> {
+  await safeInvoke("clear_diagnostic_log_history");
 }
 
 export interface TestResult {

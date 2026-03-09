@@ -16,6 +16,13 @@ import React, {
 import styled from "styled-components";
 import { ArrowLeft, Check, Plus, Upload, X } from "lucide-react";
 import { Modal } from "@/components/Modal";
+import { parseAIResponse } from "@/components/content-creator/a2ui/parser";
+import type { A2UIResponse } from "@/components/content-creator/a2ui/types";
+import { REVIEW_A2UI_TASK_CARD_PRESET } from "@/components/content-creator/a2ui/taskCardPresets";
+import {
+  A2UITaskCard,
+  A2UITaskLoadingCard,
+} from "@/components/agent/chat/components/A2UITaskCard";
 import type {
   ContentReviewExpert,
   CustomContentReviewExpertInput,
@@ -287,6 +294,26 @@ const ReviewStateText = styled.div`
   color: hsl(var(--muted-foreground));
   white-space: pre-wrap;
   word-break: break-word;
+`;
+
+const ReviewStateContent = styled.div`
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const ReviewStructuredHint = styled.div`
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+  font-size: 12px;
+  line-height: 1.5;
+`;
+
+const ReviewA2UIPreview = styled.div`
+  overflow: hidden;
 `;
 
 const SidebarFooter = styled.div`
@@ -661,6 +688,12 @@ export const ContentReviewPanel: React.FC<ContentReviewPanelProps> = memo(
       () => new Set(selectedExpertIds),
       [selectedExpertIds],
     );
+    const parsedReviewResult = useMemo(() => {
+      if (!reviewResult.trim()) {
+        return null;
+      }
+      return parseAIResponse(reviewResult, false);
+    }, [reviewResult]);
 
     useEffect(() => {
       if (!open) {
@@ -677,6 +710,65 @@ export const ContentReviewPanel: React.FC<ContentReviewPanelProps> = memo(
     );
 
     const selectedCount = selectedExpertIds.length;
+
+    const renderReviewResult = useCallback(() => {
+      if (
+        !parsedReviewResult ||
+        (!parsedReviewResult.hasA2UI && !parsedReviewResult.hasPending)
+      ) {
+        return <ReviewStateText>{reviewResult}</ReviewStateText>;
+      }
+
+      return (
+        <ReviewStateContent>
+          <ReviewStructuredHint>
+            检测到结构化补充信息，右侧栏已按结构化内容展示，不再直接输出原始
+            A2UI 代码块。
+          </ReviewStructuredHint>
+          {parsedReviewResult.parts.map((part, index) => {
+            if (part.type === "a2ui" && typeof part.content !== "string") {
+              const readonlyResponse: A2UIResponse = {
+                ...part.content,
+                submitAction: undefined,
+              };
+              return (
+                <ReviewA2UIPreview key={`review-a2ui-${index}`}>
+                  <A2UITaskCard
+                    response={readonlyResponse}
+                    compact={true}
+                    preview={true}
+                    preset={REVIEW_A2UI_TASK_CARD_PRESET}
+                  />
+                </ReviewA2UIPreview>
+              );
+            }
+
+            if (part.type === "pending_a2ui") {
+              return (
+                <A2UITaskLoadingCard
+                  key={`review-pending-a2ui-${index}`}
+                  compact={true}
+                  preset={REVIEW_A2UI_TASK_CARD_PRESET}
+                  subtitle="评审结果正在解析结构化字段。"
+                />
+              );
+            }
+
+            const textContent =
+              typeof part.content === "string" ? part.content.trim() : "";
+            if (!textContent) {
+              return null;
+            }
+
+            return (
+              <ReviewStateText key={`review-text-${index}`}>
+                {textContent}
+              </ReviewStateText>
+            );
+          })}
+        </ReviewStateContent>
+      );
+    }, [parsedReviewResult, reviewResult]);
 
     return (
       <>
@@ -769,7 +861,7 @@ export const ContentReviewPanel: React.FC<ContentReviewPanelProps> = memo(
             {!reviewRunning && !reviewError && reviewResult ? (
               <ReviewStateCard>
                 <ReviewStateTitle>评审结果</ReviewStateTitle>
-                <ReviewStateText>{reviewResult}</ReviewStateText>
+                {renderReviewResult()}
               </ReviewStateCard>
             ) : null}
 

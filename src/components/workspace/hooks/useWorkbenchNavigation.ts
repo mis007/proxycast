@@ -41,6 +41,7 @@ export interface UseWorkbenchNavigationParams {
   setLeftSidebarCollapsed: (collapsed: boolean) => void;
   isAgentChatWorkspace: boolean;
   hasPrimaryWorkspaceRenderer: boolean;
+  shouldRenderWorkspaceRightRailInWorkspace?: boolean;
 }
 
 export function useWorkbenchNavigation({
@@ -52,6 +53,7 @@ export function useWorkbenchNavigation({
   setLeftSidebarCollapsed,
   isAgentChatWorkspace,
   hasPrimaryWorkspaceRenderer,
+  shouldRenderWorkspaceRightRailInWorkspace,
 }: UseWorkbenchNavigationParams) {
   const [workflowProgress, setWorkflowProgress] =
     useState<WorkflowProgressSnapshot | null>(null);
@@ -137,8 +139,8 @@ export function useWorkbenchNavigation({
     workspaceMode === "workspace" && activeWorkspaceView === "create";
   const shouldRenderWorkspaceRightRail =
     workspaceMode === "workspace" &&
-    isAgentChatWorkspace &&
-    !hasPrimaryWorkspaceRenderer;
+    (shouldRenderWorkspaceRightRailInWorkspace ??
+      (isAgentChatWorkspace && !hasPrimaryWorkspaceRenderer));
   const activeWorkspaceViewLabel =
     navigationItems.find((item) => item.key === activeWorkspaceView)?.label ??
     "当前视图";
