@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.83.0"
+version = "0.83.1"
 edition = "2021"
 authors = ["coso"]
 repository = "https://github.com/aiclientproxy/proxycast"
