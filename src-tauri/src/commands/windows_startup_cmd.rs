@@ -1,5 +1,8 @@
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+
+#[cfg(target_os = "windows")]
+use tauri::Manager;
 
 #[cfg(target_os = "windows")]
 use std::path::PathBuf;

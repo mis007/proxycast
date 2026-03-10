@@ -98,13 +98,13 @@ pub fn run() {
     let db_clone = db.clone();
     let pool_service_clone = provider_pool_service_state.0.clone();
     #[cfg(debug_assertions)]
-    let _api_key_provider_service_clone = api_key_provider_service_state.0.clone();
+    let api_key_provider_service_clone = api_key_provider_service_state.0.clone();
     #[cfg(debug_assertions)]
-    let _connect_state_clone = connect_state.0.clone();
+    let connect_state_clone = connect_state.0.clone();
     #[cfg(debug_assertions)]
-    let _model_registry_clone = model_registry_state.clone();
+    let model_registry_clone = model_registry_state.clone();
     #[cfg(debug_assertions)]
-    let _skill_service_clone = skill_service_state.0.clone();
+    let skill_service_clone = skill_service_state.0.clone();
     let token_cache_clone = token_cache_service_state.0.clone();
     let shared_stats_clone = shared_stats.clone();
     let shared_tokens_clone = shared_tokens.clone();
