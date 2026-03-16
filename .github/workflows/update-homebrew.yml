@@ -34,14 +34,14 @@ jobs:
           
           # 下载 ARM64 DMG
           echo "下载 ARM64 DMG..."
-          curl -sL -o arm64.dmg "https://github.com/aiclientproxy/proxycast/releases/download/v${VERSION}/proxycast_${VERSION}_aarch64.dmg"
+          curl -sL -o arm64.dmg "https://github.com/aiclientproxy/lime/releases/download/v${VERSION}/lime_${VERSION}_aarch64.dmg"
           ARM64_SHA=$(shasum -a 256 arm64.dmg | awk '{print $1}')
           echo "ARM64 SHA256: $ARM64_SHA"
           echo "arm64_sha=$ARM64_SHA" >> $GITHUB_OUTPUT
           
           # 下载 x64 DMG
           echo "下载 x64 DMG..."
-          curl -sL -o x64.dmg "https://github.com/aiclientproxy/proxycast/releases/download/v${VERSION}/proxycast_${VERSION}_x64.dmg"
+          curl -sL -o x64.dmg "https://github.com/aiclientproxy/lime/releases/download/v${VERSION}/lime_${VERSION}_x64.dmg"
           X64_SHA=$(shasum -a 256 x64.dmg | awk '{print $1}')
           echo "x64 SHA256: $X64_SHA"
           echo "x64_sha=$X64_SHA" >> $GITHUB_OUTPUT
@@ -59,37 +59,37 @@ jobs:
           ARM64_SHA="${{ steps.sha.outputs.arm64_sha }}"
           X64_SHA="${{ steps.sha.outputs.x64_sha }}"
           
-          cat > homebrew-tap/Casks/proxycast.rb << EOF
-          cask "proxycast" do
+          cat > homebrew-tap/Casks/lime.rb << EOF
+          cask "lime" do
             version "$VERSION"
 
             on_arm do
               sha256 "$ARM64_SHA"
-              url "https://github.com/aiclientproxy/proxycast/releases/download/v#{version}/proxycast_#{version}_aarch64.dmg"
+              url "https://github.com/aiclientproxy/lime/releases/download/v#{version}/lime_#{version}_aarch64.dmg"
             end
 
             on_intel do
               sha256 "$X64_SHA"
-              url "https://github.com/aiclientproxy/proxycast/releases/download/v#{version}/proxycast_#{version}_x64.dmg"
+              url "https://github.com/aiclientproxy/lime/releases/download/v#{version}/lime_#{version}_x64.dmg"
             end
 
-            name "ProxyCast"
+            name "Lime"
             desc "AI API 代理桌面应用 - 将 AI 客户端凭证转换为 OpenAI 兼容接口"
-            homepage "https://github.com/aiclientproxy/proxycast"
+            homepage "https://github.com/aiclientproxy/lime"
 
             livecheck do
               url :url
               strategy :github_latest
             end
 
-            app "ProxyCast.app"
+            app "Lime.app"
 
             zap trash: [
-              "~/.config/com.proxycast.app",
-              "~/Library/Application Support/com.proxycast.app",
-              "~/Library/Caches/com.proxycast.app",
-              "~/Library/Preferences/com.proxycast.app.plist",
-              "~/Library/Saved Application State/com.proxycast.app.savedState",
+              "~/.config/com.lime.app",
+              "~/Library/Application Support/com.lime.app",
+              "~/Library/Caches/com.lime.app",
+              "~/Library/Preferences/com.lime.app.plist",
+              "~/Library/Saved Application State/com.lime.app.savedState",
             ]
           end
           EOF
@@ -99,6 +99,6 @@ jobs:
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/proxycast.rb
-          git commit -m "chore: bump proxycast to ${{ steps.version.outputs.version }}"
+          git add Casks/lime.rb
+          git commit -m "chore: bump lime to ${{ steps.version.outputs.version }}"
           git push

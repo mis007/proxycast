@@ -15,7 +15,7 @@ pub(super) async fn try_handle(
             let app = args
                 .get("app")
                 .and_then(|value| value.as_str())
-                .unwrap_or("proxycast")
+                .unwrap_or("lime")
                 .to_string();
             let refresh_remote = args
                 .get("refresh_remote")
@@ -43,7 +43,7 @@ pub(super) async fn try_handle(
             let app = args
                 .get("app")
                 .and_then(|value| value.as_str())
-                .unwrap_or("proxycast")
+                .unwrap_or("lime")
                 .to_string();
 
             if let Some(db) = &state.db {
@@ -68,7 +68,7 @@ pub(super) async fn try_handle(
             let app = args
                 .get("app")
                 .and_then(|value| value.as_str())
-                .unwrap_or("proxycast")
+                .unwrap_or("lime")
                 .to_string();
             let directory = get_string_arg(&args, "directory", "directory")?;
             let inspection =
@@ -81,7 +81,7 @@ pub(super) async fn try_handle(
             let app = args
                 .get("app")
                 .and_then(|value| value.as_str())
-                .unwrap_or("proxycast")
+                .unwrap_or("lime")
                 .to_string();
             let target = get_string_arg(&args, "target", "target")?;
             let directory = get_string_arg(&args, "directory", "directory")?;
@@ -102,7 +102,7 @@ pub(super) async fn try_handle(
             let app = args
                 .get("app")
                 .and_then(|value| value.as_str())
-                .unwrap_or("proxycast")
+                .unwrap_or("lime")
                 .to_string();
             let source_path = get_string_arg(&args, "source_path", "source_path")
                 .or_else(|_| get_string_arg(&args, "sourcePath", "sourcePath"))?;

@@ -1,7 +1,7 @@
 //! 外部 CLI 工具管理命令
 //!
 //! 管理 Codex CLI 等外部工具的状态检查和配置
-//! 这些工具有自己的认证系统，不通过 ProxyCast 凭证池管理
+//! 这些工具有自己的认证系统，不通过 Lime 凭证池管理
 
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;

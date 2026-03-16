@@ -1,4 +1,4 @@
-//! ProxyCast WebSocket 支持模块
+//! Lime WebSocket 支持模块
 //!
 //! 提供 WebSocket API 支持，允许客户端通过持久连接发送请求：
 //! - 连接握手和升级
@@ -18,13 +18,13 @@ pub mod protocol;
 pub mod stream;
 
 pub use handlers::RpcHandler;
-pub use processor::MessageProcessor;
-pub use protocol::{GatewayRpcRequest, GatewayRpcResponse, RpcError, RpcMethod};
-pub use proxycast_core::websocket::types;
-pub use proxycast_core::websocket::{
+pub use lime_core::websocket::types;
+pub use lime_core::websocket::{
     KiroTokenInfo, WsApiRequest, WsApiResponse, WsConfig, WsConnection, WsEndpoint, WsError,
     WsKiroEvent, WsMessage, WsStats, WsStatsSnapshot, WsStreamChunk, WsStreamEnd,
 };
+pub use processor::MessageProcessor;
+pub use protocol::{GatewayRpcRequest, GatewayRpcResponse, RpcError, RpcMethod};
 
 use dashmap::DashMap;
 use std::sync::Arc;

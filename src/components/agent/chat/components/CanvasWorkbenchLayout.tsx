@@ -164,6 +164,21 @@ const TAB_META: Array<{ key: CanvasWorkbenchTab; label: string }> = [
   { key: "preview", label: "预览" },
 ];
 
+const WORKBENCH_PANEL_CLASSNAME =
+  "rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.94)_100%)] shadow-sm shadow-slate-950/5";
+
+const WORKBENCH_MUTED_PANEL_CLASSNAME =
+  "rounded-[24px] border border-dashed border-slate-200/90 bg-slate-50/82 px-4 py-6 text-sm text-slate-500";
+
+const WORKBENCH_BUTTON_CLASSNAME =
+  "border-slate-200/80 bg-white/90 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900";
+
+const WORKBENCH_ACTIVE_BUTTON_CLASSNAME =
+  "border-slate-300 bg-slate-100 text-slate-900";
+
+const WORKBENCH_GHOST_BUTTON_CLASSNAME =
+  "border-slate-200/80 text-slate-500 hover:bg-slate-50 hover:text-slate-900";
+
 const STACKED_LAYOUT_BREAKPOINT = 1040;
 
 function normalizePath(value: string): string {
@@ -418,7 +433,7 @@ function renderDiffState(
   diffLines: CanvasWorkbenchDiffLine[],
 ): ReactNode {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-background">
+    <div className={cn("overflow-hidden", WORKBENCH_PANEL_CLASSNAME)}>
       <div className="max-h-[28rem] overflow-auto">
         {diffLines.map((line, index) => (
           <div
@@ -427,7 +442,7 @@ function renderDiffState(
               "grid grid-cols-[20px_1fr] gap-3 px-3 py-2 font-mono text-[12px] leading-6",
               line.type === "add" && "bg-emerald-50 text-emerald-900",
               line.type === "remove" && "bg-rose-50 text-rose-900",
-              line.type === "context" && "text-muted-foreground",
+              line.type === "context" && "text-slate-500",
             )}
           >
             <span className="select-none text-center">
@@ -890,7 +905,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
   const renderEntriesTab = () => {
     if (entries.length === 0) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           暂无产物记录，可先生成一份文稿或从文件树中选择已有文件。
         </div>
       );
@@ -905,16 +920,16 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
             aria-label={`选择画布产物-${entry.title}`}
             onClick={() => setSelectedKey(entry.key)}
             className={cn(
-              "w-full rounded-xl border px-3 py-3 text-left transition-colors",
+              "w-full rounded-[22px] border px-3.5 py-3.5 text-left shadow-sm shadow-slate-950/5 transition-colors",
               effectiveKey === entry.key
-                ? "border-primary/30 bg-primary/5"
-                : "border-border bg-background hover:bg-muted/60",
+                ? WORKBENCH_ACTIVE_BUTTON_CLASSNAME
+                : WORKBENCH_BUTTON_CLASSNAME,
             )}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="rounded-full border border-slate-200/80 bg-slate-50/90 px-2 py-0.5 text-[10px] font-medium text-slate-500">
                     {entry.kindLabel}
                   </span>
                   {entry.isCurrent ? (
@@ -927,12 +942,12 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
                   {entry.title}
                 </div>
                 {entry.subtitle ? (
-                  <div className="mt-1 truncate text-xs text-muted-foreground">
+                  <div className="mt-1 truncate text-xs text-slate-500">
                     {entry.subtitle}
                   </div>
                 ) : null}
                 {entry.previewText ? (
-                  <div className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                  <div className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">
                     {entry.previewText}
                   </div>
                 ) : null}
@@ -979,10 +994,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
               void handleSelectWorkspaceFile(entry.path);
             }}
             className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors",
+              "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm transition-colors",
               isSelected
-                ? "bg-primary/10 text-foreground"
-                : "hover:bg-muted/60 text-muted-foreground",
+                ? "bg-slate-100 text-slate-900"
+                : "text-slate-500 hover:bg-white/84 hover:text-slate-900",
             )}
             style={{ paddingLeft: `${depth * 14 + 8}px` }}
           >
@@ -1020,7 +1035,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
   const renderFilesTab = () => {
     if (workspaceUnavailable) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           当前工作区路径不可用，暂时无法浏览全部文件。
         </div>
       );
@@ -1028,7 +1043,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
 
     if (!workspaceRoot?.trim()) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           当前会话没有绑定可浏览的工作区目录。
         </div>
       );
@@ -1036,10 +1051,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
 
     const rootListing = directoryCache[workspaceRoot];
     return (
-      <div className="rounded-xl border border-border bg-background">
-        <div className="flex items-center justify-between border-b border-border px-3 py-3">
+      <div className={WORKBENCH_PANEL_CLASSNAME}>
+        <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-3">
           <div className="min-w-0">
-            <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
               Workspace Root
             </div>
             <div className="mt-1 truncate text-sm text-foreground">{workspaceRoot}</div>
@@ -1048,21 +1063,24 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
             type="button"
             aria-label="刷新工作区文件树"
             onClick={() => void loadDirectory(workspaceRoot)}
-            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className={cn(
+              "rounded-xl border px-2.5 py-1.5 text-xs transition-colors",
+              WORKBENCH_GHOST_BUTTON_CLASSNAME,
+            )}
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="max-h-[30rem] overflow-auto px-2 py-2">
           {loadingDirectories[workspaceRoot] && !rootListing ? (
-            <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 px-2 py-4 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" />
               正在加载目录...
             </div>
           ) : rootListing ? (
             renderDirectoryNode(workspaceRoot)
           ) : (
-            <div className="px-2 py-4 text-sm text-muted-foreground">
+            <div className="px-2 py-4 text-sm text-slate-500">
               暂无目录内容。
             </div>
           )}
@@ -1074,7 +1092,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
   const renderChangesTab = () => {
     if (!currentContent.trim()) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           当前选中项没有可比较的正文内容。
         </div>
       );
@@ -1082,7 +1100,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
 
     if (previousContent === null) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           当前选中项没有可用的上一版本，暂时无法展示变更。
         </div>
       );
@@ -1094,7 +1112,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
   const renderPreviewTab = () => {
     if (currentTarget.kind === "loading") {
       return (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-6 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-[24px] border border-slate-200/80 bg-white/86 px-4 py-6 text-sm text-slate-500 shadow-sm shadow-slate-950/5">
           <Loader2 className="h-4 w-4 animate-spin" />
           正在读取文件内容...
         </div>
@@ -1103,7 +1121,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
 
     if (currentTarget.kind === "unsupported") {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           {currentTarget.reason}
         </div>
       );
@@ -1111,14 +1129,14 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
 
     if (!currentContent.trim()) {
       return (
-        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className={WORKBENCH_MUTED_PANEL_CLASSNAME}>
           当前选中项暂无可展示内容。
         </div>
       );
     }
 
     return (
-      <div className="overflow-hidden rounded-xl border border-border bg-background">
+      <div className={cn("overflow-hidden", WORKBENCH_PANEL_CLASSNAME)}>
         <div className="max-h-[30rem] overflow-auto px-4 py-4">
           <pre className="whitespace-pre-wrap break-all text-xs leading-6 text-foreground">
             {currentContent}
@@ -1142,10 +1160,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
           aria-label={`切换画布标签-${tab.label}`}
           onClick={() => setActiveTab(tab.key)}
           className={cn(
-            "rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
+            "rounded-2xl border px-2 py-2 text-xs font-medium transition-colors",
             activeTab === tab.key
-              ? "border-primary/30 bg-primary/10 text-foreground"
-              : "border-border bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              ? WORKBENCH_ACTIVE_BUTTON_CLASSNAME
+              : WORKBENCH_BUTTON_CLASSNAME,
           )}
         >
           {tab.label}
@@ -1160,17 +1178,22 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
       showCollapseButton?: boolean;
     },
   ) => (
-    <div className={cn("border-b border-border/80", stacked ? "px-3 py-3" : "px-4 py-4")}>
+    <div
+      className={cn(
+        "border-b border-slate-200/80",
+        stacked ? "px-3 py-3" : "px-4 py-4",
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Canvas Workbench
           </div>
           <div className="mt-1 truncate text-sm font-semibold text-foreground">
             {currentTarget.title}
           </div>
           {selectionPath ? (
-            <div className="mt-1 truncate text-xs text-muted-foreground">
+            <div className="mt-1 truncate text-xs text-slate-500">
               {selectionPath}
             </div>
           ) : null}
@@ -1181,7 +1204,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
             aria-label="下载当前画布项"
             disabled={!currentContent.trim()}
             onClick={handleDownload}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              WORKBENCH_GHOST_BUTTON_CLASSNAME,
+            )}
           >
             <Download className="h-4 w-4" />
           </button>
@@ -1196,7 +1222,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
                 }
                 setCollapsed(true);
               }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
+                WORKBENCH_GHOST_BUTTON_CLASSNAME,
+              )}
             >
               <PanelRightClose className="h-4 w-4" />
             </button>
@@ -1208,7 +1237,12 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
   );
 
   const renderWorkbenchFooter = (stacked: boolean) => (
-    <div className={cn("border-t border-border/80", stacked ? "px-3 py-3" : "px-4 py-3")}>
+    <div
+      className={cn(
+        "border-t border-slate-200/80",
+        stacked ? "px-3 py-3" : "px-4 py-3",
+      )}
+    >
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -1217,7 +1251,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
           onClick={() => {
             void handleCopyPath();
           }}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+            WORKBENCH_GHOST_BUTTON_CLASSNAME,
+          )}
         >
           <Copy className="h-3.5 w-3.5" />
           复制路径
@@ -1231,7 +1268,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
               void onRevealPath(selectionPath);
             }
           }}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+            WORKBENCH_GHOST_BUTTON_CLASSNAME,
+          )}
         >
           <FolderOpen className="h-3.5 w-3.5" />
           定位
@@ -1245,14 +1285,17 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
               void onOpenPath(selectionPath);
             }
           }}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+            WORKBENCH_GHOST_BUTTON_CLASSNAME,
+          )}
         >
           <ExternalLink className="h-3.5 w-3.5" />
           打开
         </button>
       </div>
       {previousContent !== null ? (
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
           <GitCompare className="h-3.5 w-3.5" />
           已关联到上一版本，可在“变更”中查看差异。
         </div>
@@ -1276,7 +1319,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
         aria-label="展开画布工作台"
         title="工作台"
         onClick={() => setStackedWorkbenchOpen(true)}
-        className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/80 bg-white/88 text-slate-500 shadow-sm shadow-slate-950/5 transition-all hover:bg-white hover:text-slate-900"
       >
         <PanelRightOpen className="h-4 w-4" />
       </button>
@@ -1288,7 +1331,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
       data-testid="canvas-workbench-shell"
       data-layout-mode={isStackedLayout ? "stacked" : "split"}
       className={cn(
-        "relative h-full min-h-0 overflow-hidden rounded-[14px] border border-border bg-[linear-gradient(180deg,hsl(var(--background)),hsl(var(--muted)/0.12))]",
+        "relative h-full min-h-0 overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.94)_100%)] shadow-sm shadow-slate-950/5",
         isStackedLayout ? "block" : "flex flex-row",
       )}
     >
@@ -1308,7 +1351,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
           <section
             data-testid="canvas-workbench-layout"
             data-panel-placement="overlay-right"
-            className="absolute inset-y-3 right-3 z-10 flex w-[min(25rem,calc(100%-1.5rem))] max-w-full flex-col overflow-hidden rounded-[18px] border border-border/80 bg-background/95 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-md"
+            className="absolute inset-y-3 right-3 z-10 flex w-[min(25rem,calc(100%-1.5rem))] max-w-full flex-col overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.14)] backdrop-blur-md"
           >
             {renderWorkbenchHeader(true)}
             <div className="flex-1 overflow-auto px-3 py-3">{renderActiveTab()}</div>
@@ -1320,7 +1363,7 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
           data-testid="canvas-workbench-layout"
           data-panel-placement="side"
           className={cn(
-            "relative flex h-full flex-col border-l border-border/80 bg-background/88 backdrop-blur-sm transition-[width] duration-200",
+            "relative flex h-full flex-col border-l border-slate-200/80 bg-white/82 backdrop-blur-sm transition-[width] duration-200",
             collapsed ? "w-12" : "w-[360px]",
           )}
         >
@@ -1330,7 +1373,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
                 type="button"
                 aria-label="展开画布工作台"
                 onClick={() => setCollapsed(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                className={cn(
+                  "inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
+                  WORKBENCH_GHOST_BUTTON_CLASSNAME,
+                )}
               >
                 <PanelRightOpen className="h-4 w-4" />
               </button>
@@ -1341,8 +1387,10 @@ export const CanvasWorkbenchLayout = memo(function CanvasWorkbenchLayout({
                   aria-label={`切换画布标签-${tab.label}`}
                   onClick={() => setActiveTab(tab.key)}
                   className={cn(
-                    "rounded-lg px-2 py-1.5 text-[11px] text-muted-foreground transition-colors",
-                    activeTab === tab.key && "bg-primary/10 text-primary",
+                    "rounded-xl border px-2 py-1.5 text-[11px] transition-colors",
+                    activeTab === tab.key
+                      ? WORKBENCH_ACTIVE_BUTTON_CLASSNAME
+                      : WORKBENCH_BUTTON_CLASSNAME,
                   )}
                 >
                   {tab.label}

@@ -8,8 +8,8 @@ const repoRoot = path.resolve(process.cwd());
 const cargoConfigDir = path.join(repoRoot, ".cargo");
 const cargoConfigPath = path.join(cargoConfigDir, "config.toml");
 const defaultAsterRepo = path.resolve(repoRoot, "..", "..", "astercloud", "aster-rust");
-const blockStart = "# >>> proxycast local aster override >>>";
-const blockEnd = "# <<< proxycast local aster override <<<";
+const blockStart = "# >>> lime local aster override >>>";
+const blockEnd = "# <<< lime local aster override <<<";
 
 function normalizePath(filePath) {
   return filePath.split(path.sep).join("/");
@@ -47,7 +47,7 @@ function validateAsterRepo(asterRepoPath) {
 
   for (const cratePath of crates) {
     if (!fs.existsSync(cratePath)) {
-      console.error(`[proxycast] 未找到 Aster crate: ${cratePath}`);
+      console.error(`[lime] 未找到 Aster crate: ${cratePath}`);
       process.exit(1);
     }
   }
@@ -121,17 +121,17 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 if (process.argv.includes("--clear")) {
   const existingContent = readExistingConfig();
   if (!existingContent) {
-    console.log("[proxycast] 本地 Aster 覆盖配置不存在，无需删除。");
+    console.log("[lime] 本地 Aster 覆盖配置不存在，无需删除。");
     process.exit(0);
   }
 
   const nextContent = removeManagedBlock(existingContent);
   if (nextContent) {
     fs.writeFileSync(cargoConfigPath, `${nextContent}\n`, "utf8");
-    console.log(`[proxycast] 已移除本地 Aster 覆盖区块: ${cargoConfigPath}`);
+    console.log(`[lime] 已移除本地 Aster 覆盖区块: ${cargoConfigPath}`);
   } else {
     fs.rmSync(cargoConfigPath);
-    console.log(`[proxycast] 已删除本地 Aster 覆盖配置: ${cargoConfigPath}`);
+    console.log(`[lime] 已删除本地 Aster 覆盖配置: ${cargoConfigPath}`);
   }
   process.exit(0);
 }
@@ -146,5 +146,5 @@ const nextContent = upsertManagedBlock(
 );
 fs.writeFileSync(cargoConfigPath, nextContent, "utf8");
 
-console.log(`[proxycast] 已生成本地 Aster 覆盖配置: ${cargoConfigPath}`);
-console.log(`[proxycast] Aster 仓库: ${asterRepoPath}`);
+console.log(`[lime] 已生成本地 Aster 覆盖配置: ${cargoConfigPath}`);
+console.log(`[lime] Aster 仓库: ${asterRepoPath}`);

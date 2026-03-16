@@ -8,7 +8,7 @@
  *   node scripts/social-workbench-e2e-smoke.mjs --session-id <session_id> --content-id <content_id>
  *
  * 前置条件：
- *   1. ProxyCast 已运行（Dev Bridge: http://127.0.0.1:3030/invoke）
+ *   1. Lime 已运行（Dev Bridge: http://127.0.0.1:3030/invoke）
  *   2. 该 session 已在 UI 中实际触发过社媒生成
  */
 

@@ -1,6 +1,6 @@
 //! Anthropic 格式转换为 OpenAI 格式 (支持 Claude Code)
-use proxycast_core::models::anthropic::*;
-use proxycast_core::models::openai::*;
+use lime_core::models::anthropic::*;
+use lime_core::models::openai::*;
 use uuid::Uuid;
 
 /// 将 Anthropic MessagesRequest 转换为 OpenAI ChatCompletionRequest

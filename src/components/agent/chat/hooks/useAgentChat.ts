@@ -48,6 +48,10 @@ import {
   normalizeIncomingToolResult,
 } from "./agentChatToolResult";
 import { buildActionRequestSubmissionContext } from "../utils/actionRequestA2UI";
+import {
+  getAgentPreferenceKeys,
+  resolveWorkspaceAgentPreferences,
+} from "./agentChatStorage";
 
 /** 话题（会话）信息 */
 export interface Topic {
@@ -77,7 +81,7 @@ const initAudio = () => {
 };
 
 const getSoundEnabled = (): boolean => {
-  return localStorage.getItem("proxycast_sound_enabled") === "true";
+  return localStorage.getItem("lime_sound_enabled") === "true";
 };
 
 const playToolcallSound = () => {
@@ -161,106 +165,6 @@ const setTitleManuallyEdited = (sessionId: string, edited: boolean) => {
   savePersisted(`${TITLE_EDITED_KEY_PREFIX}${sessionId}`, edited);
 };
 
-const DEFAULT_AGENT_PROVIDER = "claude";
-const DEFAULT_AGENT_MODEL = PROVIDER_CONFIG["claude"]?.models[0] || "";
-const GLOBAL_PROVIDER_PREF_KEY = "agent_pref_provider_global";
-const GLOBAL_MODEL_PREF_KEY = "agent_pref_model_global";
-const GLOBAL_MIGRATED_PREF_KEY = "agent_pref_migrated_global";
-
-const loadPersistedString = (key: string): string | null => {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored === null) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(stored);
-      return typeof parsed === "string" ? parsed : stored;
-    } catch {
-      return stored;
-    }
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
-};
-
-interface AgentPreferences {
-  providerType: string;
-  model: string;
-}
-
-interface AgentPreferenceKeys {
-  providerKey: string;
-  modelKey: string;
-  migratedKey: string;
-}
-
-const getAgentPreferenceKeys = (
-  workspaceId?: string | null,
-): AgentPreferenceKeys => {
-  const resolvedWorkspaceId = workspaceId?.trim();
-  if (!resolvedWorkspaceId) {
-    return {
-      providerKey: GLOBAL_PROVIDER_PREF_KEY,
-      modelKey: GLOBAL_MODEL_PREF_KEY,
-      migratedKey: GLOBAL_MIGRATED_PREF_KEY,
-    };
-  }
-
-  return {
-    providerKey: `agent_pref_provider_${resolvedWorkspaceId}`,
-    modelKey: `agent_pref_model_${resolvedWorkspaceId}`,
-    migratedKey: `agent_pref_migrated_${resolvedWorkspaceId}`,
-  };
-};
-
-const resolveWorkspaceAgentPreferences = (
-  workspaceId?: string | null,
-): AgentPreferences => {
-  const { providerKey, modelKey, migratedKey } =
-    getAgentPreferenceKeys(workspaceId);
-
-  const scopedProvider = loadPersistedString(providerKey);
-  const scopedModel = loadPersistedString(modelKey);
-  if (scopedProvider || scopedModel) {
-    return {
-      providerType: scopedProvider || DEFAULT_AGENT_PROVIDER,
-      model: scopedModel || DEFAULT_AGENT_MODEL,
-    };
-  }
-
-  const migrated = loadPersisted<boolean>(migratedKey, false);
-  if (!migrated) {
-    const legacyProvider =
-      loadPersistedString("agent_pref_provider") ||
-      loadPersistedString(GLOBAL_PROVIDER_PREF_KEY);
-    const legacyModel =
-      loadPersistedString("agent_pref_model") ||
-      loadPersistedString(GLOBAL_MODEL_PREF_KEY);
-
-    if (legacyProvider) {
-      savePersisted(providerKey, legacyProvider);
-    }
-    if (legacyModel) {
-      savePersisted(modelKey, legacyModel);
-    }
-
-    savePersisted(migratedKey, true);
-
-    return {
-      providerType: legacyProvider || DEFAULT_AGENT_PROVIDER,
-      model: legacyModel || DEFAULT_AGENT_MODEL,
-    };
-  }
-
-  return {
-    providerType: DEFAULT_AGENT_PROVIDER,
-    model: DEFAULT_AGENT_MODEL,
-  };
-};
-
 /** useAgentChat 的配置选项 */
 interface UseAgentChatOptions {
   /** 系统提示词（用于内容创作等场景） */
@@ -311,7 +215,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
     useState<ProviderConfigMap>(PROVIDER_CONFIG);
   const [isConfigLoading, setIsConfigLoading] = useState(true);
 
-  const initialPreferencesRef = useRef<AgentPreferences>(
+  const initialPreferencesRef = useRef(
     resolveWorkspaceAgentPreferences(workspaceId),
   );
 

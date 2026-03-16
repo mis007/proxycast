@@ -24,7 +24,7 @@
 // 预留功能模块，暂未在主流程中调用
 #![allow(dead_code)]
 
-use proxycast_core::models::openai::ChatMessage;
+use lime_core::models::openai::ChatMessage;
 
 /// 模型类型，用于确定推理内容处理策略
 #[derive(Debug, Clone, PartialEq)]
@@ -147,7 +147,7 @@ impl ReasoningHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::models::openai::MessageContent;
+    use lime_core::models::openai::MessageContent;
 
     #[test]
     fn test_model_type_detection() {

@@ -95,7 +95,7 @@ fn execute_playwright_migration(conn: &Connection) -> Result<String, String> {
     // 插入服务器配置
     conn.execute(
         "INSERT INTO mcp_servers (id, name, server_config, description,
-                                 enabled_proxycast, enabled_claude, enabled_codex,
+                                 enabled_lime, enabled_claude, enabled_codex,
                                  enabled_gemini, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
@@ -103,7 +103,7 @@ fn execute_playwright_migration(conn: &Connection) -> Result<String, String> {
             PLAYWRIGHT_SERVER_NAME,
             serde_json::to_string(&server_config).unwrap_or_default(),
             PLAYWRIGHT_SERVER_DESCRIPTION,
-            1i32, // enabled_proxycast = true
+            1i32, // enabled_lime = true
             0i32, // enabled_claude = false
             0i32, // enabled_codex = false
             0i32, // enabled_gemini = false

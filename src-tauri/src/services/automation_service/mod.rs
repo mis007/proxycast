@@ -21,15 +21,15 @@ use crate::services::browser_environment_service::get_browser_environment_preset
 use crate::services::browser_profile_service::get_browser_profile;
 use crate::services::execution_tracker_service::{ExecutionTracker, RunHandle, RunSource};
 use chrono::Utc;
-use proxycast_browser_runtime::{BrowserStreamMode, CdpSessionState};
-use proxycast_core::config::{
+use lime_browser_runtime::{BrowserStreamMode, CdpSessionState};
+use lime_core::config::{
     AutomationExecutionMode, AutomationSettings, DeliveryConfig, TaskSchedule,
 };
-use proxycast_core::database::dao::agent_run::{AgentRun, AgentRunDao};
-use proxycast_core::database::dao::automation_job::{
+use lime_core::database::dao::agent_run::{AgentRun, AgentRunDao};
+use lime_core::database::dao::automation_job::{
     AutomationJob, AutomationJobDao, AutomationJobLastDelivery,
 };
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -1105,7 +1105,7 @@ mod tests {
         save_browser_environment_preset, SaveBrowserEnvironmentPresetInput,
     };
     use crate::services::browser_profile_service::{save_browser_profile, SaveBrowserProfileInput};
-    use proxycast_core::database::dao::browser_profile::BrowserProfileTransportKind;
+    use lime_core::database::dao::browser_profile::BrowserProfileTransportKind;
     use rusqlite::Connection;
 
     fn setup_db() -> Connection {

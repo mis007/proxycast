@@ -2,7 +2,8 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 pub const DURABLE_MEMORY_VIRTUAL_ROOT: &str = "/memories";
-pub const DURABLE_MEMORY_ROOT_ENV: &str = "PROXYCAST_DURABLE_MEMORY_DIR";
+pub const LIME_DURABLE_MEMORY_ROOT_ENV: &str = "LIME_DURABLE_MEMORY_DIR";
+pub const LEGACY_DURABLE_MEMORY_ROOT_ENV: &str = "PROXYCAST_DURABLE_MEMORY_DIR";
 
 const DURABLE_MEMORY_SUBDIR: &str = "harness/memories";
 
@@ -24,16 +25,11 @@ pub fn durable_memory_permission_pattern() -> &'static str {
 }
 
 pub fn resolve_durable_memory_root() -> Result<PathBuf, String> {
-    let root = if let Ok(override_dir) = std::env::var(DURABLE_MEMORY_ROOT_ENV) {
-        let trimmed = override_dir.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(PathBuf::from(trimmed))
-        }
-    } else {
-        None
-    };
+    let root = lime_core::env_compat::var_nonempty(&[
+        LIME_DURABLE_MEMORY_ROOT_ENV,
+        LEGACY_DURABLE_MEMORY_ROOT_ENV,
+    ])
+    .map(PathBuf::from);
 
     let root = match root {
         Some(path) => path,
@@ -41,12 +37,12 @@ pub fn resolve_durable_memory_root() -> Result<PathBuf, String> {
             #[cfg(test)]
             {
                 std::env::temp_dir()
-                    .join("proxycast-tests")
+                    .join("lime-tests")
                     .join(DURABLE_MEMORY_SUBDIR)
             }
             #[cfg(not(test))]
             {
-                proxycast_core::app_paths::preferred_data_dir()?.join(DURABLE_MEMORY_SUBDIR)
+                lime_core::app_paths::preferred_data_dir()?.join(DURABLE_MEMORY_SUBDIR)
             }
         }
     };
@@ -151,8 +147,12 @@ mod tests {
 
     impl EnvOverrideGuard {
         fn set(path: &Path) -> Self {
-            let previous = std::env::var_os(DURABLE_MEMORY_ROOT_ENV);
-            std::env::set_var(DURABLE_MEMORY_ROOT_ENV, path.as_os_str());
+            let previous = lime_core::env_compat::var_os(&[
+                LIME_DURABLE_MEMORY_ROOT_ENV,
+                LEGACY_DURABLE_MEMORY_ROOT_ENV,
+            ]);
+            std::env::set_var(LIME_DURABLE_MEMORY_ROOT_ENV, path.as_os_str());
+            std::env::remove_var(LEGACY_DURABLE_MEMORY_ROOT_ENV);
             Self { previous }
         }
     }
@@ -160,10 +160,11 @@ mod tests {
     impl Drop for EnvOverrideGuard {
         fn drop(&mut self) {
             if let Some(value) = &self.previous {
-                std::env::set_var(DURABLE_MEMORY_ROOT_ENV, value);
+                std::env::set_var(LIME_DURABLE_MEMORY_ROOT_ENV, value);
             } else {
-                std::env::remove_var(DURABLE_MEMORY_ROOT_ENV);
+                std::env::remove_var(LIME_DURABLE_MEMORY_ROOT_ENV);
             }
+            std::env::remove_var(LEGACY_DURABLE_MEMORY_ROOT_ENV);
         }
     }
 

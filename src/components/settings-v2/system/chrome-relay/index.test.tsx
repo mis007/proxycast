@@ -120,7 +120,7 @@ beforeEach(() => {
       profile_key: "search_google",
       target_id: "mock-target",
       target_title: "Mock Target",
-      target_url: "https://www.google.com/search?q=proxycast+browser+assist",
+      target_url: "https://www.google.com/search?q=lime+browser+assist",
       remote_debugging_port: 13001,
       ws_debugger_url: "ws://127.0.0.1:13001/devtools/page/mock-target",
       created_at: "2026-03-14T00:00:00Z",
@@ -146,12 +146,12 @@ beforeEach(() => {
     pending_commands: [],
   });
   mockGetBrowserBackendPolicy.mockResolvedValue({
-    priority: ["aster_compat", "proxycast_extension_bridge", "cdp_direct"],
+    priority: ["aster_compat", "lime_extension_bridge", "cdp_direct"],
     auto_fallback: true,
   });
   mockGetBrowserBackendsStatus.mockResolvedValue({
     policy: {
-      priority: ["aster_compat", "proxycast_extension_bridge", "cdp_direct"],
+      priority: ["aster_compat", "lime_extension_bridge", "cdp_direct"],
       auto_fallback: true,
     },
     bridge_observer_count: 0,
@@ -209,7 +209,7 @@ describe("ChromeRelaySettings", () => {
     expect(mockLaunchBrowserSession).toHaveBeenCalledTimes(1);
     expect(mockLaunchBrowserSession).toHaveBeenCalledWith({
       profile_key: "search_google",
-      url: "https://www.google.com/search?q=proxycast+browser+assist",
+      url: "https://www.google.com/search?q=lime+browser+assist",
       open_window: true,
       stream_mode: "both",
     });

@@ -278,7 +278,7 @@ export interface ChromeBridgeCommandResult {
 
 export type BrowserBackendType =
   | "aster_compat"
-  | "proxycast_extension_bridge"
+  | "lime_extension_bridge"
   | "cdp_direct";
 
 export interface BrowserBackendPolicy {

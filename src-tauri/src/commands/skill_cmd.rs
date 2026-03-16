@@ -6,8 +6,8 @@ use crate::models::skill_model::{
     Skill, SkillCatalogSource, SkillPackageInspection, SkillRepo, SkillState,
 };
 use chrono::Utc;
-use proxycast_core::app_paths;
-use proxycast_services::skill_service::SkillService;
+use lime_core::app_paths;
+use lime_services::skill_service::SkillService;
 use serde::Serialize;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -49,7 +49,7 @@ pub fn scan_installed_skills(skills_dir: &Path) -> Vec<String> {
 
 fn get_skills_dir(app_type: &AppType) -> Result<PathBuf, String> {
     match app_type {
-        AppType::ProxyCast => app_paths::resolve_skills_dir(),
+        AppType::Lime => app_paths::resolve_skills_dir(),
         AppType::Claude => dirs::home_dir()
             .ok_or_else(|| "Failed to get home directory".to_string())
             .map(|home| home.join(".claude").join("skills")),
@@ -64,7 +64,7 @@ fn get_skills_dir(app_type: &AppType) -> Result<PathBuf, String> {
 
 fn get_skill_lookup_roots(app_type: &AppType) -> Result<Vec<PathBuf>, String> {
     match app_type {
-        AppType::ProxyCast => app_paths::resolve_proxycast_skill_roots(),
+        AppType::Lime => app_paths::resolve_lime_skill_roots(),
         _ => Ok(vec![get_skills_dir(app_type)?]),
     }
 }
@@ -177,9 +177,9 @@ fn resolve_skill_scaffold_root(
     match target {
         SkillScaffoldTarget::User => get_skills_dir(app_type),
         SkillScaffoldTarget::Project => match app_type {
-            AppType::ProxyCast => app_paths::resolve_project_skills_dir()
+            AppType::Lime => app_paths::resolve_project_skills_dir()
                 .ok_or_else(|| "Failed to resolve project skills directory".to_string()),
-            _ => Err("Project skill scaffold is only supported for proxycast".to_string()),
+            _ => Err("Project skill scaffold is only supported for lime".to_string()),
         },
     }
 }
@@ -388,27 +388,27 @@ pub struct ImportedSkillResult {
     pub directory: String,
 }
 
-/// 获取已安装的 ProxyCast Skills 目录列表
+/// 获取已安装的 Lime Skills 目录列表
 ///
-/// 扫描 ProxyCast Skills 目录，返回包含 SKILL.md 的子目录名列表。
+/// 扫描 Lime Skills 目录，返回包含 SKILL.md 的子目录名列表。
 /// 这些 Skills 将被传递给 aster 用于 AI Agent 功能。
 ///
 /// # Returns
 /// - `Ok(Vec<String>)`: 已安装的 Skill 目录名列表
 /// - `Err(String)`: 错误信息
 #[tauri::command]
-pub async fn get_installed_proxycast_skills() -> Result<Vec<String>, String> {
-    let skills_dir = get_skills_dir(&AppType::ProxyCast)?;
+pub async fn get_installed_lime_skills() -> Result<Vec<String>, String> {
+    let skills_dir = get_skills_dir(&AppType::Lime)?;
     Ok(scan_installed_skills(&skills_dir))
 }
 
 /// 获取本地已安装 Skill 的标准检查结果
 ///
 /// 仅支持读取本地 Skills 目录下的文件，包含目录合法性、路径穿越防护、
-/// Agent Skills 标准检查和 ProxyCast 扩展引用校验。
+/// Agent Skills 标准检查和 Lime 扩展引用校验。
 ///
 /// # Arguments
-/// - `app`: 应用类型（proxycast/claude/codex/gemini）
+/// - `app`: 应用类型（lime/claude/codex/gemini）
 /// - `directory`: Skill 目录名
 ///
 /// # Returns
@@ -441,8 +441,8 @@ pub fn create_skill_scaffold_for_app(
     let skills_root = resolve_skill_scaffold_root(&app_type, target)?;
     let inspection = create_skill_scaffold_in_root(&skills_root, &directory, &name, &description)?;
 
-    if matches!(app_type, AppType::ProxyCast) {
-        AsterAgentState::reload_proxycast_skills();
+    if matches!(app_type, AppType::Lime) {
+        AsterAgentState::reload_lime_skills();
     }
 
     Ok(inspection)
@@ -460,8 +460,8 @@ pub fn import_local_skill_for_app(
     let skills_root = get_skills_dir(&app_type)?;
     let directory = import_local_skill_into_root(&skills_root, Path::new(&source_path))?;
 
-    if matches!(app_type, AppType::ProxyCast) {
-        AsterAgentState::reload_proxycast_skills();
+    if matches!(app_type, AppType::Lime) {
+        AsterAgentState::reload_lime_skills();
     }
 
     Ok(ImportedSkillResult { directory })
@@ -520,7 +520,7 @@ pub async fn get_skills(
     db: State<'_, DbConnection>,
     skill_service: State<'_, SkillServiceState>,
 ) -> Result<Vec<Skill>, String> {
-    get_skills_for_app(db, skill_service, "proxycast".to_string()).await
+    get_skills_for_app(db, skill_service, "lime".to_string()).await
 }
 
 #[tauri::command]
@@ -593,7 +593,7 @@ pub async fn install_skill(
     skill_service: State<'_, SkillServiceState>,
     directory: String,
 ) -> Result<bool, String> {
-    install_skill_for_app(db, skill_service, "proxycast".to_string(), directory).await
+    install_skill_for_app(db, skill_service, "lime".to_string(), directory).await
 }
 
 #[tauri::command]
@@ -660,14 +660,14 @@ pub async fn install_skill_for_app(
     }
 
     // 刷新 aster-rust 的 global_registry，使 AI 能够发现新安装的 Skill
-    AsterAgentState::reload_proxycast_skills();
+    AsterAgentState::reload_lime_skills();
 
     Ok(true)
 }
 
 #[tauri::command]
 pub fn uninstall_skill(db: State<'_, DbConnection>, directory: String) -> Result<bool, String> {
-    uninstall_skill_for_app(db, "proxycast".to_string(), directory)
+    uninstall_skill_for_app(db, "lime".to_string(), directory)
 }
 
 #[tauri::command]
@@ -692,7 +692,7 @@ pub fn uninstall_skill_for_app(
     SkillDao::update_skill_state(&conn, &key, &state).map_err(|e| e.to_string())?;
 
     // 刷新 aster-rust 的 global_registry，移除已卸载的 Skill
-    AsterAgentState::reload_proxycast_skills();
+    AsterAgentState::reload_lime_skills();
 
     Ok(true)
 }
@@ -865,7 +865,7 @@ mod tests {
 name: Demo Skill
 description: Inspect me
 metadata:
-  proxycast_workflow_ref: references/workflow.yaml
+  lime_workflow_ref: references/workflow.yaml
 ---
 
 # Demo Skill

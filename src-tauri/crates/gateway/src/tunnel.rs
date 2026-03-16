@@ -3,8 +3,8 @@
 //! 目标：为 webhook 渠道提供公网入口（优先 Cloudflare Tunnel）。
 
 use chrono::Utc;
-use proxycast_core::config::{Config, GatewayTunnelConfig};
-use proxycast_core::logger::LogStore;
+use lime_core::config::{Config, GatewayTunnelConfig};
+use lime_core::logger::LogStore;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{ffi::OsStr, process::Stdio};

@@ -1,4 +1,5 @@
 import type { OpenClawSubpage } from "@/types/page";
+import type { OpenClawInstallProgressEvent } from "@/lib/api/openclaw";
 
 export type { OpenClawSubpage };
 
@@ -23,6 +24,21 @@ export interface OpenClawOperationState {
   description: string | null;
   message: string | null;
   returnSubpage: OpenClawSubpage;
+}
+
+export interface OpenClawOperationHistoryEntry {
+  kind: OpenClawOperationKind;
+  target: OpenClawOperationState["target"];
+  title: string | null;
+  description: string | null;
+  message: string | null;
+  returnSubpage: OpenClawSubpage;
+  success: boolean;
+  updatedAt: string;
+  logs: OpenClawInstallProgressEvent[];
+  rawLogsText: string;
+  diagnosticBundleJson: string;
+  repairPrompt: string;
 }
 
 export interface OpenClawSceneDefinition {

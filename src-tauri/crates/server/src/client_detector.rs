@@ -1,14 +1,14 @@
 //! 客户端类型检测模块
 //!
-//! 已迁移到 proxycast-core crate，本文件仅做重新导出。
+//! 已迁移到 lime-core crate，本文件仅做重新导出。
 
-pub use proxycast_core::models::client_type::*;
+pub use lime_core::models::client_type::*;
 
 #[cfg(test)]
 mod property_tests {
     use super::*;
+    use lime_core::config::EndpointProvidersConfig;
     use proptest::prelude::*;
-    use proxycast_core::config::EndpointProvidersConfig;
 
     fn arb_client_type() -> impl Strategy<Value = ClientType> {
         prop_oneof![

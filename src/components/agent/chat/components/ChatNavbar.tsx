@@ -21,6 +21,7 @@ import { Navbar } from "../styles";
 
 interface ChatNavbarProps {
   isRunning: boolean;
+  chrome?: "full" | "workspace-compact";
   onToggleHistory: () => void;
   showHistoryToggle?: boolean;
   onToggleFullscreen: () => void;
@@ -69,22 +70,23 @@ function resolveBrowserAssistTitle(
 }
 
 const toolbarGroupClassName =
-  "flex items-center rounded-full border border-slate-200/80 bg-white/94 p-1 shadow-sm shadow-slate-950/5";
+  "flex items-center rounded-[20px] border border-slate-200/80 bg-white/90 p-1.5 shadow-sm shadow-slate-950/5 backdrop-blur-sm";
 
 const toolbarDividerClassName =
-  "mx-1 h-5 w-px shrink-0 bg-slate-200/80";
+  "mx-1.5 h-6 w-px shrink-0 bg-slate-200/80";
 
 const toolbarEmbeddedButtonClassName =
-  "h-8 rounded-full border border-transparent px-3 text-xs shadow-none";
+  "h-9 rounded-2xl border border-transparent px-3.5 text-xs shadow-none";
 
 const toolbarGhostIconButtonClassName =
-  "h-8 w-8 rounded-full text-muted-foreground hover:bg-slate-100";
+  "h-9 w-9 rounded-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-900";
 
 const toolbarTextButtonClassName =
-  "gap-1.5 text-slate-700 hover:bg-slate-50 hover:text-slate-900";
+  "gap-1.5 text-slate-700 hover:bg-white hover:text-slate-900";
 
 export const ChatNavbar: React.FC<ChatNavbarProps> = ({
   isRunning: _isRunning,
+  chrome = "full",
   onToggleHistory,
   showHistoryToggle = true,
   onToggleFullscreen: _onToggleFullscreen,
@@ -112,15 +114,19 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
   browserAssistLabel,
   onOpenBrowserAssist,
 }) => {
+  const isWorkspaceCompact = chrome === "workspace-compact";
   const browserAssistTitle = resolveBrowserAssistTitle(
     browserAssistAttentionLevel,
   );
   const showStatusTools = showBrowserAssistEntry || showHarnessToggle;
   const showNavigationTools =
-    Boolean(onBackHome) ||
-    Boolean(onBackToResources) ||
-    Boolean(onBackToProjectManagement);
+    !isWorkspaceCompact &&
+    (Boolean(onBackHome) ||
+      Boolean(onBackToResources) ||
+      Boolean(onBackToProjectManagement));
   const showWorkspaceTools = showHistoryToggle || showCanvasToggle || Boolean(novelCanvasControls);
+  const showProjectSelector = !isWorkspaceCompact;
+  const showCompactSettingsButton = isWorkspaceCompact && Boolean(onToggleSettings);
 
   return (
     <Navbar>
@@ -251,31 +257,48 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
       <div className="flex-1" />
 
       <div className="flex items-center gap-2">
-        <div className={toolbarGroupClassName}>
-          <ProjectSelector
-            value={projectId}
-            onChange={(nextProjectId) => onProjectChange?.(nextProjectId)}
-            workspaceType={workspaceType}
-            placeholder="选择项目"
-            dropdownSide="bottom"
-            dropdownAlign="end"
-            enableManagement={workspaceType === "general"}
-            density="compact"
-            chrome="embedded"
-            className="min-w-[196px] max-w-[280px]"
-          />
-          <div className={toolbarDividerClassName} aria-hidden="true" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className={toolbarGhostIconButtonClassName}
-            onClick={onToggleSettings}
-            aria-label="打开设置"
-            title="打开设置"
-          >
-            <Settings2 size={18} />
-          </Button>
-        </div>
+        {showProjectSelector ? (
+          <div className={toolbarGroupClassName}>
+            <ProjectSelector
+              value={projectId}
+              onChange={(nextProjectId) => onProjectChange?.(nextProjectId)}
+              workspaceType={workspaceType}
+              placeholder="选择项目"
+              dropdownSide="bottom"
+              dropdownAlign="end"
+              enableManagement={workspaceType === "general"}
+              density="compact"
+              chrome="embedded"
+              className="min-w-[196px] max-w-[280px]"
+            />
+            <div className={toolbarDividerClassName} aria-hidden="true" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className={toolbarGhostIconButtonClassName}
+              onClick={onToggleSettings}
+              aria-label="打开设置"
+              title="打开设置"
+            >
+              <Settings2 size={18} />
+            </Button>
+          </div>
+        ) : null}
+
+        {showCompactSettingsButton ? (
+          <div className={toolbarGroupClassName}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={toolbarGhostIconButtonClassName}
+              onClick={onToggleSettings}
+              aria-label="打开设置"
+              title="打开设置"
+            >
+              <Settings2 size={18} />
+            </Button>
+          </div>
+        ) : null}
 
         {showStatusTools ? (
           <div className={toolbarGroupClassName}>
@@ -303,7 +326,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "h-2 w-2 rounded-full",
+                      "h-2 w-2 rounded-full shadow-sm shadow-slate-950/10",
                       browserAssistAttentionLevel === "warning"
                         ? "bg-amber-500"
                         : "bg-sky-500",
@@ -351,7 +374,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
                 <Sparkles size={14} />
                 <span>{harnessToggleLabel}</span>
                 {harnessPendingCount > 0 ? (
-                  <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-medium leading-none text-destructive-foreground">
+                  <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
                     {harnessPendingCount > 99 ? "99+" : harnessPendingCount}
                   </span>
                 ) : null}

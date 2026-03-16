@@ -58,6 +58,8 @@ vi.mock("sonner", () => ({
 vi.mock("@/components/agent", () => ({
   AgentChatPage: (props: {
     hideTopBar?: boolean;
+    hideHistoryToggle?: boolean;
+    topBarChrome?: string;
     initialUserPrompt?: string;
     preferContentReviewInRightRail?: boolean;
   }) => {
@@ -65,7 +67,9 @@ vi.mock("@/components/agent", () => ({
     return (
       <div
         data-testid="agent-chat-page"
-        data-hide-topbar={String(props.hideTopBar)}
+        data-hide-topbar={String(Boolean(props.hideTopBar))}
+        data-hide-history-toggle={String(Boolean(props.hideHistoryToggle))}
+        data-topbar-chrome={props.topBarChrome || "full"}
         data-initial-user-prompt={props.initialUserPrompt || ""}
       />
     );
@@ -1146,12 +1150,16 @@ describe("WorkbenchPage 左侧栏模式行为", () => {
     expect(requestPayload?.duration).toBe(5);
   });
 
-  it("统一工作区中的聊天页隐藏内部顶部栏，避免双导航", async () => {
+  it("统一工作区中的聊天页应启用 compact 顶栏，保留执行入口", async () => {
     const { container } = await enterDefaultWorkspace();
 
     const chat = container.querySelector("[data-testid='agent-chat-page']");
     expect(chat).not.toBeNull();
-    expect(chat?.getAttribute("data-hide-topbar")).toBe("true");
+    expect(chat?.getAttribute("data-hide-topbar")).toBe("false");
+    expect(chat?.getAttribute("data-hide-history-toggle")).toBe("false");
+    expect(chat?.getAttribute("data-topbar-chrome")).toBe(
+      "workspace-compact",
+    );
   });
 
   it("视频主题在作业模式渲染视频工作区，而非通用对话创作页", async () => {

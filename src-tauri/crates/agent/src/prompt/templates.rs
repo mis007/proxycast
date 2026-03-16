@@ -3,7 +3,7 @@
 //! 模块化的提示词组件，参考 claude-code-open 设计
 
 /// 核心身份描述
-pub const CORE_IDENTITY: &str = r#"你是 ProxyCast Agent，一个强大的 AI 编程助手。
+pub const CORE_IDENTITY: &str = r#"你是 Lime Agent，一个强大的 AI 编程助手。
 
 你可以使用各种工具来帮助用户完成编程任务，包括：
 - 读取和编辑文件

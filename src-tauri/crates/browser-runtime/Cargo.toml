@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-browser-runtime"
+name = "lime-browser-runtime"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

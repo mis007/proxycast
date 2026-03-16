@@ -76,7 +76,7 @@ const sectionStyleMap = {
 } as const;
 
 export const SkillsPage = forwardRef<SkillsPageRef, SkillsPageProps>(
-  ({ initialApp = "proxycast", hideHeader = false }, ref) => {
+  ({ initialApp = "lime", hideHeader = false }, ref) => {
     const [app] = useState<AppType>(initialApp);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<
@@ -671,7 +671,7 @@ export const SkillsPage = forwardRef<SkillsPageRef, SkillsPageProps>(
           onOpenChange={setScaffoldDialogOpen}
           onCreate={handleCreateScaffold}
           creating={scaffoldCreating}
-          allowProjectTarget={app === "proxycast"}
+          allowProjectTarget={app === "lime"}
         />
 
         {/* Skill 执行对话框 */}

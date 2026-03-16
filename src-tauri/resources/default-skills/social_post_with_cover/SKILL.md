@@ -3,13 +3,13 @@ name: social_post_with_cover
 description: 生成可直接发布的社媒成稿（默认公众号风格）并自动生成 1 张头图，最终以 write_file 落盘。
 allowed-tools: social_generate_cover_image, search_query
 metadata:
-  proxycast_argument_hint: 输入主题、平台（如公众号/小红书）、目标受众、语气、字数、转化目标和已知素材。
-  proxycast_when_to_use: 用户需要“社媒文章 + 封面图”一体化输出，且希望直接复制发布。
-  proxycast_version: 1.4.0
-  proxycast_execution_mode: workflow
-  proxycast_workflow_ref: references/workflow.json
-  proxycast_surface: creator
-  proxycast_category: social
+  lime_argument_hint: 输入主题、平台（如公众号/小红书）、目标受众、语气、字数、转化目标和已知素材。
+  lime_when_to_use: 用户需要“社媒文章 + 封面图”一体化输出，且希望直接复制发布。
+  lime_version: 1.4.0
+  lime_execution_mode: workflow
+  lime_workflow_ref: references/workflow.json
+  lime_surface: creator
+  lime_category: social
 ---
 
 <!-- 本 skill 以 3 个步骤执行：(1)素材检索 (2)文稿撰写 (3)封面图+落盘 -->

@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowUpCircle,
   Copy,
   ExternalLink,
   Loader2,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
+import { copyTextToClipboard } from "@/lib/crashDiagnostic";
 import { cn } from "@/lib/utils";
 import {
   openClawPanelClassName,
@@ -22,10 +24,14 @@ interface OpenClawDashboardPageProps {
   running: boolean;
   windowBusy: boolean;
   windowOpen: boolean;
+  hasUpdate?: boolean;
+  latestVersion?: string | null;
+  updating?: boolean;
   onBack: () => void;
   onOpenExternal: () => void;
   onOpenWindow: () => void;
   onRefresh: () => void;
+  onUpdate?: () => void;
 }
 
 export function OpenClawDashboardPage({
@@ -34,10 +40,14 @@ export function OpenClawDashboardPage({
   running,
   windowBusy,
   windowOpen,
+  hasUpdate = false,
+  latestVersion = null,
+  updating = false,
   onBack,
   onOpenExternal,
   onOpenWindow,
   onRefresh,
+  onUpdate,
 }: OpenClawDashboardPageProps) {
   const actionDisabled = !running || !dashboardUrl || loading || windowBusy;
   const hasDashboardToken = useMemo(() => {
@@ -98,10 +108,18 @@ export function OpenClawDashboardPage({
     }
 
     try {
-      await navigator.clipboard.writeText(dashboardUrl);
+      await copyTextToClipboard(dashboardUrl, {
+        fallbackErrorMessage: "复制 Dashboard 地址失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制 Dashboard 地址。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制 Dashboard 地址。",
+      });
       toast.success("完整 Dashboard 地址已复制。");
-    } catch {
-      toast.error("复制 Dashboard 地址失败。");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "复制 Dashboard 地址失败。",
+      );
     }
   };
 
@@ -132,6 +150,24 @@ export function OpenClawDashboardPage({
           </div>
 
           <div className="flex w-full flex-wrap gap-3 xl:max-w-[360px] xl:justify-end">
+            {hasUpdate && onUpdate ? (
+              <button
+                type="button"
+                onClick={onUpdate}
+                disabled={updating || loading || windowBusy}
+                className={cn(
+                  openClawPrimaryButtonClassName,
+                  "min-w-[132px] px-5 py-2.5",
+                )}
+              >
+                {updating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUpCircle className="h-4 w-4" />
+                )}
+                升级到 {latestVersion || "最新版本"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onRefresh}

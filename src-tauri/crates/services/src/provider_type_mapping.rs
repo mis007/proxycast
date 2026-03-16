@@ -3,9 +3,9 @@
 //! 统一 services 层中 PoolProviderType 与 ApiProviderType 的映射规则，
 //! 避免 `provider_pool_service` 与 `api_key_provider_service` 规则漂移。
 
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::models::provider_pool_model::PoolProviderType;
-use proxycast_core::models::provider_type::is_custom_provider_id as core_is_custom_provider_id;
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::models::provider_pool_model::PoolProviderType;
+use lime_core::models::provider_type::is_custom_provider_id as core_is_custom_provider_id;
 
 /// 是否为自定义 Provider ID（`custom-*`）
 pub(crate) fn is_custom_provider_id(provider_type: &str) -> bool {
@@ -71,8 +71,8 @@ mod tests {
         api_provider_type_to_pool_type, is_custom_provider_id, parse_pool_provider_type,
         pool_provider_type_to_api_type, resolve_pool_provider_type_or_default,
     };
-    use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-    use proxycast_core::models::provider_pool_model::PoolProviderType;
+    use lime_core::database::dao::api_key_provider::ApiProviderType;
+    use lime_core::models::provider_pool_model::PoolProviderType;
 
     #[test]
     fn test_api_provider_type_to_pool_type_mapping() {

@@ -52,7 +52,7 @@ pub async fn start_capture() -> Result<PathBuf, CaptureError> {
     // 生成临时文件路径
     let temp_dir = std::env::temp_dir();
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
-    let filename = format!("proxycast_screenshot_{timestamp}.png");
+    let filename = format!("lime_screenshot_{timestamp}.png");
     let temp_path = temp_dir.join(&filename);
 
     debug!("截图临时文件路径: {:?}", temp_path);
@@ -110,7 +110,7 @@ async fn capture_macos(output_path: &Path) -> Result<(), CaptureError> {
             if stderr.contains("cannot") || stderr.contains("permission") {
                 warn!("屏幕录制权限不足: {}", stderr);
                 return Err(CaptureError::PermissionDenied(
-                    "请在系统设置 → 隐私与安全性 → 录屏与系统录音 中授权 ProxyCast".to_string(),
+                    "请在系统设置 → 隐私与安全性 → 录屏与系统录音 中授权 Lime".to_string(),
                 ));
             }
         }
@@ -235,13 +235,10 @@ mod tests {
     fn test_temp_path_generation() {
         let temp_dir = std::env::temp_dir();
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%3f");
-        let filename = format!("proxycast_screenshot_{timestamp}.png");
+        let filename = format!("lime_screenshot_{timestamp}.png");
         let temp_path = temp_dir.join(&filename);
 
-        assert!(temp_path
-            .to_str()
-            .unwrap()
-            .contains("proxycast_screenshot_"));
+        assert!(temp_path.to_str().unwrap().contains("lime_screenshot_"));
         assert!(temp_path.to_str().unwrap().ends_with(".png"));
     }
 }

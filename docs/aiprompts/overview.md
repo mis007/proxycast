@@ -1,8 +1,8 @@
-# ProxyCast 项目架构概览
+# Lime 项目架构概览
 
 ## 概述
 
-ProxyCast 是一个以创作为中心的本地优先 AI Agent 交互工作台，基于 Tauri 桌面应用构建，面向创作者、内容团队与轻知识工作者。系统由 Workspace、Skills 编排层、MCP 标准能力层、Claw 渠道层、Artifact 交付层与多模型接入能力共同组成。
+Lime 是一个以创作为中心的本地优先 AI Agent 交互工作台，基于 Tauri 桌面应用构建，面向创作者、内容团队与轻知识工作者。系统由 Workspace、Skills 编排层、MCP 标准能力层、Claw 渠道层、Artifact 交付层与多模型接入能力共同组成。
 
 可以把它理解为三层结构：
 
@@ -20,12 +20,12 @@ ProxyCast 是一个以创作为中心的本地优先 AI Agent 交互工作台，
 - **Tracing**：时间线、步骤与调用轨迹可观测
 - **MCP**：tools / resources / prompts / roots 的标准能力接入
 
-在 ProxyCast 中，Skills 处于比 MCP 更贴近产品的一层：它不是底层原语，而是将领域经验、交互方式和执行流程打包后的编排单元。
+在 Lime 中，Skills 处于比 MCP 更贴近产品的一层：它不是底层原语，而是将领域经验、交互方式和执行流程打包后的编排单元。
 
 ## 项目结构
 
 ```
-proxycast/
+lime/
 ├── src/                 # React 前端
 │   ├── components/      # UI 组件
 │   ├── pages/           # 页面组件

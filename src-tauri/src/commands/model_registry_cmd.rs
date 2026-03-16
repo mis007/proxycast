@@ -5,7 +5,7 @@
 use crate::models::model_registry::{
     EnhancedModelMetadata, ModelSyncState, ModelTier, ProviderAliasConfig, UserModelPreference,
 };
-use proxycast_services::model_registry_service::{FetchModelsResult, ModelRegistryService};
+use lime_services::model_registry_service::{FetchModelsResult, ModelRegistryService};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;

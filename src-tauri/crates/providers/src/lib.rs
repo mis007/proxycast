@@ -1,4 +1,4 @@
-//! ProxyCast Providers Crate
+//! Lime Providers Crate
 //!
 //! 包含所有 Provider 实现、协议转换、流式传输等核心业务模块。
 //!

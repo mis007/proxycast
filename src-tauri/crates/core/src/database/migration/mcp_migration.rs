@@ -2,40 +2,37 @@ use rusqlite::Connection;
 
 use super::{is_true_setting, mark_true_setting};
 
-const MCP_PROXYCAST_ENABLED_MIGRATED_KEY: &str = "migrated_mcp_proxycast_enabled";
+const MCP_LIME_ENABLED_MIGRATED_KEY: &str = "migrated_mcp_lime_enabled";
 const MCP_CREATED_AT_INTEGER_MIGRATED_KEY: &str = "migrated_mcp_created_at_to_integer";
 
-/// 修复历史 MCP 导入数据：补齐 enabled_proxycast
+/// 修复历史 MCP 导入数据：补齐 enabled_lime
 ///
-/// 早期版本从 Claude/Codex/Gemini 导入 MCP 时，默认写入 enabled_proxycast=0，
-/// 导致 ProxyCast 本身不会使用这些服务器。
+/// 早期版本从 Claude/Codex/Gemini 导入 MCP 时，默认写入 enabled_lime=0，
+/// 导致 Lime 本身不会使用这些服务器。
 ///
 /// 迁移策略：
-/// - 仅处理 enabled_proxycast=0 的记录
+/// - 仅处理 enabled_lime=0 的记录
 /// - 且至少在一个外部应用中启用（enabled_claude/codex/gemini 任一为 1）
-/// - 将 enabled_proxycast 设为 1
-pub fn migrate_mcp_proxycast_enabled(conn: &Connection) -> Result<usize, String> {
-    if is_true_setting(conn, MCP_PROXYCAST_ENABLED_MIGRATED_KEY) {
-        tracing::debug!("[迁移] MCP proxycast 启用状态已迁移过，跳过");
+/// - 将 enabled_lime 设为 1
+pub fn migrate_mcp_lime_enabled(conn: &Connection) -> Result<usize, String> {
+    if is_true_setting(conn, MCP_LIME_ENABLED_MIGRATED_KEY) {
+        tracing::debug!("[迁移] MCP lime 启用状态已迁移过，跳过");
         return Ok(0);
     }
 
     let updated = conn
         .execute(
             "UPDATE mcp_servers
-             SET enabled_proxycast = 1
-             WHERE enabled_proxycast = 0
+             SET enabled_lime = 1
+             WHERE enabled_lime = 0
                AND (enabled_claude = 1 OR enabled_codex = 1 OR enabled_gemini = 1)",
             [],
         )
-        .map_err(|e| format!("修复 MCP enabled_proxycast 失败: {e}"))?;
+        .map_err(|e| format!("修复 MCP enabled_lime 失败: {e}"))?;
 
-    mark_true_setting(conn, MCP_PROXYCAST_ENABLED_MIGRATED_KEY)?;
+    mark_true_setting(conn, MCP_LIME_ENABLED_MIGRATED_KEY)?;
 
-    tracing::info!(
-        "[迁移] MCP proxycast 启用状态修复完成，更新 {} 条记录",
-        updated
-    );
+    tracing::info!("[迁移] MCP lime 启用状态修复完成，更新 {} 条记录", updated);
 
     Ok(updated)
 }
@@ -96,7 +93,7 @@ mod tests {
             );
             CREATE TABLE mcp_servers (
                 id TEXT PRIMARY KEY,
-                enabled_proxycast INTEGER NOT NULL DEFAULT 0,
+                enabled_lime INTEGER NOT NULL DEFAULT 0,
                 enabled_claude INTEGER NOT NULL DEFAULT 0,
                 enabled_codex INTEGER NOT NULL DEFAULT 0,
                 enabled_gemini INTEGER NOT NULL DEFAULT 0,
@@ -109,42 +106,42 @@ mod tests {
     }
 
     #[test]
-    fn migrate_mcp_proxycast_enabled_updates_only_imported_rows() {
+    fn migrate_mcp_lime_enabled_updates_only_imported_rows() {
         let conn = setup_mcp_migration_db();
 
         conn.execute(
-            "INSERT INTO mcp_servers (id, enabled_proxycast, enabled_claude) VALUES (?1, 0, 1)",
+            "INSERT INTO mcp_servers (id, enabled_lime, enabled_claude) VALUES (?1, 0, 1)",
             ["server-1"],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO mcp_servers (id, enabled_proxycast, enabled_claude) VALUES (?1, 0, 0)",
+            "INSERT INTO mcp_servers (id, enabled_lime, enabled_claude) VALUES (?1, 0, 0)",
             ["server-2"],
         )
         .unwrap();
 
-        let updated = migrate_mcp_proxycast_enabled(&conn).unwrap();
+        let updated = migrate_mcp_lime_enabled(&conn).unwrap();
         assert_eq!(updated, 1);
 
-        let enabled_proxycast: i64 = conn
+        let enabled_lime: i64 = conn
             .query_row(
-                "SELECT enabled_proxycast FROM mcp_servers WHERE id = ?1",
+                "SELECT enabled_lime FROM mcp_servers WHERE id = ?1",
                 ["server-1"],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(enabled_proxycast, 1);
+        assert_eq!(enabled_lime, 1);
 
         let untouched: i64 = conn
             .query_row(
-                "SELECT enabled_proxycast FROM mcp_servers WHERE id = ?1",
+                "SELECT enabled_lime FROM mcp_servers WHERE id = ?1",
                 ["server-2"],
                 |row| row.get(0),
             )
             .unwrap();
         assert_eq!(untouched, 0);
 
-        let updated_again = migrate_mcp_proxycast_enabled(&conn).unwrap();
+        let updated_again = migrate_mcp_lime_enabled(&conn).unwrap();
         assert_eq!(updated_again, 0);
     }
 

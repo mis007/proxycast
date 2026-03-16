@@ -22,10 +22,10 @@ use std::path::{Path, PathBuf};
 ///
 /// # Examples
 /// ```ignore
-/// use proxycast_lib::config::expand_tilde;
+/// use lime_lib::config::expand_tilde;
 ///
-/// let expanded = expand_tilde("~/.proxycast/auth");
-/// // 返回类似 "/Users/username/.proxycast/auth" 的路径
+/// let expanded = expand_tilde("~/.lime/auth");
+/// // 返回类似 "/Users/username/.lime/auth" 的路径
 /// ```
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
@@ -68,10 +68,10 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 ///
 /// # Examples
 /// ```ignore
-/// use proxycast_lib::config::collapse_tilde;
+/// use lime_lib::config::collapse_tilde;
 ///
-/// let collapsed = collapse_tilde("/Users/username/.proxycast/auth");
-/// // 返回 "~/.proxycast/auth"
+/// let collapsed = collapse_tilde("/Users/username/.lime/auth");
+/// // 返回 "~/.lime/auth"
 /// ```
 pub fn collapse_tilde<P: AsRef<Path>>(path: P) -> String {
     let path = path.as_ref();
@@ -112,9 +112,9 @@ mod unit_tests {
 
     #[test]
     fn test_expand_tilde_with_path() {
-        let expanded = expand_tilde("~/.proxycast/auth");
+        let expanded = expand_tilde("~/.lime/auth");
         let home = dirs::home_dir().expect("应该能获取主目录");
-        assert_eq!(expanded, home.join(".proxycast/auth"));
+        assert_eq!(expanded, home.join(".lime/auth"));
     }
 
     #[test]
@@ -156,9 +156,9 @@ mod unit_tests {
     #[test]
     fn test_collapse_tilde_with_subpath() {
         let home = dirs::home_dir().expect("应该能获取主目录");
-        let path = home.join(".proxycast/auth");
+        let path = home.join(".lime/auth");
         let collapsed = collapse_tilde(&path);
-        assert_eq!(collapsed, "~/.proxycast/auth");
+        assert_eq!(collapsed, "~/.lime/auth");
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod unit_tests {
     #[test]
     fn test_expand_collapse_roundtrip() {
         // 对于 ~/path 格式，展开后再收缩应该得到原路径
-        let original = "~/.proxycast/auth/token.json";
+        let original = "~/.lime/auth/token.json";
         let expanded = expand_tilde(original);
         let collapsed = collapse_tilde(&expanded);
         assert_eq!(collapsed, original);

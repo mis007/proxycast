@@ -2,7 +2,7 @@
 
 ## 目录定位
 
-`docs/` 是 ProxyCast 文档中心，分为两类受众：
+`docs/` 是 Lime 文档中心，分为两类受众：
 
 - 普通创作者：优先阅读 `content/` 下的入门与用户指南
 - 开发者与维护者：阅读 `aiprompts/`、`develop/`、`tests/` 等工程文档
@@ -13,6 +13,7 @@
 
 - `content/`：对外文档站正文（产品介绍、用户指南、进阶能力）
 - `aiprompts/`：模块级工程文档（前后端组件、服务、命令、数据层）
+- `bussniss/`：商务合作与代理运营方案
 - `develop/`：开发流程与协作规范
 - `plugins/`：插件与扩展相关文档
 - `tests/`：测试策略与用例文档
@@ -24,7 +25,7 @@
 - `develop/execution-tracker-p0-acceptance-report.md`：统一执行追踪 P0 验收报告
 - `develop/execution-tracker-p1-p2-roadmap.md`：统一执行追踪后续路线（P1/P2）
 - `develop/scheduler-task-governance-p1.md`：调度任务治理 P1（连续失败、自动停用、冷却恢复）
-- `roadmap/proxycast-skills-standardization-roadmap.md`：Skills 标准化与产品化路线图
+- `roadmap/lime-skills-standardization-roadmap.md`：Skills 标准化与产品化路线图
 - `ops.md`：运维与发布说明
 - `app.config.ts` / `nuxt.config.ts` / `package.json`：文档站配置
 

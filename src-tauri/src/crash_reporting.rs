@@ -1,6 +1,6 @@
 //! 崩溃上报初始化与上报辅助（Sentry 协议兼容）
 
-use proxycast_core::config::{Config, CrashReportingConfig};
+use lime_core::config::{Config, CrashReportingConfig};
 use serde_json::Value;
 
 /// 根据配置初始化 Sentry 客户端
@@ -43,7 +43,7 @@ fn init(config: &CrashReportingConfig) -> Option<sentry::ClientInitGuard> {
     sentry::configure_scope(|scope| {
         scope.set_tag("platform", std::env::consts::OS);
         scope.set_tag("arch", std::env::consts::ARCH);
-        scope.set_tag("app", "proxycast");
+        scope.set_tag("app", "lime");
         scope.set_tag("app_version", env!("CARGO_PKG_VERSION"));
     });
 

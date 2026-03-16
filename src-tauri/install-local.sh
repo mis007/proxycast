@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 ProxyCast 本地安装脚本"
+echo "🔧 Lime 本地安装脚本"
 echo "================================"
 
 # 1. 更新 Rust
@@ -24,12 +24,12 @@ cargo clean 2>/dev/null || true
 # 3. 编译
 echo ""
 echo "🔨 开始编译 (dev 模式)..."
-cargo build 2>&1 | tee /tmp/proxycast_build.log
+cargo build 2>&1 | tee /tmp/lime_build.log
 
 BUILD_STATUS=${PIPESTATUS[0]}
 if [ $BUILD_STATUS -ne 0 ]; then
-    echo "❌ 编译失败！查看日志: /tmp/proxycast_build.log"
-    tail -50 /tmp/proxycast_build.log
+    echo "❌ 编译失败！查看日志: /tmp/lime_build.log"
+    tail -50 /tmp/lime_build.log
     exit 1
 fi
 
@@ -38,12 +38,12 @@ echo "✅ 编译成功"
 # 4. 本地安装
 echo ""
 echo "📦 正在本地安装..."
-cargo install --path . --force 2>&1 | tee /tmp/proxycast_install.log
+cargo install --path . --force 2>&1 | tee /tmp/lime_install.log
 
 INSTALL_STATUS=${PIPESTATUS[0]}
 if [ $INSTALL_STATUS -ne 0 ]; then
-    echo "❌ 安装失败！查看日志: /tmp/proxycast_install.log"
-    tail -50 /tmp/proxycast_install.log
+    echo "❌ 安装失败！查看日志: /tmp/lime_install.log"
+    tail -50 /tmp/lime_install.log
     exit 1
 fi
 
@@ -52,11 +52,11 @@ echo "✅ 安装成功"
 # 5. 验证安装
 echo ""
 echo "🔍 验证安装..."
-if command -v proxycast &> /dev/null; then
-    echo "✅ ProxyCast 已安装到: $(which proxycast)"
+if command -v lime &> /dev/null; then
+    echo "✅ Lime 已安装到: $(which lime)"
 else
-    echo "⚠️  ProxyCast 命令行工具未在 PATH 中"
-    echo "安装位置: ~/.cargo/bin/proxycast"
+    echo "⚠️  Lime 命令行工具未在 PATH 中"
+    echo "安装位置: ~/.cargo/bin/lime"
     echo ""
     echo "请将以下内容添加到 ~/.zshrc 或 ~/.bash_profile:"
     echo 'export PATH="$HOME/.cargo/bin:$PATH"'

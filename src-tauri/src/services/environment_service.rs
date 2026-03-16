@@ -1,4 +1,4 @@
-use proxycast_core::config::{Config, EnvironmentVariableOverride, WebSearchProvider};
+use lime_core::config::{Config, EnvironmentVariableOverride, WebSearchProvider};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Mutex, OnceLock};
@@ -588,9 +588,7 @@ pub fn apply_environment_namespace(namespace: &str, env: &BTreeMap<String, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::config::{
-        Config, MultiSearchEngineEntryConfig, SearchEngine, WebSearchConfig,
-    };
+    use lime_core::config::{Config, MultiSearchEngineEntryConfig, SearchEngine, WebSearchConfig};
 
     #[tokio::test]
     async fn environment_preview_prefers_explicit_override_over_web_search() {

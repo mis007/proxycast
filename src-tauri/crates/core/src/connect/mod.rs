@@ -1,4 +1,4 @@
-//! ProxyCast Connect 模块
+//! Lime Connect 模块
 //!
 //! 实现中转商生态合作方案，通过 Deep Link 协议实现一键配置功能。
 //!
@@ -11,10 +11,10 @@
 //! ## 使用示例
 //!
 //! ```rust,ignore
-//! use proxycast::connect::{parse_deep_link, RelayRegistry};
+//! use lime::connect::{parse_deep_link, RelayRegistry};
 //!
 //! // 解析 Deep Link
-//! let payload = parse_deep_link("proxycast://connect?relay=example&key=sk-xxx")?;
+//! let payload = parse_deep_link("lime://connect?relay=example&key=sk-xxx")?;
 //!
 //! // 查询中转商信息
 //! let registry = RelayRegistry::new(cache_path);

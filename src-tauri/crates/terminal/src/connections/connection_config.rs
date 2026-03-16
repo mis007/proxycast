@@ -1,7 +1,7 @@
 //! 连接配置管理
 //!
 //! 管理用户保存的连接配置，支持本地和 SSH 连接。
-//! 配置存储在 `~/.config/proxycast/connections.json`。
+//! 配置存储在 `~/.config/lime/connections.json`。
 //!
 //! ## 功能
 //! - 加载/保存连接配置文件
@@ -200,7 +200,7 @@ impl ConnectionConfigManager {
     pub fn default_config_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("proxycast")
+            .join("lime")
             .join("connections.json")
     }
 

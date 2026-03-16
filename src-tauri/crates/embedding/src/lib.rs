@@ -59,7 +59,7 @@ pub struct ApiError {
 /// # 示例
 ///
 /// ```ignore
-/// use proxycast_embedding::get_embedding;
+/// use lime_embedding::get_embedding;
 ///
 /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 ///     let api_key = "sk-...";

@@ -1,13 +1,13 @@
 [package]
-name = "proxycast-gateway"
+name = "lime-gateway"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-proxycast-core.workspace = true
-proxycast-websocket.workspace = true
+lime-core.workspace = true
+lime-websocket.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true

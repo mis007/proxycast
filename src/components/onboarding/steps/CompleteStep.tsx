@@ -63,7 +63,7 @@ export function CompleteStep({ onFinish }: CompleteStepProps) {
       </IconContainer>
 
       <Title>设置完成！</Title>
-      <Subtitle>ProxyCast 已准备就绪，您可以开始使用了。</Subtitle>
+      <Subtitle>Lime 已准备就绪，您可以开始使用了。</Subtitle>
 
       <TipsMessage>
         提示：您可以在左侧导航栏的"插件中心"随时安装插件

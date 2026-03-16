@@ -7,10 +7,10 @@ use crate::agent::aster_state::{AsterAgentState, SessionConfigBuilder};
 use crate::database::DbConnection;
 use aster::conversation::message::Message;
 use futures::StreamExt;
-use proxycast_agent::{convert_agent_event, TauriAgentEvent, WriteArtifactEventEmitter};
+use lime_agent::{convert_agent_event, TauriAgentEvent, WriteArtifactEventEmitter};
 use tauri::{AppHandle, Emitter};
 
-pub use proxycast_agent::session_store::{SessionDetail, SessionInfo};
+pub use lime_agent::session_store::{SessionDetail, SessionInfo};
 
 /// Aster Agent 包装器
 ///
@@ -119,7 +119,7 @@ impl AsterAgentWrapper {
         workspace_id: String,
         execution_strategy: Option<String>,
     ) -> Result<String, String> {
-        proxycast_agent::session_store::create_session_sync(
+        lime_agent::session_store::create_session_sync(
             db,
             name,
             working_dir,
@@ -130,12 +130,12 @@ impl AsterAgentWrapper {
 
     /// 列出所有会话
     pub fn list_sessions_sync(db: &DbConnection) -> Result<Vec<SessionInfo>, String> {
-        proxycast_agent::session_store::list_sessions_sync(db)
+        lime_agent::session_store::list_sessions_sync(db)
     }
 
     /// 获取会话详情
     pub fn get_session_sync(db: &DbConnection, session_id: &str) -> Result<SessionDetail, String> {
-        proxycast_agent::session_store::get_session_sync(db, session_id)
+        lime_agent::session_store::get_session_sync(db, session_id)
     }
 
     /// 重命名会话
@@ -144,12 +144,12 @@ impl AsterAgentWrapper {
         session_id: &str,
         name: &str,
     ) -> Result<(), String> {
-        proxycast_agent::session_store::rename_session_sync(db, session_id, name)
+        lime_agent::session_store::rename_session_sync(db, session_id, name)
     }
 
     /// 删除会话
     pub fn delete_session_sync(db: &DbConnection, session_id: &str) -> Result<(), String> {
-        proxycast_agent::session_store::delete_session_sync(db, session_id)
+        lime_agent::session_store::delete_session_sync(db, session_id)
     }
 }
 

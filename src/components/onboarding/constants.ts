@@ -76,7 +76,7 @@ export const ONBOARDING_VERSION = "1.1.0";
  * localStorage 键名
  */
 export const STORAGE_KEYS = {
-  ONBOARDING_COMPLETE: "proxycast_onboarding_complete",
-  ONBOARDING_VERSION: "proxycast_onboarding_version",
-  USER_PROFILE: "proxycast_user_profile",
+  ONBOARDING_COMPLETE: "lime_onboarding_complete",
+  ONBOARDING_VERSION: "lime_onboarding_version",
+  USER_PROFILE: "lime_user_profile",
 } as const;

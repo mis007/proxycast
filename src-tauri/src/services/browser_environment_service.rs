@@ -1,5 +1,5 @@
-use proxycast_browser_runtime::BrowserRuntimeManager;
-use proxycast_core::database::dao::browser_environment_preset::{
+use lime_browser_runtime::BrowserRuntimeManager;
+use lime_core::database::dao::browser_environment_preset::{
     BrowserEnvironmentPresetDao, BrowserEnvironmentPresetRecord,
     UpsertBrowserEnvironmentPresetInput,
 };

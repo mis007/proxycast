@@ -14,6 +14,8 @@ import { OpenClawPage } from "./OpenClawPage";
 const {
   mockToastError,
   mockToastInfo,
+  mockToastSuccess,
+  mockToastWarning,
   mockDetectDesktopPlatform,
   mockOpenUrl,
   mockInstall,
@@ -22,16 +24,23 @@ const {
   mockGetStatus,
   mockCheckUpdate,
   mockPerformUpdate,
+  mockListRuntimeCandidates,
+  mockSetPreferredRuntime,
   mockGetNodeDownloadUrl,
   mockGetGitDownloadUrl,
   mockListenInstallProgress,
   mockGetProgressLogs,
   mockInstallPageRender,
+  mockRuntimePageRender,
   mockRefreshDashboardUrl,
   mockRefreshDashboardWindowState,
+  mockCheckHealth,
+  mockGetChannels,
 } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
   mockToastInfo: vi.fn(),
+  mockToastSuccess: vi.fn(),
+  mockToastWarning: vi.fn(),
   mockDetectDesktopPlatform: vi.fn(),
   mockOpenUrl: vi.fn(),
   mockInstall: vi.fn(),
@@ -40,21 +49,26 @@ const {
   mockGetStatus: vi.fn(),
   mockCheckUpdate: vi.fn(),
   mockPerformUpdate: vi.fn(),
+  mockListRuntimeCandidates: vi.fn(),
+  mockSetPreferredRuntime: vi.fn(),
   mockGetNodeDownloadUrl: vi.fn(),
   mockGetGitDownloadUrl: vi.fn(),
   mockListenInstallProgress: vi.fn(),
   mockGetProgressLogs: vi.fn(),
   mockInstallPageRender: vi.fn(),
+  mockRuntimePageRender: vi.fn(),
   mockRefreshDashboardUrl: vi.fn(),
   mockRefreshDashboardWindowState: vi.fn(),
+  mockCheckHealth: vi.fn(),
+  mockGetChannels: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
   toast: {
     error: mockToastError,
     info: mockToastInfo,
-    success: vi.fn(),
-    warning: vi.fn(),
+    success: mockToastSuccess,
+    warning: mockToastWarning,
   },
 }));
 
@@ -84,6 +98,8 @@ vi.mock("@/lib/api/openclaw", () => ({
     getStatus: mockGetStatus,
     checkUpdate: mockCheckUpdate,
     performUpdate: mockPerformUpdate,
+    listRuntimeCandidates: mockListRuntimeCandidates,
+    setPreferredRuntime: mockSetPreferredRuntime,
     getNodeDownloadUrl: mockGetNodeDownloadUrl,
     getGitDownloadUrl: mockGetGitDownloadUrl,
     listenInstallProgress: mockListenInstallProgress,
@@ -96,8 +112,8 @@ vi.mock("@/lib/api/openclaw", () => ({
     restartGateway: vi.fn(),
     startGateway: vi.fn(),
     stopGateway: vi.fn(),
-    checkHealth: vi.fn(),
-    getChannels: vi.fn(),
+    checkHealth: mockCheckHealth,
+    getChannels: mockGetChannels,
     getDashboardUrl: vi.fn(),
     syncProviderConfig: vi.fn(),
   },
@@ -126,12 +142,17 @@ vi.mock("./useOpenClawStore", () => {
     selectedProviderId: null as string | null,
     selectedModelId: "",
     gatewayPort: 18790,
+    preferredRuntimeId: null as string | null,
     lastSynced: null,
+    recentOperation: null,
     setSelectedProviderId: vi.fn(),
     setSelectedModelId: vi.fn(),
     setGatewayPort: vi.fn(),
+    setPreferredRuntimeId: vi.fn(),
     setLastSynced: vi.fn(),
+    setRecentOperation: vi.fn(),
     clearLastSynced: vi.fn(),
+    clearRecentOperation: vi.fn(),
   };
 
   return {
@@ -147,6 +168,7 @@ vi.mock("./OpenClawInstallPage", () => ({
     onInstall: () => void;
     onInstallNode: () => void;
     onInstallGit: () => void;
+    onSelectPreferredRuntime: (runtimeId: string | null) => void;
   }) => {
     mockInstallPageRender(props);
     return (
@@ -163,6 +185,12 @@ vi.mock("./OpenClawInstallPage", () => ({
         </button>
         <button type="button" onClick={props.onInstallGit}>
           触发 Git 安装
+        </button>
+        <button
+          type="button"
+          onClick={() => props.onSelectPreferredRuntime("mock-runtime")}
+        >
+          切换运行时
         </button>
       </div>
     );
@@ -182,7 +210,25 @@ vi.mock("./OpenClawProgressPage", () => ({
 }));
 
 vi.mock("./OpenClawRuntimePage", () => ({
-  OpenClawRuntimePage: () => <div data-testid="openclaw-runtime-page" />,
+  OpenClawRuntimePage: (props: {
+    onUpdate: () => void;
+    onUseRecommendedUpdateRuntime: () => void;
+  }) => {
+    mockRuntimePageRender(props);
+    return (
+      <div data-testid="openclaw-runtime-page">
+        <button type="button" onClick={props.onUpdate}>
+          触发升级
+        </button>
+        <button
+          type="button"
+          onClick={props.onUseRecommendedUpdateRuntime}
+        >
+          切到推荐升级环境
+        </button>
+      </div>
+    );
+  },
 }));
 
 const mountedRoots: MountedRoot[] = [];
@@ -203,12 +249,12 @@ function buildEnvironmentStatus(options?: {
   return {
     node: {
       status: nodeStatus,
-      version: nodeStatus === "ok" ? "22.0.0" : null,
+      version: nodeStatus === "ok" ? "22.12.0" : null,
       path: nodeStatus === "ok" ? "C:/Program Files/nodejs/node.exe" : null,
       message:
         nodeStatus === "ok"
-          ? "Node.js 已就绪：22.0.0"
-          : "未检测到 Node.js，需要安装 22.0.0+。",
+          ? "Node.js 已就绪：22.12.0"
+          : "未检测到 Node.js，需要安装 22.12.0+。",
       autoInstallSupported: false,
     },
     git: {
@@ -283,6 +329,11 @@ beforeEach(() => {
     packageManager: "pnpm",
     message: null,
   });
+  mockListRuntimeCandidates.mockResolvedValue([]);
+  mockSetPreferredRuntime.mockResolvedValue({
+    success: true,
+    message: "已切换为自动选择执行环境。",
+  });
   mockGetNodeDownloadUrl.mockResolvedValue("https://nodejs.org/en/download");
   mockGetGitDownloadUrl.mockResolvedValue("https://git-scm.com/download/win");
   mockListenInstallProgress.mockResolvedValue(() => {});
@@ -290,6 +341,13 @@ beforeEach(() => {
   mockInstall.mockResolvedValue({ success: true, message: "ok" });
   mockInstallDependency.mockResolvedValue({ success: true, message: "ok" });
   mockPerformUpdate.mockResolvedValue({ success: true, message: "ok" });
+  mockCheckHealth.mockResolvedValue({
+    status: "healthy",
+    gatewayPort: 18790,
+    uptime: 10,
+    version: "2026.3.8",
+  });
+  mockGetChannels.mockResolvedValue([]);
   mockRefreshDashboardUrl.mockResolvedValue(null);
   mockRefreshDashboardWindowState.mockResolvedValue(false);
 });
@@ -431,7 +489,7 @@ describe("OpenClawPage", () => {
         openclawVersion: "0.4.1",
         openclawPath: "C:/Users/demo/AppData/Roaming/npm",
         openclawMessage:
-          "已在 npm 全局目录检测到 openclaw（0.4.1），但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 ProxyCast。",
+          "已在 npm 全局目录检测到 openclaw（0.4.1），但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 Lime。",
         summary:
           "已检测到 OpenClaw 包，但命令尚未生效；请点击“重新检测”。",
       }),
@@ -448,7 +506,7 @@ describe("OpenClawPage", () => {
 
     expect(mockInstall).not.toHaveBeenCalled();
     expect(mockToastError).toHaveBeenCalledWith(
-      "已在 npm 全局目录检测到 openclaw（0.4.1），但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 ProxyCast。",
+      "已在 npm 全局目录检测到 openclaw（0.4.1），但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 Lime。",
     );
   });
 
@@ -479,5 +537,224 @@ describe("OpenClawPage", () => {
     );
     expect(mockInstall).toHaveBeenCalledTimes(1);
     expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("切换执行环境时应先同步后端再刷新页面状态", async () => {
+    mockListRuntimeCandidates.mockResolvedValue([
+      {
+        id: "mock-runtime",
+        source: "nvm",
+        binDir: "/Users/demo/.nvm/versions/node/v23.4.0/bin",
+        nodePath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/node",
+        nodeVersion: "23.4.0",
+        npmPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/npm",
+        npmGlobalPrefix: "/Users/demo/.nvm/versions/node/v23.4.0",
+        openclawPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        openclawVersion: "2026.3.8",
+        openclawPackagePath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/@qingchencloud/openclaw-zh/package.json",
+        isActive: true,
+        isPreferred: false,
+      },
+    ]);
+    mockSetPreferredRuntime.mockResolvedValue({
+      success: true,
+      message: "已固定使用执行环境：nvm · Node 23.4.0。",
+    });
+
+    const mounted = renderPage();
+    await waitForInstallPage(mounted.container);
+    await flushEffects();
+
+    await act(async () => {
+      findButton(mounted.container, "切换运行时").click();
+      await flushEffects();
+    });
+
+    await waitForCondition(
+      () =>
+        mockSetPreferredRuntime.mock.calls.some(
+          ([runtimeId]) => runtimeId === "mock-runtime",
+        ),
+      20,
+      "切换执行环境后未同步到后端",
+    );
+    expect(mockGetEnvironmentStatus.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("命令待刷新但 Gateway 已运行时不应阻塞进入后续页面", async () => {
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "needs_reload",
+        openclawVersion: "2026.3.13-zh.1",
+        openclawPath: "/Users/demo/.nvm/versions/node/v23.4.0",
+        summary: "已检测到 OpenClaw 包，但命令尚未生效。",
+      }),
+    );
+    mockGetStatus.mockResolvedValue({ status: "running", port: 18790 });
+
+    const mounted = renderPage();
+    await flushEffects();
+
+    await waitForCondition(
+      () => !!mounted.container.querySelector('[data-testid="openclaw-runtime-page"]'),
+      40,
+      "Gateway 已运行时仍被阻塞在安装页",
+    );
+  });
+
+  it("智能升级前会自动切到检测到 OpenClaw 的执行环境", async () => {
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "ok",
+        openclawVersion: "2026.3.8",
+        openclawPath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        summary: "OpenClaw 已安装。",
+      }),
+    );
+    mockDetectDesktopPlatform.mockReturnValue("macos");
+    mockListRuntimeCandidates.mockResolvedValue([
+      {
+        id: "node-without-openclaw",
+        source: "PhpWebStudy",
+        binDir: "/Users/demo/Library/PhpWebStudy/env/node/bin",
+        nodePath: "/Users/demo/Library/PhpWebStudy/env/node/bin/node",
+        nodeVersion: "22.12.0",
+        npmPath: "/Users/demo/Library/PhpWebStudy/env/node/bin/npm",
+        npmGlobalPrefix: "/Users/demo/Library/PhpWebStudy/env/node",
+        openclawPath: null,
+        openclawVersion: null,
+        openclawPackagePath: null,
+        isActive: true,
+        isPreferred: false,
+      },
+      {
+        id: "node-with-openclaw",
+        source: "nvm",
+        binDir: "/Users/demo/.nvm/versions/node/v23.4.0/bin",
+        nodePath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/node",
+        nodeVersion: "23.4.0",
+        npmPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/npm",
+        npmGlobalPrefix: "/Users/demo/.nvm/versions/node/v23.4.0",
+        openclawPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        openclawVersion: "2026.3.8",
+        openclawPackagePath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/@qingchencloud/openclaw-zh/package.json",
+        isActive: false,
+        isPreferred: false,
+      },
+    ]);
+
+    const mounted = renderPage();
+    await flushEffects();
+
+    await waitForCondition(
+      () => !!mounted.container.querySelector('[data-testid="openclaw-runtime-page"]'),
+      40,
+      "OpenClaw 运行页未在预期时间内渲染",
+    );
+
+    await act(async () => {
+      findButton(mounted.container, "触发升级").click();
+      await flushEffects();
+    });
+
+    await waitForCondition(
+      () =>
+        mockSetPreferredRuntime.mock.calls.some(
+          ([runtimeId]) => runtimeId === "node-with-openclaw",
+        ),
+      40,
+      "升级前未自动切换到检测到 OpenClaw 的执行环境",
+    );
+    expect(mockPerformUpdate).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "已自动切换到检测到 OpenClaw 的执行环境。",
+      expect.objectContaining({
+        description: expect.stringContaining("OpenClaw 2026.3.8"),
+      }),
+    );
+  });
+
+  it("升级后若运行中仍是旧版本应显示 warning 而不是默认 success", async () => {
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "ok",
+        openclawVersion: "2026.3.13-zh.1",
+        openclawPath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        summary: "OpenClaw 已安装。",
+      }),
+    );
+    mockDetectDesktopPlatform.mockReturnValue("macos");
+    mockGetStatus.mockResolvedValue({ status: "running", port: 18790 });
+    mockCheckHealth.mockResolvedValue({
+      status: "healthy",
+      gatewayPort: 18790,
+      uptime: 20,
+      version: "2026.3.8",
+    });
+    mockCheckUpdate.mockResolvedValue({
+      hasUpdate: true,
+      currentVersion: "2026.3.13",
+      latestVersion: "2026.3.13",
+      channel: "stable",
+      installKind: "package",
+      packageManager: "pnpm",
+      message: null,
+    });
+    mockListRuntimeCandidates.mockResolvedValue([
+      {
+        id: "node-with-openclaw",
+        source: "nvm",
+        binDir: "/Users/demo/.nvm/versions/node/v23.4.0/bin",
+        nodePath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/node",
+        nodeVersion: "23.4.0",
+        npmPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/npm",
+        npmGlobalPrefix: "/Users/demo/.nvm/versions/node/v23.4.0",
+        openclawPath: "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        openclawVersion: "2026.3.13",
+        openclawPackagePath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/@qingchencloud/openclaw-zh/package.json",
+        isActive: true,
+        isPreferred: false,
+      },
+    ]);
+
+    const mounted = renderPage();
+    await flushEffects();
+
+    await waitForCondition(
+      () => !!mounted.container.querySelector('[data-testid="openclaw-runtime-page"]'),
+      40,
+      "OpenClaw 运行页未在预期时间内渲染",
+    );
+
+    await act(async () => {
+      findButton(mounted.container, "触发升级").click();
+      await flushEffects();
+    });
+    await flushInstallTimer();
+
+    await waitForCondition(
+      () => mockPerformUpdate.mock.calls.length > 0,
+      40,
+      "未触发升级接口",
+    );
+
+    expect(mockToastWarning).toHaveBeenCalledWith(
+      "新版本已经安装，但当前仍在运行旧版 Gateway。",
+      expect.objectContaining({
+        description: expect.stringContaining("当前运行中 2026.3.8"),
+      }),
+    );
+    expect(mockToastSuccess).not.toHaveBeenCalledWith("ok");
   });
 });

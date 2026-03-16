@@ -1,6 +1,6 @@
 /**
  * @file Connect 错误提示 Alert 组件
- * @description 提供 ProxyCast Connect 功能的错误提示 Alert 组件
+ * @description 提供 Lime Connect 功能的错误提示 Alert 组件
  * @module components/connect/ConnectErrorToast
  *
  * _Requirements: 7.1, 7.2, 7.3, 7.4_

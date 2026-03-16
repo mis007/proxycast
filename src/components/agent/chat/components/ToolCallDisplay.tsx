@@ -38,7 +38,7 @@ import {
   isUnifiedWebSearchToolName,
   resolveSearchResultPreviewItemsFromText,
 } from "../utils/searchResultPreview";
-import { extractProxycastToolMetadataBlock } from "../hooks/agentChatToolResult";
+import { extractLimeToolMetadataBlock } from "../hooks/agentChatToolResult";
 import {
   classifySearchQuerySemantic,
   summarizeSearchQuerySemantics,
@@ -237,7 +237,7 @@ const getToolDisplayInfo = (
 
   if (
     normalizedName === "task" ||
-    normalizedName.startsWith("proxycastcreate") &&
+    normalizedName.startsWith("limecreate") &&
       normalizedName.endsWith("tasktool")
   ) {
     return {
@@ -700,7 +700,7 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
       );
     }
     if (
-      normalizeToolNameKey(toolCall.name).startsWith("proxycastcreate") &&
+      normalizeToolNameKey(toolCall.name).startsWith("limecreate") &&
       (parsedArgs.title ||
         parsedArgs.topic ||
         parsedArgs.keyword ||
@@ -736,14 +736,14 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
   );
   const resultText = useMemo(() => {
     const rawText = toolCall.result?.error || toolCall.result?.output || "";
-    const normalized = extractProxycastToolMetadataBlock(rawText).text;
+    const normalized = extractLimeToolMetadataBlock(rawText).text;
     return normalized || "(无输出)";
   }, [toolCall.result?.error, toolCall.result?.output]);
   const resultMetaItems = useMemo(() => {
     if (!resultMetadata) return [];
 
     const items: string[] = [];
-    if (resultMetadata.proxycast_offloaded === true) {
+    if (resultMetadata.lime_offloaded === true) {
       items.push("完整输出已转存");
     }
     if (typeof resultMetadata.exit_code === "number") {

@@ -13,8 +13,8 @@ const INSTRUCTION_FILENAMES: &[&str] = &[
     "AGENT.md",
     ".agent.md",
     "agent.md",
-    ".proxycast/AGENT.md",
-    ".proxycast/instructions.md",
+    ".lime/AGENT.md",
+    ".lime/instructions.md",
 ];
 
 // 保留旧常量供测试使用（第一优先级文件名）
@@ -24,7 +24,7 @@ const INSTRUCTION_FILENAME: &str = "AGENT.md";
 /// 指令来源，按优先级从低到高
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionSource {
-    /// ~/.proxycast/AGENT.md
+    /// ~/.lime/AGENT.md
     Global,
     /// 项目根目录/AGENT.md
     Project,
@@ -56,9 +56,9 @@ fn find_instruction_file(dir: &Path) -> Option<PathBuf> {
 pub fn discover_instructions(working_dir: &Path) -> Vec<InstructionLayer> {
     let mut layers = Vec::new();
 
-    // 1. 全局: ~/.proxycast/ 下查找指令文件
+    // 1. 全局: ~/.lime/ 下查找指令文件
     if let Some(home) = dirs::home_dir() {
-        let global_dir = home.join(".proxycast");
+        let global_dir = home.join(".lime");
         // 全局层只查找 AGENT.md（不递归子目录模式）
         let global_path = global_dir.join("AGENT.md");
         if let Some(layer) = load_layer(&global_path, InstructionSource::Global) {
@@ -384,7 +384,7 @@ mod tests {
             InstructionLayer {
                 source: InstructionSource::Global,
                 content: "global rule".to_string(),
-                path: PathBuf::from("/home/.proxycast/AGENT.md"),
+                path: PathBuf::from("/home/.lime/AGENT.md"),
             },
             InstructionLayer {
                 source: InstructionSource::Project,

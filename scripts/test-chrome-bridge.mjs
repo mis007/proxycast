@@ -4,7 +4,7 @@
  * Chrome Bridge 测试脚本
  *
  * 使用方式：
- * 1. 确保 ProxyCast 服务器正在运行
+ * 1. 确保 Lime 服务器正在运行
  * 2. 确保 Chrome Profile 已打开并连接
  * 3. 运行: node scripts/test-chrome-bridge.mjs
  */
@@ -12,11 +12,11 @@
 import WebSocket from 'ws';
 
 const SERVER_URL = 'ws://127.0.0.1:8999';
-const BRIDGE_KEY = 'Proxycast-key11';
+const BRIDGE_KEY = 'Lime-key11';
 const PROFILE_KEY = 'search_google';
 
 // 连接 Control 通道
-const controlUrl = `${SERVER_URL}/proxycast-chrome-control/${BRIDGE_KEY}`;
+const controlUrl = `${SERVER_URL}/lime-chrome-control/${BRIDGE_KEY}`;
 console.log(`[测试] 连接 Control 通道: ${controlUrl}`);
 
 const ws = new WebSocket(controlUrl);

@@ -10,7 +10,7 @@ const DEFAULTS = {
 
 function printHelp() {
   console.log(`
-ProxyCast DevBridge 健康检查
+Lime DevBridge 健康检查
 
 用法:
   node scripts/check-dev-bridge-health.mjs [选项]

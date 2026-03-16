@@ -1,6 +1,6 @@
 //! 数据迁移逻辑
 //!
-//! 从旧的文件系统记忆（~/.proxycast/memory/<session_id>/）迁移到新的 SQLite 统一记忆表
+//! 从旧的文件系统记忆（~/.lime/memory/<session_id>/）迁移到新的 SQLite 统一记忆表
 
 use crate::models::{UnifiedMemory, MemoryCategory, MemorySource};
 use crate::migrations::v1_unified_memory::migrate as migrate_v1;
@@ -37,13 +37,13 @@ pub fn migrate_file_memory_to_sqlite(
     let memory_dir = std::env::var("HOME")
         .map(|home| {
             let mut path = PathBuf::from(home);
-            path.push(".proxycast");
+            path.push(".lime");
             path.push("memory");
             path
         })
         .unwrap_or_else(|_| {
             let mut path = PathBuf::from(".");
-            path.push(".proxycast");
+            path.push(".lime");
             path.push("memory");
             path
         });

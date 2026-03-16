@@ -129,12 +129,12 @@ export function WelcomeStep({ onNext, onSkip }: WelcomeStepProps) {
   return (
     <Container>
       <LogoContainer>
-        <Logo src="/logo.png" alt="ProxyCast" />
+        <Logo src="/logo.png" alt="Lime" />
       </LogoContainer>
 
-      <Title>欢迎使用 ProxyCast</Title>
+      <Title>欢迎使用 Lime</Title>
       <Subtitle>
-        ProxyCast 是一款强大的 AI 客户端代理，帮助您轻松管理和使用多种 AI 服务。
+        Lime 是一款强大的 AI 客户端代理，帮助您轻松管理和使用多种 AI 服务。
       </Subtitle>
 
       <FeatureGrid>

@@ -1,5 +1,5 @@
 use crate::models::machine_id::*;
-use proxycast_services::machine_id_service::MachineIdService;
+use lime_services::machine_id_service::MachineIdService;
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
@@ -148,7 +148,7 @@ pub async fn clear_machine_id_override() -> Result<MachineIdResult, String> {
 
         let override_file = dirs::data_dir()
             .ok_or("Failed to get app data directory")?
-            .join("proxycast")
+            .join("lime")
             .join("machine-id-override");
 
         match fs::remove_file(override_file) {

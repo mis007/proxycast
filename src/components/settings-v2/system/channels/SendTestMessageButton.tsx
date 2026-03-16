@@ -24,9 +24,9 @@ export interface SendTestMessageButtonProps {
 }
 
 const DEFAULT_TEST_MESSAGES = {
-  [NotificationChannelType.FEISHU]: "这是一条来自 ProxyCast 的测试消息 📱",
-  [NotificationChannelType.TELEGRAM]: "This is a test message from ProxyCast 🚀",
-  [NotificationChannelType.DISCORD]: "🎉 Test message from ProxyCast",
+  [NotificationChannelType.FEISHU]: "这是一条来自 Lime 的测试消息 📱",
+  [NotificationChannelType.TELEGRAM]: "This is a test message from Lime 🚀",
+  [NotificationChannelType.DISCORD]: "🎉 Test message from Lime",
 };
 
 export function SendTestMessageButton({

@@ -13,8 +13,8 @@ const JSON_RECURSION_LIMIT: usize = 50;
 ///
 /// 支持的格式：
 /// 1. Aster 格式: `[{"Text":"..."}, {"ToolRequest":...}]`
-/// 2. ProxyCast 纯文本: `"string"`
-/// 3. ProxyCast Parts: `[{"type":"text","text":"..."}]`
+/// 2. Lime 纯文本: `"string"`
+/// 3. Lime Parts: `[{"type":"text","text":"..."}]`
 fn parse_message_content(content_json: &str) -> MessageContent {
     // 尝试解析为纯文本字符串
     if let Ok(text) = serde_json::from_str::<String>(content_json) {
@@ -39,7 +39,7 @@ fn parse_message_content(content_json: &str) -> MessageContent {
         }
     }
 
-    // 尝试直接解析为 ProxyCast MessageContent
+    // 尝试直接解析为 Lime MessageContent
     if let Ok(content) = serde_json::from_str::<MessageContent>(content_json) {
         return content;
     }
@@ -618,7 +618,7 @@ impl AgentDao {
 
             // 解析 JSON - 支持多种格式
             // 1. Aster 格式: [{"Text":"..."}, {"Text":"..."}]
-            // 2. ProxyCast 格式: "string" 或 [{"type":"text","text":"..."}]
+            // 2. Lime 格式: "string" 或 [{"type":"text","text":"..."}]
             let content = parse_message_content(&content_json);
 
             // 兼容历史数据：tool_calls 中缺失 type 字段时自动降级解析

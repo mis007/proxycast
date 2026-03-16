@@ -4,9 +4,9 @@
 
 use super::traits::{PipelineStep, StepError};
 use async_trait::async_trait;
-use proxycast_core::plugin::PluginManager;
-use proxycast_core::processor::RequestContext;
-use proxycast_core::ProviderType;
+use lime_core::plugin::PluginManager;
+use lime_core::processor::RequestContext;
+use lime_core::ProviderType;
 use std::sync::Arc;
 
 /// 插件前置钩子步骤

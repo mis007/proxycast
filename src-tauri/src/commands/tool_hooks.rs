@@ -1,6 +1,6 @@
 //! 工具钩子管理相关的 Tauri 命令
 
-use proxycast_services::tool_hooks_service::{
+use lime_services::tool_hooks_service::{
     HookContext, HookExecutionStats, HookRule, HookTrigger, ToolHooksService,
 };
 use serde::{Deserialize, Serialize};

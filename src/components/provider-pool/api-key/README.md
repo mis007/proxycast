@@ -106,7 +106,7 @@ function ApiKeySection() {
    - 负责 Provider 工厂与别名归一；
    - 支持 `ASTER_PROVIDER_ALIAS_OVERRIDES` 做运行时覆盖（JSON 或 `k=v`）。
 
-2. **应用后端层（Proxycast Tauri）**
+2. **应用后端层（Lime Tauri）**
    - `get_system_provider_catalog` 作为 Provider 元信息入口（含 `legacy_ids`）；
    - `get_model_registry_provider_ids` 从 `src-tauri/resources/models/index.json` 提供模型 Provider 真相集。
 

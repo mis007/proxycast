@@ -320,7 +320,7 @@ const OAUTH_SUCCESS_HTML: &str = r#"<!DOCTYPE html>
             <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
         </div>
         <h1>Authentication Successful!</h1>
-        <p>You can close this window and return to ProxyCast.</p>
+        <p>You can close this window and return to Lime.</p>
     </div>
 </body>
 </html>"#;
@@ -1276,10 +1276,10 @@ fn resolve_codex_instructions(
         return Some(system_instructions.join("\n\n"));
     }
 
-    std::env::var("PROXYCAST_CODEX_DEFAULT_INSTRUCTIONS")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    lime_core::env_compat::var_nonempty(&[
+        "LIME_CODEX_DEFAULT_INSTRUCTIONS",
+        "PROXYCAST_CODEX_DEFAULT_INSTRUCTIONS",
+    ])
 }
 
 /// Transform OpenAI chat completion request to Codex format
@@ -2067,7 +2067,7 @@ const CODEX_OAUTH_SUCCESS_HTML: &str = r#"<!DOCTYPE html>
 <body>
     <div class="container">
         <h1>✓ 授权成功</h1>
-        <p>Codex 账号已添加到 ProxyCast</p>
+        <p>Codex 账号已添加到 Lime</p>
         <p class="email">EMAIL_PLACEHOLDER</p>
         <p style="margin-top: 20px; color: #999;">可以关闭此页面</p>
     </div>
@@ -2260,7 +2260,7 @@ pub async fn start_codex_oauth_server_and_get_url() -> Result<
                 // 保存凭证到应用数据目录
                 let creds_dir = dirs::data_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
-                    .join("proxycast")
+                    .join("lime")
                     .join("credentials")
                     .join("codex");
 

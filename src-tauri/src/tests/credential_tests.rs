@@ -5,9 +5,9 @@
 #![allow(dead_code)]
 
 use crate::ProviderType;
+use lime_core::credential::{Credential, CredentialData, CredentialPool};
+use lime_credential::{BalanceStrategy, LoadBalancer};
 use proptest::prelude::*;
-use proxycast_core::credential::{Credential, CredentialData, CredentialPool};
-use proxycast_credential::{BalanceStrategy, LoadBalancer};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -356,7 +356,7 @@ proptest! {
         provider in arb_provider_type(),
         failure_threshold in 1u32..=5u32
     ) {
-        use proxycast_core::credential::{CredentialStatus, HealthCheckConfig, HealthChecker};
+        use lime_core::credential::{CredentialStatus, HealthCheckConfig, HealthChecker};
         use std::time::Duration;
 
         // 创建带自定义阈值的健康检查器
@@ -429,7 +429,7 @@ proptest! {
         provider in arb_provider_type(),
         latency_ms in 1u64..1000u64
     ) {
-        use proxycast_core::credential::{CredentialStatus, HealthChecker};
+        use lime_core::credential::{CredentialStatus, HealthChecker};
 
         let checker = HealthChecker::with_defaults();
         let pool = CredentialPool::new(provider);
@@ -487,7 +487,7 @@ proptest! {
         failures_before in 1u32..3u32,
         latency_ms in 1u64..1000u64
     ) {
-        use proxycast_core::credential::HealthChecker;
+        use lime_core::credential::HealthChecker;
 
         let checker = HealthChecker::with_defaults();
         let pool = CredentialPool::new(provider);
@@ -540,7 +540,7 @@ proptest! {
         cooldown_index in 0usize..5usize
     ) {
         use chrono::{Duration, Utc};
-        use proxycast_core::credential::CredentialStatus;
+        use lime_core::credential::CredentialStatus;
 
         let lb = LoadBalancer::new(BalanceStrategy::RoundRobin);
         let pool = Arc::new(CredentialPool::new(provider));
@@ -622,7 +622,7 @@ proptest! {
         cred_count in 1usize..=5usize
     ) {
         use chrono::Duration;
-        use proxycast_core::credential::PoolError;
+        use lime_core::credential::PoolError;
 
         let lb = LoadBalancer::new(BalanceStrategy::RoundRobin);
         let pool = Arc::new(CredentialPool::new(provider));
@@ -670,8 +670,8 @@ proptest! {
 use crate::models::provider_pool_model::{
     CredentialData as PoolCredentialData, PoolProviderType, ProviderCredential,
 };
-use proxycast_core::config::{Config, ConfigManager};
-use proxycast_credential::CredentialSyncService;
+use lime_core::config::{Config, ConfigManager};
+use lime_credential::CredentialSyncService;
 use std::sync::RwLock;
 use tempfile::TempDir;
 
@@ -1391,8 +1391,8 @@ proptest! {
 
 // ============ 配额管理器属性测试 ============
 
-use proxycast_core::config::QuotaExceededConfig;
-use proxycast_credential::QuotaManager;
+use lime_core::config::QuotaExceededConfig;
+use lime_credential::QuotaManager;
 
 /// 生成随机的配额超限配置
 fn arb_quota_config() -> impl Strategy<Value = QuotaExceededConfig> {

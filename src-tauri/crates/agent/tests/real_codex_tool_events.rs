@@ -1,14 +1,13 @@
 use futures::StreamExt;
-use proxycast_agent::{
-    convert_agent_event, AsterAgentState, SessionConfigBuilder, TauriAgentEvent,
-};
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::database::init_database;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
+use lime_agent::{convert_agent_event, AsterAgentState, SessionConfigBuilder, TauriAgentEvent};
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::database::init_database;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
 use uuid::Uuid;
 
 fn should_run_real_test() -> bool {
-    std::env::var("PROXYCAST_REAL_API_TEST").ok().as_deref() == Some("1")
+    lime_core::env_compat::var(&["LIME_REAL_API_TEST", "PROXYCAST_REAL_API_TEST"]).as_deref()
+        == Some("1")
 }
 
 fn resolve_model_name(
@@ -32,17 +31,19 @@ fn resolve_model_name(
     }
 
     Err(
-        "未找到可用模型：请设置 PROXYCAST_REAL_MODEL，或在 Provider custom_models 中配置模型。"
+        "未找到可用模型：请设置 LIME_REAL_MODEL，或在 Provider custom_models 中配置模型（兼容旧的 PROXYCAST_REAL_MODEL）。"
             .to_string(),
     )
 }
 
 fn resolve_codex_provider_and_model(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
 ) -> Result<(String, String), String> {
-    let explicit_model = std::env::var("PROXYCAST_REAL_MODEL").ok();
+    let explicit_model = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"]);
 
-    if let Ok(explicit) = std::env::var("PROXYCAST_REAL_PROVIDER_ID") {
+    if let Some(explicit) =
+        lime_core::env_compat::var(&["LIME_REAL_PROVIDER_ID", "PROXYCAST_REAL_PROVIDER_ID"])
+    {
         let trimmed = explicit.trim();
         if !trimmed.is_empty() {
             let service = ApiKeyProviderService::new();
@@ -72,7 +73,7 @@ fn resolve_codex_provider_and_model(
 }
 
 #[tokio::test]
-#[ignore = "真实联网测试：设置 PROXYCAST_REAL_API_TEST=1 后执行"]
+#[ignore = "真实联网测试：设置 LIME_REAL_API_TEST=1 后执行"]
 async fn test_real_codex_stream_emits_tool_events() {
     if !should_run_real_test() {
         return;
@@ -107,7 +108,7 @@ async fn test_real_codex_stream_emits_tool_events() {
 
     let prompt = if preferred_tool == "bash" {
         "请严格执行以下步骤：\
-1) 必须调用工具 bash，执行命令 `echo PROXYCAST_REAL_TOOL_EVENT`; \
+1) 必须调用工具 bash，执行命令 `echo LIME_REAL_TOOL_EVENT`; \
 2) 然后只回复 `REAL_TOOL_OK`。"
             .to_string()
     } else {

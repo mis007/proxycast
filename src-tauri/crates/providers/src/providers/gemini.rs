@@ -1043,7 +1043,7 @@ const GEMINI_OAUTH_SUCCESS_HTML: &str = r#"<!DOCTYPE html>
 <body>
     <div class="container">
         <h1>✓ 授权成功</h1>
-        <p>Gemini 账号已添加到 ProxyCast</p>
+        <p>Gemini 账号已添加到 Lime</p>
         <p class="email">EMAIL_PLACEHOLDER</p>
         <p style="margin-top: 20px; color: #999;">可以关闭此页面</p>
     </div>
@@ -1089,7 +1089,7 @@ async fn save_gemini_credentials_to_file(
     // 获取凭证存储目录
     let credentials_dir = dirs::data_dir()
         .ok_or("无法获取应用数据目录")?
-        .join("proxycast")
+        .join("lime")
         .join("credentials");
 
     // 确保目录存在

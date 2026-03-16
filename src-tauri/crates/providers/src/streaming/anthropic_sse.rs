@@ -39,8 +39,8 @@ pub struct ToolCallState {
 /// # 示例
 ///
 /// ```ignore
-/// use proxycast::streaming::anthropic_sse::AnthropicSseGenerator;
-/// use proxycast::streaming::aws_parser::AwsEvent;
+/// use lime::streaming::anthropic_sse::AnthropicSseGenerator;
+/// use lime::streaming::aws_parser::AwsEvent;
 ///
 /// let mut generator = AnthropicSseGenerator::new("claude-3-sonnet");
 ///

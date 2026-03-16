@@ -10,8 +10,8 @@
 //! - claude-haiku-4-5 → claude-haiku-4.5
 
 use crate::translator::traits::{RequestTranslator, TranslateError};
-use proxycast_core::models::codewhisperer::*;
-use proxycast_core::models::openai::*;
+use lime_core::models::codewhisperer::*;
+use lime_core::models::openai::*;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 

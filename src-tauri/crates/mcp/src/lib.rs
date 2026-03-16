@@ -1,4 +1,4 @@
-//! ProxyCast MCP Crate
+//! Lime MCP Crate
 //!
 //! MCP（Model Context Protocol）集成模块，提供 MCP 协议的客户端实现。
 //! 使用 DynEmitter 替代 Tauri AppHandle 进行事件发射，实现与 Tauri 的解耦。
@@ -8,7 +8,7 @@ pub mod manager;
 pub mod tool_converter;
 pub mod types;
 
-pub use client::{McpClientWrapper, ProxyCastMcpClient};
+pub use client::{LimeMcpClient, McpClientWrapper};
 pub use manager::McpClientManager;
 pub use tool_converter::ToolConverter;
 pub use types::{

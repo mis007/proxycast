@@ -225,8 +225,8 @@ pub async fn update_provider_env_vars(
     api_host: String,
     api_key: Option<String>,
 ) -> Result<(), String> {
-    use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-    use proxycast_services::live_sync::write_env_to_shell_config;
+    use lime_core::database::dao::api_key_provider::ApiProviderType;
+    use lime_services::live_sync::write_env_to_shell_config;
     use serde_json::{json, Value};
     use std::fs;
 
@@ -338,7 +338,7 @@ fn upsert_environment_overrides(config: &mut config::Config, env_vars: &[(String
         config
             .environment
             .variables
-            .push(proxycast_core::config::EnvironmentVariableOverride {
+            .push(lime_core::config::EnvironmentVariableOverride {
                 key: trimmed_key.to_string(),
                 value: value.clone(),
                 enabled: true,
@@ -351,9 +351,7 @@ fn build_provider_env_vars(
     api_host: &str,
     api_key: Option<&str>,
 ) -> Vec<(String, String)> {
-    use proxycast_core::database::dao::api_key_provider::{
-        ApiProviderType, ProviderProtocolFamily,
-    };
+    use lime_core::database::dao::api_key_provider::{ApiProviderType, ProviderProtocolFamily};
 
     let push_if_key = |vars: &mut Vec<(String, String)>, key_name: &str| {
         if let Some(value) = api_key {
@@ -449,7 +447,7 @@ fn build_provider_env_vars(
 #[cfg(test)]
 mod tests {
     use super::{build_provider_env_vars, upsert_environment_overrides};
-    use proxycast_core::config::Config;
+    use lime_core::config::Config;
 
     #[test]
     fn test_build_provider_env_vars_explicit_anthropic_compatible() {
@@ -508,7 +506,7 @@ mod tests {
         config
             .environment
             .variables
-            .push(proxycast_core::config::EnvironmentVariableOverride {
+            .push(lime_core::config::EnvironmentVariableOverride {
                 key: "OPENAI_BASE_URL".to_string(),
                 value: "http://old".to_string(),
                 enabled: false,

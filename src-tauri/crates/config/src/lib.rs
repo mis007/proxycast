@@ -1,4 +1,4 @@
-//! ProxyCast 配置观察者模块
+//! Lime 配置观察者模块
 //!
 //! 提供基于观察者模式的配置管理系统。
 //! Tauri 相关的具体实现（TauriObserver、AppHandle 集成）

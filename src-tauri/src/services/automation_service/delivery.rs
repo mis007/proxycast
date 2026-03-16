@@ -2,7 +2,7 @@
 
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use proxycast_core::config::DeliveryConfig;
+use lime_core::config::DeliveryConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -1033,10 +1033,7 @@ async fn deliver_webhook(
     match client
         .post(url)
         .header("Idempotency-Key", context.attempt_id.as_str())
-        .header(
-            "X-Proxycast-Delivery-Attempt-Id",
-            context.attempt_id.as_str(),
-        )
+        .header("X-Lime-Delivery-Attempt-Id", context.attempt_id.as_str())
         .json(&payload)
         .timeout(std::time::Duration::from_secs(30))
         .send()
@@ -1505,13 +1502,13 @@ mod tests {
     #[test]
     fn parse_google_sheets_target_should_support_key_value_pairs() {
         let parsed = parse_google_sheets_target(
-            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/proxycast/service-account.json;include_header=true;value_input_option=USER_ENTERED",
+            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/lime/service-account.json;include_header=true;value_input_option=USER_ENTERED",
         )
         .expect("应成功解析 Google Sheets 目标");
 
         assert_eq!(parsed.spreadsheet_id, "sheet-1");
         assert_eq!(parsed.sheet, "巡检结果");
-        assert_eq!(parsed.credentials_file, "C:/proxycast/service-account.json");
+        assert_eq!(parsed.credentials_file, "C:/lime/service-account.json");
         assert!(parsed.include_header);
         assert_eq!(parsed.value_input_option, "USER_ENTERED");
     }
@@ -1638,7 +1635,7 @@ mod tests {
             .expect("系统时间异常")
             .as_nanos();
         let output_path = std::env::temp_dir()
-            .join("proxycast-delivery-tests")
+            .join("lime-delivery-tests")
             .join(format!("automation-output-{unique}.json"));
         let rendered = render_output(
             &DeliveryConfig {

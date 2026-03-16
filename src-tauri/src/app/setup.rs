@@ -11,10 +11,10 @@ use crate::database;
 use crate::skills::ensure_default_local_skills;
 use crate::telemetry;
 use crate::tray::{TrayIconStatus, TrayManager, TrayStateSnapshot};
-use proxycast_scheduler::AgentScheduler;
-use proxycast_services::aster_session_store::ProxyCastSessionStore;
-use proxycast_services::provider_pool_service::ProviderPoolService;
-use proxycast_services::token_cache_service::TokenCacheService;
+use lime_scheduler::AgentScheduler;
+use lime_services::aster_session_store::LimeSessionStore;
+use lime_services::provider_pool_service::ProviderPoolService;
+use lime_services::token_cache_service::TokenCacheService;
 
 use super::scheduler_service::{SchedulerService, SchedulerServiceConfig};
 use super::types::{AppState, LogState, TrayManagerState};
@@ -37,12 +37,12 @@ pub fn setup_app(
     // 注册全局 SessionStore（作为后备方案）
     // 注意：主要的 SessionStore 注入在 AsterAgentState::init_agent_with_db() 中完成
     // 这里的全局注册是为了兼容可能直接使用 SessionManager 静态方法的代码
-    let session_store = Arc::new(ProxyCastSessionStore::new(db.clone()));
+    let session_store = Arc::new(LimeSessionStore::new(db.clone()));
     tauri::async_runtime::block_on(async {
         if let Err(e) = aster::session::set_global_session_store(session_store).await {
             tracing::warn!("[启动] 注册全局 SessionStore 失败（可能已注册）: {}", e);
         } else {
-            tracing::info!("[启动] 全局 ProxyCastSessionStore 已注册（后备方案）");
+            tracing::info!("[启动] 全局 LimeSessionStore 已注册（后备方案）");
         }
     });
 
@@ -76,7 +76,7 @@ pub fn setup_app(
 
     // 初始化默认 skill repos
     {
-        let conn = proxycast_core::database::lock_db(&db)?;
+        let conn = lime_core::database::lock_db(&db)?;
         database::dao::skills::SkillDao::init_default_skill_repos(&conn)
             .expect("Failed to initialize default skill repos");
     }

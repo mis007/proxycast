@@ -81,6 +81,21 @@ export interface OpenClawUpdateInfo {
   message?: string | null;
 }
 
+export interface OpenClawRuntimeCandidate {
+  id: string;
+  source: string;
+  binDir: string;
+  nodePath: string;
+  nodeVersion?: string | null;
+  npmPath?: string | null;
+  npmGlobalPrefix?: string | null;
+  openclawPath?: string | null;
+  openclawVersion?: string | null;
+  openclawPackagePath?: string | null;
+  isActive: boolean;
+  isPreferred: boolean;
+}
+
 export interface OpenClawChannelInfo {
   id: string;
   name: string;
@@ -215,6 +230,20 @@ export async function openclawGetProgressLogs(): Promise<
   return safeInvoke("openclaw_get_progress_logs");
 }
 
+export async function openclawListRuntimeCandidates(): Promise<
+  OpenClawRuntimeCandidate[]
+> {
+  return safeInvoke("openclaw_list_runtime_candidates");
+}
+
+export async function openclawSetPreferredRuntime(
+  runtimeId?: string | null,
+): Promise<OpenClawActionResult> {
+  return safeInvoke("openclaw_set_preferred_runtime", {
+    runtimeId: runtimeId ?? null,
+  });
+}
+
 export const openclawApi = {
   checkInstalled: openclawCheckInstalled,
   getEnvironmentStatus: openclawGetEnvironmentStatus,
@@ -237,6 +266,8 @@ export const openclawApi = {
   getDashboardUrl: openclawGetDashboardUrl,
   getChannels: openclawGetChannels,
   getProgressLogs: openclawGetProgressLogs,
+  listRuntimeCandidates: openclawListRuntimeCandidates,
+  setPreferredRuntime: openclawSetPreferredRuntime,
   syncProviderConfig: openclawSyncProviderConfig,
   listenInstallProgress: listenOpenClawInstallProgress,
 };

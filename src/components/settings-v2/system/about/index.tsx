@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FALLBACK_RELEASES_URL =
-  "https://github.com/aiclientproxy/proxycast/releases";
+  "https://github.com/aiclientproxy/lime/releases";
 
 const CREATIVE_THEMES = [
   "通用对话",
@@ -58,17 +58,17 @@ const PRODUCT_CAPABILITIES = [
 
 const RELATED_LINKS = [
   {
-    href: "https://github.com/aiclientproxy/proxycast",
+    href: "https://github.com/aiclientproxy/lime",
     label: "GitHub 仓库",
     description: "查看源码、版本历史和讨论。",
   },
   {
-    href: "https://aiclientproxy.github.io/proxycast/",
+    href: "https://aiclientproxy.github.io/lime/",
     label: "文档",
     description: "阅读安装、配置与使用说明。",
   },
   {
-    href: "https://github.com/aiclientproxy/proxycast/issues",
+    href: "https://github.com/aiclientproxy/lime/issues",
     label: "问题反馈",
     description: "提交 bug、改进建议和排障信息。",
   },
@@ -261,7 +261,7 @@ export function AboutSection() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
             <div className="max-w-3xl space-y-5">
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-white/85 px-3 py-1 text-xs font-semibold tracking-[0.16em] text-emerald-700 shadow-sm">
-                ABOUT PROXYCAST
+                ABOUT LIME
               </span>
 
               <div className="space-y-2">
@@ -270,8 +270,8 @@ export function AboutSection() {
                 </h2>
                 <p className="max-w-2xl text-sm leading-7 text-slate-600">
                   {t(
-                    "ProxyCast 面向真实创作流程而不是单点问答。你可以从一句模糊需求开始，在同一个空间里完成方向判断、内容生成、素材制作和结果沉淀。",
-                    "ProxyCast 面向真实创作流程而不是单点问答。你可以从一句模糊需求开始，在同一个空间里完成方向判断、内容生成、素材制作和结果沉淀。",
+                    "Lime 面向真实创作流程而不是单点问答。你可以从一句模糊需求开始，在同一个空间里完成方向判断、内容生成、素材制作和结果沉淀。",
+                    "Lime 面向真实创作流程而不是单点问答。你可以从一句模糊需求开始，在同一个空间里完成方向判断、内容生成、素材制作和结果沉淀。",
                   )}
                 </p>
               </div>
@@ -294,14 +294,14 @@ export function AboutSection() {
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-slate-900 to-slate-700 shadow-sm shadow-slate-950/20">
                   <img
                     src="/logo.png"
-                    alt="ProxyCast"
+                    alt="Lime"
                     className="h-10 w-10 object-contain"
                   />
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xl font-semibold tracking-tight text-slate-900">
-                      ProxyCast
+                      Lime
                     </h3>
                     <span
                       className={cn(
@@ -441,8 +441,8 @@ export function AboutSection() {
             <div className="space-y-4">
               <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4 text-sm leading-7 text-slate-600">
                 {t(
-                  "ProxyCast 是面向普通创作者的 AI Agent 平台。你不需要先懂复杂设置，只要带着一个想法进来，就可以在同一处完成对话定方向、生成内容与素材、持续迭代修改，并把结果沉淀成可复用资产。",
-                  "ProxyCast 是面向普通创作者的 AI Agent 平台。你不需要先懂复杂设置，只要带着一个想法进来，就可以在同一处完成对话定方向、生成内容与素材、持续迭代修改，并把结果沉淀成可复用资产。",
+                  "Lime 是面向普通创作者的 AI Agent 平台。你不需要先懂复杂设置，只要带着一个想法进来，就可以在同一处完成对话定方向、生成内容与素材、持续迭代修改，并把结果沉淀成可复用资产。",
+                  "Lime 是面向普通创作者的 AI Agent 平台。你不需要先懂复杂设置，只要带着一个想法进来，就可以在同一处完成对话定方向、生成内容与素材、持续迭代修改，并把结果沉淀成可复用资产。",
                 )}
               </div>
               <div className="rounded-[22px] border border-slate-200/80 bg-white p-4">
@@ -577,7 +577,7 @@ export function AboutSection() {
           {t("Made for creators & builders", "Made for creators & builders")}
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          2025-2026 ProxyCast
+          2025-2026 Lime
         </p>
       </section>
     </div>

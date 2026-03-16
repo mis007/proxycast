@@ -5,9 +5,9 @@
 use crate::config::GlobalConfigManagerState;
 use crate::database::DbConnection;
 use crate::services::chat_history_service::{load_memory_source_candidates, MemorySourceCandidate};
-use proxycast_memory::extractor::{self, ExtractionContext};
-use proxycast_memory::gatekeeper::ChatMessage;
-use proxycast_memory::{MemoryCategory, MemoryMetadata, MemorySource, MemoryType, UnifiedMemory};
+use lime_memory::extractor::{self, ExtractionContext};
+use lime_memory::gatekeeper::ChatMessage;
+use lime_memory::{MemoryCategory, MemoryMetadata, MemorySource, MemoryType, UnifiedMemory};
 use rusqlite::{params, params_from_iter, types::Value};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -719,6 +719,7 @@ fn resolve_llm_api_key() -> Option<String> {
     [
         "ANTHROPIC_API_KEY",
         "CLAUDE_API_KEY",
+        "LIME_ANTHROPIC_API_KEY",
         "PROXYCAST_ANTHROPIC_API_KEY",
     ]
     .iter()

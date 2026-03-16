@@ -18,7 +18,7 @@ export interface RecordWorkspaceRepairInput {
   source: WorkspaceRepairSource;
 }
 
-const WORKSPACE_REPAIR_HISTORY_KEY = "proxycast.workspace_repair_history.v1";
+const WORKSPACE_REPAIR_HISTORY_KEY = "lime.workspace_repair_history.v1";
 const MAX_WORKSPACE_REPAIR_HISTORY = 50;
 
 export function recordWorkspaceRepair(
@@ -54,7 +54,7 @@ export function buildWorkspaceRepairSummary(
   record: WorkspaceRepairRecord,
 ): string {
   return [
-    "# ProxyCast Workspace 自愈记录",
+    "# Lime Workspace 自愈记录",
     `- 时间: ${record.timestamp}`,
     `- Workspace ID: ${record.workspace_id}`,
     `- 来源: ${record.source}`,
@@ -66,10 +66,10 @@ export function buildWorkspaceRepairBatchSummary(
   records: WorkspaceRepairRecord[],
 ): string {
   if (records.length === 0) {
-    return "# ProxyCast Workspace 自愈记录\n- 暂无记录";
+    return "# Lime Workspace 自愈记录\n- 暂无记录";
   }
 
-  const lines: string[] = ["# ProxyCast Workspace 自愈记录（最近）"];
+  const lines: string[] = ["# Lime Workspace 自愈记录（最近）"];
   records.forEach((record, index) => {
     lines.push(
       `\n## 记录 ${index + 1}`,

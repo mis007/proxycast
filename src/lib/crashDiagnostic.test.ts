@@ -21,7 +21,7 @@ const payload = {
   generated_at: "2026-03-02T00:00:00.000Z",
   app_version: "0.76.0",
   platform: "MacIntel",
-  user_agent: "ProxyCast-Test",
+  user_agent: "Lime-Test",
   locale: "zh-CN",
   timezone: "Asia/Shanghai",
   page_url: "tauri://localhost/settings",
@@ -138,7 +138,7 @@ describe("clipboard permission guide", () => {
 describe("diagnostic clipboard text", () => {
   it("应包含提示词和 JSON 诊断数据", () => {
     const text = buildCrashDiagnosticClipboardText(payload);
-    expect(text).toContain("ProxyCast 故障诊断请求");
+    expect(text).toContain("Lime 故障诊断请求");
     expect(text).toContain("自动摘要");
     expect(text).toContain("你的任务");
     expect(text).toContain("诊断数据（JSON）");
@@ -153,7 +153,7 @@ describe("diagnostic export file name", () => {
       timestamp: new Date("2026-03-02T08:09:10.000Z").getTime(),
     });
 
-    expect(fileName).toContain("proxycast-crash-workspace-path-missing");
+    expect(fileName).toContain("lime-crash-workspace-path-missing");
     expect(fileName).toContain("v-0-76-0");
     expect(fileName).toContain("20260302-");
     expect(fileName.endsWith(".json")).toBe(true);
@@ -199,7 +199,7 @@ describe("buildCrashDiagnosticPayload", () => {
 
   it("摘要应包含最近调用轨迹条数", () => {
     window.localStorage.setItem(
-      "proxycast_invoke_trace_buffer_v1",
+      "lime_invoke_trace_buffer_v1",
       JSON.stringify([
         {
           timestamp: "2026-03-09T01:02:03.000Z",
@@ -315,21 +315,21 @@ describe("buildCrashDiagnosticPayload", () => {
         },
       },
       logStorageDiagnostics: {
-        log_directory: "/tmp/proxycast/logs",
-        current_log_path: "/tmp/proxycast/logs/proxycast.log",
+        log_directory: "/tmp/lime/logs",
+        current_log_path: "/tmp/lime/logs/lime.log",
         current_log_exists: true,
         current_log_size_bytes: 1024,
         in_memory_log_count: 5,
         related_log_files: [
           {
-            file_name: "proxycast.log",
-            path: "/tmp/proxycast/logs/proxycast.log",
+            file_name: "lime.log",
+            path: "/tmp/lime/logs/lime.log",
             size_bytes: 1024,
             compressed: false,
           },
           {
-            file_name: "proxycast.log.20260309-010000",
-            path: "/tmp/proxycast/logs/proxycast.log.20260309-010000",
+            file_name: "lime.log.20260309-010000",
+            path: "/tmp/lime/logs/lime.log.20260309-010000",
             size_bytes: 2048,
             compressed: false,
           },
@@ -337,7 +337,7 @@ describe("buildCrashDiagnosticPayload", () => {
         raw_response_files: [
           {
             file_name: "raw_response_1.txt",
-            path: "/tmp/proxycast/logs/raw_response_1.txt",
+            path: "/tmp/lime/logs/raw_response_1.txt",
             size_bytes: 300,
             compressed: false,
           },
@@ -427,7 +427,7 @@ describe("buildCrashDiagnosticPayload", () => {
         mcp_summary: {
           total_servers: 3,
           running_servers: 1,
-          enabled_proxycast: 2,
+          enabled_lime: 2,
           enabled_claude: 1,
           enabled_codex: 1,
           enabled_gemini: 0,
@@ -435,7 +435,7 @@ describe("buildCrashDiagnosticPayload", () => {
             {
               name: "filesystem",
               is_running: true,
-              enabled_proxycast: true,
+              enabled_lime: true,
               enabled_claude: false,
               enabled_codex: true,
               enabled_gemini: false,
@@ -443,7 +443,7 @@ describe("buildCrashDiagnosticPayload", () => {
             {
               name: "fetch",
               is_running: false,
-              enabled_proxycast: true,
+              enabled_lime: true,
               enabled_claude: true,
               enabled_codex: false,
               enabled_gemini: false,
@@ -451,7 +451,7 @@ describe("buildCrashDiagnosticPayload", () => {
             {
               name: "sqlite",
               is_running: false,
-              enabled_proxycast: false,
+              enabled_lime: false,
               enabled_claude: false,
               enabled_codex: false,
               enabled_gemini: false,
@@ -534,15 +534,15 @@ describe("buildCrashDiagnosticPayload", () => {
       userAgent: payload.user_agent,
       windowsStartupDiagnostics: {
         platform: "windows",
-        app_data_dir: "C:/Users/test/AppData/Roaming/proxycast",
-        legacy_proxycast_dir: "C:/Users/test/.proxycast",
-        db_path: "C:/Users/test/.proxycast/proxycast.db",
+        app_data_dir: "C:/Users/test/AppData/Roaming/lime",
+        legacy_lime_dir: "C:/Users/test/.lime",
+        db_path: "C:/Users/test/.lime/lime.db",
         webview2_version: "123.0.0.0",
         current_exe:
-          "C:/Users/test/AppData/Local/Programs/ProxyCast/ProxyCast.exe",
-        current_dir: "C:/Users/test/AppData/Local/Programs/ProxyCast",
+          "C:/Users/test/AppData/Local/Programs/Lime/Lime.exe",
+        current_dir: "C:/Users/test/AppData/Local/Programs/Lime",
         resource_dir:
-          "C:/Users/test/AppData/Local/Programs/ProxyCast/resources",
+          "C:/Users/test/AppData/Local/Programs/Lime/resources",
         home_dir: "C:/Users/test",
         shell_env: "/bin/bash",
         comspec_env: "C:/Windows/System32/cmd.exe",
@@ -585,7 +585,7 @@ describe("buildCrashDiagnosticPayload", () => {
       windowsStartupDiagnostics: {
         platform: "windows",
         app_data_dir: null,
-        legacy_proxycast_dir: null,
+        legacy_lime_dir: null,
         db_path: null,
         webview2_version: null,
         current_exe: null,
@@ -613,7 +613,7 @@ describe("buildCrashDiagnosticPayload", () => {
 
   it("应自动附加诊断采集说明", () => {
     window.localStorage.setItem(
-      "proxycast_invoke_trace_buffer_v1",
+      "lime_invoke_trace_buffer_v1",
       JSON.stringify([
         {
           timestamp: "2026-03-09T01:02:03.000Z",
@@ -651,21 +651,21 @@ describe("buildCrashDiagnosticPayload", () => {
       platform: payload.platform,
       userAgent: payload.user_agent,
       logStorageDiagnostics: {
-        log_directory: "/tmp/proxycast/logs",
-        current_log_path: "/tmp/proxycast/logs/proxycast.log",
+        log_directory: "/tmp/lime/logs",
+        current_log_path: "/tmp/lime/logs/lime.log",
         current_log_exists: true,
         current_log_size_bytes: 1024,
         in_memory_log_count: 5,
         related_log_files: [
           {
-            file_name: "proxycast.log",
-            path: "/tmp/proxycast/logs/proxycast.log",
+            file_name: "lime.log",
+            path: "/tmp/lime/logs/lime.log",
             size_bytes: 1024,
             compressed: false,
           },
           {
-            file_name: "proxycast.log.20260309-010000",
-            path: "/tmp/proxycast/logs/proxycast.log.20260309-010000",
+            file_name: "lime.log.20260309-010000",
+            path: "/tmp/lime/logs/lime.log.20260309-010000",
             size_bytes: 2048,
             compressed: false,
           },
@@ -695,15 +695,15 @@ describe("clearCrashDiagnosticHistory", () => {
     vi.spyOn(logsApi, "clearDiagnosticLogHistory").mockResolvedValue();
 
     window.localStorage.setItem(
-      "proxycast_frontend_crash_buffer_v1",
+      "lime_frontend_crash_buffer_v1",
       JSON.stringify([{ timestamp: "2026-03-09T00:00:00.000Z" }]),
     );
     window.localStorage.setItem(
-      "proxycast_invoke_error_buffer_v1",
+      "lime_invoke_error_buffer_v1",
       JSON.stringify([{ timestamp: "2026-03-09T00:00:00.000Z" }]),
     );
     window.localStorage.setItem(
-      "proxycast_invoke_trace_buffer_v1",
+      "lime_invoke_trace_buffer_v1",
       JSON.stringify([{ timestamp: "2026-03-09T00:00:00.000Z" }]),
     );
     recordWorkspaceRepair({
@@ -715,16 +715,16 @@ describe("clearCrashDiagnosticHistory", () => {
     await clearCrashDiagnosticHistory();
 
     expect(
-      window.localStorage.getItem("proxycast_frontend_crash_buffer_v1"),
+      window.localStorage.getItem("lime_frontend_crash_buffer_v1"),
     ).toBeNull();
     expect(
-      window.localStorage.getItem("proxycast_invoke_error_buffer_v1"),
+      window.localStorage.getItem("lime_invoke_error_buffer_v1"),
     ).toBeNull();
     expect(
-      window.localStorage.getItem("proxycast_invoke_trace_buffer_v1"),
+      window.localStorage.getItem("lime_invoke_trace_buffer_v1"),
     ).toBeNull();
     expect(
-      window.localStorage.getItem("proxycast.workspace_repair_history.v1"),
+      window.localStorage.getItem("lime.workspace_repair_history.v1"),
     ).toBeNull();
     expect(logsApi.clearDiagnosticLogHistory).toHaveBeenCalledTimes(1);
   });

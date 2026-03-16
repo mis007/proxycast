@@ -37,8 +37,8 @@ export const availableIcons = [
   "doubao",
   "azure",
   "antigravity",
-  "proxycast",
-  "proxycast-hub",
+  "lime",
+  "lime-hub",
   // 新增图标
   "perplexity",
   "moonshot",
@@ -99,7 +99,7 @@ export const availableIcons = [
 
 export type AvailableIcon = (typeof availableIcons)[number];
 
-const LEGACY_PROXYCAST_HUB_ICON_ALIAS = `${"lobe"}${"hub"}`;
+const LEGACY_LIME_HUB_ICON_ALIAS = `${"lobe"}${"hub"}`;
 
 // ============================================================================
 // Provider 类型到图标名称的映射
@@ -127,9 +127,9 @@ export const providerTypeToIcon: Record<string, string> = {
   alibaba: "alibaba",
   copilot: "copilot",
   aws: "aws",
-  proxycast: "proxycast",
-  "proxycast-hub": "proxycast-hub",
-  [LEGACY_PROXYCAST_HUB_ICON_ALIAS]: "proxycast",
+  lime: "lime",
+  "lime-hub": "lime-hub",
+  [LEGACY_LIME_HUB_ICON_ALIAS]: "lime",
 
   // ===== 主流 AI Provider =====
   deepseek: "deepseek",

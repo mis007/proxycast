@@ -3,7 +3,7 @@
  * @description Terminal AI 模式选择器 - 复用 Agent 的模型选择逻辑
  * @module components/terminal/ai/TerminalAIModeSelector
  *
- * 参考 Waveterm 的 AIModeDropdown 设计，但复用 ProxyCast 的 Provider/Model 选择器
+ * 参考 Waveterm 的 AIModeDropdown 设计，但复用 Lime 的 Provider/Model 选择器
  */
 
 import React, { useState, useMemo, useEffect } from "react";

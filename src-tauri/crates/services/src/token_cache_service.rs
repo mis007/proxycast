@@ -11,13 +11,13 @@
 use crate::kiro_event_service::KiroEventService;
 use chrono::Utc;
 use dashmap::DashMap;
-use proxycast_core::database::dao::provider_pool::ProviderPoolDao;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::provider_pool_model::{
+use lime_core::database::dao::provider_pool::ProviderPoolDao;
+use lime_core::database::DbConnection;
+use lime_core::models::provider_pool_model::{
     CachedTokenInfo, CredentialData, PoolProviderType, ProviderCredential,
 };
-use proxycast_providers::providers::gemini::GeminiProvider;
-use proxycast_providers::providers::kiro::KiroProvider;
+use lime_providers::providers::gemini::GeminiProvider;
+use lime_providers::providers::kiro::KiroProvider;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -556,7 +556,7 @@ impl TokenCacheService {
 
     /// 刷新 Antigravity Token
     async fn refresh_antigravity(&self, creds_path: &str) -> Result<CachedTokenInfo, String> {
-        use proxycast_providers::providers::antigravity::AntigravityProvider;
+        use lime_providers::providers::antigravity::AntigravityProvider;
 
         let mut provider = AntigravityProvider::new();
         provider
@@ -588,7 +588,7 @@ impl TokenCacheService {
 
     /// 刷新 Codex Token
     async fn refresh_codex(&self, creds_path: &str) -> Result<CachedTokenInfo, String> {
-        use proxycast_providers::providers::codex::CodexProvider;
+        use lime_providers::providers::codex::CodexProvider;
 
         let mut provider = CodexProvider::new();
         provider
@@ -622,7 +622,7 @@ impl TokenCacheService {
 
     /// 刷新 Claude OAuth Token
     async fn refresh_claude_oauth(&self, creds_path: &str) -> Result<CachedTokenInfo, String> {
-        use proxycast_providers::providers::claude_oauth::ClaudeOAuthProvider;
+        use lime_providers::providers::claude_oauth::ClaudeOAuthProvider;
 
         let mut provider = ClaudeOAuthProvider::new();
         provider
@@ -1029,10 +1029,8 @@ impl TokenCacheService {
         // 首先检查缓存
         let cached = {
             let conn = db.lock().map_err(|e| e.to_string())?;
-            proxycast_core::database::dao::provider_pool::ProviderPoolDao::get_token_cache(
-                &conn, uuid,
-            )
-            .map_err(|e| e.to_string())?
+            lime_core::database::dao::provider_pool::ProviderPoolDao::get_token_cache(&conn, uuid)
+                .map_err(|e| e.to_string())?
         };
 
         // 检查是否需要提前刷新（使用指定的分钟数阈值）

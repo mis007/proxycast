@@ -3,13 +3,11 @@
 //! 目标：将 Telegram 作为标准渠道接入，承载多账号轮询、路由与策略校验。
 
 use chrono::Utc;
-use proxycast_core::config::{
-    Config, TelegramAccountConfig, TelegramBotConfig, TelegramGroupConfig,
-};
-use proxycast_core::database::DbConnection;
-use proxycast_core::logger::LogStore;
-use proxycast_websocket::handlers::{RpcHandler, RpcHandlerState};
-use proxycast_websocket::protocol::{
+use lime_core::config::{Config, TelegramAccountConfig, TelegramBotConfig, TelegramGroupConfig};
+use lime_core::database::DbConnection;
+use lime_core::logger::LogStore;
+use lime_websocket::handlers::{RpcHandler, RpcHandlerState};
+use lime_websocket::protocol::{
     AgentRunResult, AgentStopResult, AgentWaitResult, CronHealthResult, CronListResult,
     CronRunResult, GatewayRpcRequest, GatewayRpcResponse, RpcMethod, SessionGetResult,
     SessionsListResult,
@@ -767,7 +765,7 @@ fn resolve_account_token(
 }
 
 fn read_bot_token_from_file(path: &str) -> Option<String> {
-    let expanded = proxycast_core::config::expand_tilde(path);
+    let expanded = lime_core::config::expand_tilde(path);
     let content = std::fs::read_to_string(expanded).ok()?;
     let trimmed = content.trim();
     if trimmed.is_empty() {
@@ -1793,10 +1791,7 @@ fn parse_result<T: DeserializeOwned>(value: serde_json::Value) -> Result<T, Stri
     serde_json::from_value(value).map_err(|e| format!("解析 RPC 结果失败: {e}"))
 }
 
-fn extract_rpc_error(
-    error: Option<proxycast_websocket::protocol::RpcError>,
-    fallback: &str,
-) -> String {
+fn extract_rpc_error(error: Option<lime_websocket::protocol::RpcError>, fallback: &str) -> String {
     if let Some(err) = error {
         return format!("{} (code={})", err.message, err.code);
     }
@@ -1893,7 +1888,7 @@ fn danger_command_label(command: &TelegramCommand) -> &'static str {
 
 fn help_text() -> String {
     [
-        "🤖 ProxyCast Telegram Gateway 命令",
+        "🤖 Lime Telegram Gateway 命令",
         "/run <任务内容> - 启动一个 Agent 任务",
         "/new [首条消息] - 开启新对话（/reset 同义）",
         "/status <run_id> - 查看任务状态",
@@ -2396,7 +2391,7 @@ mod tests {
             message_thread_id: None,
         };
 
-        let result = authorize_group(&account, &inbound, "proxycast_bot");
+        let result = authorize_group(&account, &inbound, "lime_bot");
         assert!(result.is_ok(), "slash command 应该允许直接触发");
     }
 

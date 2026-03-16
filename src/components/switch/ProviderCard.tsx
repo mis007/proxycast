@@ -9,7 +9,7 @@ function getProviderTypeFromName(name: string, category: string): string {
 
   // 精确匹配
   if (lowerName.includes("智谱") || lowerName.includes("glm")) return "zhipu";
-  if (lowerName.includes("proxycast")) return "proxycast";
+  if (lowerName.includes("lime")) return "lime";
   if (lowerName.includes("deepseek")) return "deepseek";
   if (lowerName.includes("kimi")) return "kimi";
   if (lowerName.includes("minimax")) return "minimax";

@@ -1,30 +1,30 @@
-//! ProxyCast LLM Provider 实现
+//! Lime LLM Provider 实现
 //!
 //! 使用 ProviderPoolService 选择凭证并调用 LLM API。
-//! trait 定义（LlmProvider, SkillError）已迁移到 proxycast-skills crate。
+//! trait 定义（LlmProvider, SkillError）已迁移到 lime-skills crate。
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::database::DbConnection;
+use lime_core::models::anthropic::AnthropicMessagesRequest;
 #[cfg(test)]
-use proxycast_core::models::provider_pool_model::PoolProviderType;
-use proxycast_core::models::provider_pool_model::{CredentialData, ProviderCredential};
-use proxycast_providers::providers::claude_custom::ClaudeCustomProvider;
-use proxycast_providers::providers::kiro::KiroProvider;
-use proxycast_providers::providers::openai_custom::OpenAICustomProvider;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_core::models::provider_pool_model::PoolProviderType;
+use lime_core::models::provider_pool_model::{CredentialData, ProviderCredential};
+use lime_providers::providers::claude_custom::ClaudeCustomProvider;
+use lime_providers::providers::kiro::KiroProvider;
+use lime_providers::providers::openai_custom::OpenAICustomProvider;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::provider_pool_service::ProviderPoolService;
 
 use crate::{LlmProvider, SkillError};
 
-/// ProxyCast LLM Provider
+/// Lime LLM Provider
 ///
 /// 使用 ProviderPoolService 选择凭证并调用 LLM API。
 /// 实现 aster-rust 定义的 LlmProvider trait。
-pub struct ProxyCastLlmProvider {
+pub struct LimeLlmProvider {
     /// 凭证池服务
     pool_service: Arc<ProviderPoolService>,
     /// API Key Provider 服务（用于智能降级）
@@ -35,8 +35,8 @@ pub struct ProxyCastLlmProvider {
     preferred_provider: Option<String>,
 }
 
-impl ProxyCastLlmProvider {
-    /// 创建新的 ProxyCastLlmProvider 实例
+impl LimeLlmProvider {
+    /// 创建新的 LimeLlmProvider 实例
     ///
     /// # Arguments
     /// * `pool_service` - 凭证池服务
@@ -174,10 +174,10 @@ impl ProxyCastLlmProvider {
         user_message: &str,
         model: &str,
     ) -> Result<String, SkillError> {
-        use proxycast_core::models::anthropic::AnthropicMessage;
-        use proxycast_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
-        use proxycast_providers::providers::traits::CredentialProvider;
-        use proxycast_server_utils::parse_cw_response;
+        use lime_core::models::anthropic::AnthropicMessage;
+        use lime_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
+        use lime_providers::providers::traits::CredentialProvider;
+        use lime_server_utils::parse_cw_response;
 
         let mut kiro = KiroProvider::new();
         kiro.load_credentials_from_path(creds_file_path)
@@ -241,7 +241,7 @@ impl ProxyCastLlmProvider {
         user_message: &str,
         model: &str,
     ) -> Result<String, SkillError> {
-        use proxycast_core::models::anthropic::AnthropicMessage;
+        use lime_core::models::anthropic::AnthropicMessage;
 
         let claude =
             ClaudeCustomProvider::with_config(api_key.to_string(), base_url.map(|s| s.to_string()));
@@ -303,7 +303,7 @@ impl ProxyCastLlmProvider {
         user_message: &str,
         model: &str,
     ) -> Result<String, SkillError> {
-        use proxycast_core::models::openai::{ChatCompletionRequest, ChatMessage, MessageContent};
+        use lime_core::models::openai::{ChatCompletionRequest, ChatMessage, MessageContent};
 
         let openai =
             OpenAICustomProvider::with_config(api_key.to_string(), base_url.map(|s| s.to_string()));
@@ -371,7 +371,7 @@ impl ProxyCastLlmProvider {
 }
 
 #[async_trait]
-impl LlmProvider for ProxyCastLlmProvider {
+impl LlmProvider for LimeLlmProvider {
     /// 调用 LLM 进行对话
     ///
     /// # 实现说明
@@ -398,7 +398,7 @@ impl LlmProvider for ProxyCastLlmProvider {
         let model_name = model.unwrap_or("claude-sonnet-4-5-20250514");
 
         tracing::info!(
-            "[ProxyCastLlmProvider] chat 调用: provider_type={}, model={}",
+            "[LimeLlmProvider] chat 调用: provider_type={}, model={}",
             provider_type,
             model_name
         );
@@ -425,7 +425,7 @@ impl LlmProvider for ProxyCastLlmProvider {
             })?;
 
         tracing::info!(
-            "[ProxyCastLlmProvider] 选中凭证: uuid={}, type={:?}",
+            "[LimeLlmProvider] 选中凭证: uuid={}, type={:?}",
             &credential.uuid[..8],
             credential.provider_type
         );
@@ -463,15 +463,15 @@ mod tests {
     #[test]
     fn test_map_skill_provider_openai() {
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("openai"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("openai"),
             Some(PoolProviderType::OpenAI)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("gpt"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("gpt"),
             Some(PoolProviderType::OpenAI)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("OPENAI"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("OPENAI"),
             Some(PoolProviderType::OpenAI)
         );
     }
@@ -479,15 +479,15 @@ mod tests {
     #[test]
     fn test_map_skill_provider_claude() {
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("claude"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("claude"),
             Some(PoolProviderType::Claude)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("anthropic"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("anthropic"),
             Some(PoolProviderType::Claude)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("CLAUDE"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("CLAUDE"),
             Some(PoolProviderType::Claude)
         );
     }
@@ -495,11 +495,11 @@ mod tests {
     #[test]
     fn test_map_skill_provider_gemini() {
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("gemini"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("gemini"),
             Some(PoolProviderType::Gemini)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("google"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("google"),
             Some(PoolProviderType::Gemini)
         );
     }
@@ -507,11 +507,11 @@ mod tests {
     #[test]
     fn test_map_skill_provider_kiro() {
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("kiro"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("kiro"),
             Some(PoolProviderType::Kiro)
         );
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("codewhisperer"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("codewhisperer"),
             Some(PoolProviderType::Kiro)
         );
     }
@@ -519,13 +519,10 @@ mod tests {
     #[test]
     fn test_map_skill_provider_unknown() {
         assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type("unknown_provider"),
+            LimeLlmProvider::map_skill_provider_to_pool_type("unknown_provider"),
             None
         );
-        assert_eq!(
-            ProxyCastLlmProvider::map_skill_provider_to_pool_type(""),
-            None
-        );
+        assert_eq!(LimeLlmProvider::map_skill_provider_to_pool_type(""), None);
     }
 
     #[test]

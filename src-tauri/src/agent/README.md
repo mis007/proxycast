@@ -9,9 +9,9 @@ AI Agent 集成模块，基于 aster-rust 框架实现。
 ### 设计决策
 
 - **Aster 框架**：使用 aster-rust 框架获得多 Provider、工具系统、会话管理等能力
-- **凭证池桥接**：自动从 ProxyCast 凭证池选择凭证配置 Aster Provider
+- **凭证池桥接**：自动从 Lime 凭证池选择凭证配置 Aster Provider
 - **流式响应**：通过 Tauri 事件系统向前端推送流式内容
-- **Skills 集成**：自动加载 ProxyCast Skills 到 aster-rust，使 AI 能够自动调用
+- **Skills 集成**：自动加载 Lime Skills 到 aster-rust，使 AI 能够自动调用
 
 ## 文件索引
 
@@ -30,11 +30,11 @@ AI Agent 集成模块，基于 aster-rust 框架实现。
 
 ### 自动加载机制
 
-Agent 初始化时自动加载 `~/.proxycast/skills/` 目录下的 Skills：
+Agent 初始化时自动加载 `~/.lime/skills/` 目录下的 Skills：
 
 ```rust
 // init_agent_with_db() 内部调用
-proxycast_agent::reload_proxycast_skills();
+lime_agent::reload_lime_skills();
 ```
 
 ### AI 自动调用
@@ -49,7 +49,7 @@ aster-rust 的 `SkillTool` 会从 `global_registry` 读取可用 Skills，AI 可
 
 ```rust
 // skill_cmd.rs 中调用
-AsterAgentState::reload_proxycast_skills();
+AsterAgentState::reload_lime_skills();
 ```
 
 ## 使用方式

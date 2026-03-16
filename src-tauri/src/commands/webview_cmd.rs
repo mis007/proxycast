@@ -21,14 +21,14 @@ use crate::services::browser_profile_service::{
 use aster::chrome_mcp::{
     get_chrome_mcp_tools, is_chrome_integration_configured, is_chrome_integration_supported,
 };
-use once_cell::sync::Lazy;
-use proxycast_browser_runtime::{
+use lime_browser_runtime::{
     BrowserEvent, BrowserRuntimeManager, BrowserStreamMode, CdpSessionState, CdpTargetInfo,
     EventBufferSnapshot, OpenSessionRequest,
 };
-use proxycast_server::chrome_bridge::{
+use lime_server::chrome_bridge::{
     self, ChromeBridgeCommandRequest, ChromeBridgeCommandResult, ChromeBridgeStatusSnapshot,
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -269,7 +269,7 @@ pub struct ChromeBridgeEndpointInfo {
     pub bridge_key: String,
 }
 
-const ASTER_CHROME_TOOL_PREFIX: &str = "mcp__proxycast-browser__";
+const ASTER_CHROME_TOOL_PREFIX: &str = "mcp__lime-browser__";
 const DEFAULT_BROWSER_ACTION_TIMEOUT_MS: u64 = 30_000;
 const MIN_BROWSER_ACTION_TIMEOUT_MS: u64 = 1_000;
 const MAX_BROWSER_ACTION_TIMEOUT_MS: u64 = 120_000;
@@ -280,7 +280,7 @@ const MANAGED_CDP_READY_RETRY_INTERVAL_MS: u64 = 250;
 #[serde(rename_all = "snake_case")]
 pub enum BrowserBackendType {
     AsterCompat,
-    ProxycastExtensionBridge,
+    LimeExtensionBridge,
     CdpDirect,
 }
 
@@ -300,7 +300,7 @@ impl Default for BrowserBackendPolicy {
         Self {
             priority: vec![
                 BrowserBackendType::AsterCompat,
-                BrowserBackendType::ProxycastExtensionBridge,
+                BrowserBackendType::LimeExtensionBridge,
                 BrowserBackendType::CdpDirect,
             ],
             auto_fallback: true,
@@ -978,7 +978,7 @@ async fn ensure_managed_chrome_profile_with_manager(
     })?;
 
     let profile_dir = resolve_chrome_profile_data_dir_from_base(
-        &proxycast_core::app_paths::preferred_data_dir()
+        &lime_core::app_paths::preferred_data_dir()
             .map_err(|error| format!("获取应用数据目录失败: {error}"))?,
         &normalized_profile_key,
     );
@@ -1145,8 +1145,8 @@ async fn get_chrome_bridge_endpoint_info_with_state(
 
     Ok(ChromeBridgeEndpointInfo {
         server_running: status.running,
-        observer_ws_url: format!("ws://{host}:{port}/proxycast-chrome-observer/{bridge_key}"),
-        control_ws_url: format!("ws://{host}:{port}/proxycast-chrome-control/{bridge_key}"),
+        observer_ws_url: format!("ws://{host}:{port}/lime-chrome-observer/{bridge_key}"),
+        control_ws_url: format!("ws://{host}:{port}/lime-chrome-control/{bridge_key}"),
         host,
         port,
         bridge_key,
@@ -1251,7 +1251,7 @@ pub async fn get_browser_backends_status(
                 capabilities: aster_backend_capabilities(),
             },
             BrowserBackendStatusItem {
-                backend: BrowserBackendType::ProxycastExtensionBridge,
+                backend: BrowserBackendType::LimeExtensionBridge,
                 available: extension_available,
                 reason: if extension_available {
                     None
@@ -1317,7 +1317,7 @@ pub async fn get_browser_backends_status_global() -> Result<BrowserBackendsStatu
                 capabilities: aster_backend_capabilities(),
             },
             BrowserBackendStatusItem {
-                backend: BrowserBackendType::ProxycastExtensionBridge,
+                backend: BrowserBackendType::LimeExtensionBridge,
                 available: extension_available,
                 reason: if extension_available {
                     None
@@ -1753,7 +1753,7 @@ fn normalize_backend_policy(policy: BrowserBackendPolicy) -> Result<BrowserBacke
     }
     for backend in [
         BrowserBackendType::AsterCompat,
-        BrowserBackendType::ProxycastExtensionBridge,
+        BrowserBackendType::LimeExtensionBridge,
         BrowserBackendType::CdpDirect,
     ] {
         if !priority.contains(&backend) {
@@ -2045,7 +2045,7 @@ async fn execute_browser_action_with_backend(
     manager: Arc<Mutex<ChromeProfileManagerState>>,
 ) -> Result<Value, String> {
     match backend {
-        BrowserBackendType::ProxycastExtensionBridge => {
+        BrowserBackendType::LimeExtensionBridge => {
             execute_extension_backend_action(action, args, profile_key, timeout_ms, manager).await
         }
         BrowserBackendType::CdpDirect => {
@@ -2471,7 +2471,7 @@ async fn discover_unmanaged_profile_session(
     profile_key: &str,
 ) -> Result<Option<ChromeProfileSessionInfo>, String> {
     let normalized_profile_key = normalize_profile_key(profile_key);
-    let base_dir = proxycast_core::app_paths::preferred_data_dir()
+    let base_dir = lime_core::app_paths::preferred_data_dir()
         .map_err(|error| format!("获取应用数据目录失败: {error}"))?;
     let profile_dir = resolve_chrome_profile_data_dir_from_base(&base_dir, &normalized_profile_key);
     if !profile_dir.exists() {
@@ -2507,7 +2507,7 @@ async fn discover_unmanaged_profile_session(
 }
 
 async fn discover_unmanaged_profile_sessions() -> Result<Vec<ChromeProfileSessionInfo>, String> {
-    let base_dir = proxycast_core::app_paths::preferred_data_dir()
+    let base_dir = lime_core::app_paths::preferred_data_dir()
         .map_err(|error| format!("获取应用数据目录失败: {error}"))?;
     let chrome_profiles_dir = base_dir.join("chrome_profiles");
     if !chrome_profiles_dir.exists() {
@@ -2693,22 +2693,22 @@ fn prepare_chrome_extension(
             current_dir
         };
 
-        project_root.join("extensions").join("proxycast-chrome")
+        project_root.join("extensions").join("lime-chrome")
     } else {
         // 打包模式：使用资源目录
         let resource_dir = app
             .path()
             .resource_dir()
             .map_err(|e| format!("获取资源目录失败: {e}"))?;
-        resource_dir.join("extensions").join("proxycast-chrome")
+        resource_dir.join("extensions").join("lime-chrome")
     };
 
     if !extension_src.exists() {
         return Err(format!("扩展源目录不存在: {:?}", extension_src));
     }
 
-    // 目标路径：profile_dir/proxycast_extension
-    let extension_dst = profile_dir.join("proxycast_extension");
+    // 目标路径：profile_dir/lime_extension
+    let extension_dst = profile_dir.join("lime_extension");
 
     // 如果目标目录已存在，先删除（确保使用最新版本）
     if extension_dst.exists() {
@@ -2906,7 +2906,7 @@ fn resolve_chrome_profile_data_dir_from_base(base_dir: &Path, profile_key: &str)
 
 fn resolve_profile_data_dir(app: &AppHandle, profile_key: &str) -> Result<PathBuf, String> {
     let _ = app;
-    let base_dir = proxycast_core::app_paths::preferred_data_dir()
+    let base_dir = lime_core::app_paths::preferred_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {e}"))?;
     Ok(resolve_profile_data_dir_from_base(&base_dir, profile_key))
 }
@@ -3238,11 +3238,11 @@ mod tests {
 
     #[test]
     fn resolve_profile_data_dir_should_join_expected_segments() {
-        let base = PathBuf::from("proxycast_data");
+        let base = PathBuf::from("lime_data");
         let path = resolve_profile_data_dir_from_base(&base, "search_google");
         assert_eq!(
             path,
-            PathBuf::from("proxycast_data/webview_profiles/search_google")
+            PathBuf::from("lime_data/webview_profiles/search_google")
         );
     }
 
@@ -3285,7 +3285,7 @@ mod tests {
             vec![
                 BrowserBackendType::CdpDirect,
                 BrowserBackendType::AsterCompat,
-                BrowserBackendType::ProxycastExtensionBridge,
+                BrowserBackendType::LimeExtensionBridge,
             ]
         );
         assert!(!normalized.auto_fallback);
@@ -3293,8 +3293,8 @@ mod tests {
 
     #[test]
     fn normalize_action_name_should_strip_aster_prefix() {
-        let action = normalize_action_name("mcp__proxycast-browser__read_page")
-            .expect("action must normalize");
+        let action =
+            normalize_action_name("mcp__lime-browser__read_page").expect("action must normalize");
         assert_eq!(action, "read_page");
     }
 

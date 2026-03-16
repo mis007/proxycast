@@ -1,20 +1,20 @@
 [package]
-name = "proxycast-server"
+name = "lime-server"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-proxycast-core.workspace = true
-proxycast-config.workspace = true
-proxycast-infra.workspace = true
-proxycast-providers.workspace = true
-proxycast-services.workspace = true
-proxycast-credential.workspace = true
-proxycast-websocket.workspace = true
-proxycast-processor.workspace = true
-proxycast-server-utils.workspace = true
-proxycast-scheduler.workspace = true
-proxycast-agent.workspace = true
+lime-core.workspace = true
+lime-config.workspace = true
+lime-infra.workspace = true
+lime-providers.workspace = true
+lime-services.workspace = true
+lime-credential.workspace = true
+lime-websocket.workspace = true
+lime-processor.workspace = true
+lime-server-utils.workspace = true
+lime-scheduler.workspace = true
+lime-agent.workspace = true
 aster.workspace = true
 
 serde.workspace = true

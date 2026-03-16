@@ -1,13 +1,13 @@
 //! OpenAI API 数据模型
 //!
 //! Chat Completion types re-exported from `aster-models` crate (single source of truth).
-//! Image generation types are ProxyCast-specific and defined locally.
+//! Image generation types are Lime-specific and defined locally.
 pub use aster_models::openai::*;
 
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
-// 图像生成 API 数据模型 (ProxyCast 特有)
+// 图像生成 API 数据模型 (Lime 特有)
 // ============================================================================
 
 /// OpenAI 图像生成请求

@@ -6,8 +6,8 @@
 use crate::app::LogState;
 use crate::database::DbConnection;
 use chrono::Utc;
-use proxycast_websocket::handlers::{RpcHandler, RpcHandlerState};
-use proxycast_websocket::protocol::{
+use lime_websocket::handlers::{RpcHandler, RpcHandlerState};
+use lime_websocket::protocol::{
     AgentRunResult, AgentStopResult, AgentWaitResult, CronHealthResult, CronListResult,
     CronRunResult, GatewayRpcRequest, GatewayRpcResponse, RpcMethod, SessionGetResult,
     SessionsListResult,
@@ -731,7 +731,7 @@ fn truncate_message(text: &str) -> String {
 
 fn help_text() -> String {
     [
-        "🤖 ProxyCast Telegram 远程命令",
+        "🤖 Lime Telegram 远程命令",
         "/run <任务内容> - 启动一个 Agent 任务",
         "/status <run_id> - 查看任务状态",
         "/stop <run_id> - 停止任务（需确认）",

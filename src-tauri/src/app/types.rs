@@ -8,13 +8,13 @@ use tokio::sync::RwLock;
 
 use crate::logger;
 use crate::tray::TrayManager;
-use proxycast_server as server;
-use proxycast_services::token_cache_service::TokenCacheService;
+use lime_server as server;
+use lime_services::token_cache_service::TokenCacheService;
 
-use proxycast_core::event_emit::EventEmit;
+use lime_core::event_emit::EventEmit;
 
 // 重新导出 core crate 的 ProviderType
-pub use proxycast_core::ProviderType;
+pub use lime_core::ProviderType;
 
 /// 应用状态类型别名
 pub type AppState = Arc<RwLock<server::ServerState>>;
@@ -30,7 +30,7 @@ pub struct TrayManagerState<R: Runtime>(pub Arc<tokio::sync::RwLock<Option<TrayM
 
 /// 通用 Tauri 事件发射器
 ///
-/// 实现 `proxycast_core::EventEmit` trait，
+/// 实现 `lime_core::EventEmit` trait，
 /// 供所有独立 crate（MCP、Agent 等）通过 DynEmitter 使用。
 #[derive(Clone)]
 pub struct TauriEventEmitter(pub tauri::AppHandle);

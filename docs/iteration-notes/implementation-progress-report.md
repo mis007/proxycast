@@ -1,10 +1,10 @@
-# ProxyCast AI Agent 改进 - 实施进度报告
+# Lime AI Agent 改进 - 实施进度报告
 
 ## 已完成工作
 
 ### 1. 研究与分析（任务 #1-#4）✅
 
-通过对比研究 OpenAI Codex 和 aster-rust 框架，完成了 ProxyCast AI Agent 的全面分析，输出了改进研究报告，识别了四大痛点：
+通过对比研究 OpenAI Codex 和 aster-rust 框架，完成了 Lime AI Agent 的全面分析，输出了改进研究报告，识别了四大痛点：
 - 工具调用能力弱
 - 上下文管理差
 - 流式体验不好
@@ -96,7 +96,7 @@
 **背景**: aster 框架的上下文管理能力不明确
 
 **决策**:
-- 阶段 1: 在 ProxyCast 层实现 AI 摘要（当前）
+- 阶段 1: 在 Lime 层实现 AI 摘要（当前）
 - 阶段 2: P1 完成后统一到 aster 框架
 
 **理由**:
@@ -152,6 +152,6 @@
 
 ## 参考资料
 
-- 研究报告: ProxyCast AI Agent 改进研究报告
+- 研究报告: Lime AI Agent 改进研究报告
 - Codex 架构: SQ/EQ 异步队列对、AI 摘要
 - aster-rust: 渐进式工具响应移除、SubAgentScheduler

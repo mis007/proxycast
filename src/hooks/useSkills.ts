@@ -11,7 +11,7 @@ interface SkillsCache {
 const CACHE_TTL_MS = 30_000;
 const cache = new Map<AppType, SkillsCache>();
 
-export function useSkills(app: AppType = "proxycast") {
+export function useSkills(app: AppType = "lime") {
   const cached = cache.get(app);
   const isCacheFresh = cached && Date.now() - cached.timestamp < CACHE_TTL_MS;
 

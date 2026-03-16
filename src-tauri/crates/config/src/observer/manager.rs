@@ -11,9 +11,9 @@ use super::observers::{
 };
 use super::subject::ConfigSubject;
 use super::traits::ConfigObserver;
-use proxycast_core::config::{Config, EndpointProvidersConfig, HotReloadManager, ReloadResult};
-use proxycast_core::router::{ModelMapper, Router};
-use proxycast_infra::Injector;
+use lime_core::config::{Config, EndpointProvidersConfig, HotReloadManager, ReloadResult};
+use lime_core::router::{ModelMapper, Router};
+use lime_infra::Injector;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -108,7 +108,7 @@ impl GlobalConfigManager {
 
     /// 更新配置并通知观察者
     pub async fn update_config(&self, new_config: Config, source: ConfigChangeSource) {
-        proxycast_core::tool_calling::apply_tool_calling_runtime_config(&new_config);
+        lime_core::tool_calling::apply_tool_calling_runtime_config(&new_config);
         {
             let hot_reload = self.hot_reload.read();
             hot_reload.update_config(new_config.clone());
@@ -148,7 +148,7 @@ impl GlobalConfigManager {
 
     /// 保存配置到文件并通知观察者
     pub async fn save_config(&self, config: &Config) -> Result<(), String> {
-        proxycast_core::config::save_config(config).map_err(|e| e.to_string())?;
+        lime_core::config::save_config(config).map_err(|e| e.to_string())?;
         self.update_config(config.clone(), ConfigChangeSource::ApiCall)
             .await;
         Ok(())

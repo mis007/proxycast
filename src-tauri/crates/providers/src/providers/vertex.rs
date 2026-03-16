@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::models::vertex_model::VertexApiKeyEntry;
+use lime_core::models::vertex_model::VertexApiKeyEntry;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_vertex_provider_from_entry() {
-        use proxycast_core::models::vertex_model::VertexModelAlias;
+        use lime_core::models::vertex_model::VertexModelAlias;
 
         let entry = VertexApiKeyEntry {
             id: "test-vertex".to_string(),

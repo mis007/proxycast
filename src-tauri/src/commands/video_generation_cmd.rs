@@ -9,8 +9,8 @@ use crate::database::DbConnection;
 pub use crate::theme::video::command::{
     CancelVideoTaskRequest, GetVideoTaskRequest, ListVideoTasksRequest,
 };
-use proxycast_core::database::dao::video_generation_task_dao::VideoGenerationTask;
-use proxycast_services::video_generation_service::CreateVideoGenerationRequest;
+use lime_core::database::dao::video_generation_task_dao::VideoGenerationTask;
+use lime_services::video_generation_service::CreateVideoGenerationRequest;
 
 #[tauri::command]
 pub async fn create_video_generation_task(

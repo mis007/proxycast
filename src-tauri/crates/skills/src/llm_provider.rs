@@ -1,7 +1,7 @@
 //! LLM Provider trait 和错误类型
 //!
 //! 定义 Skill 执行引擎调用 LLM 的接口。
-//! 具体实现（ProxyCastLlmProvider）留在主 crate。
+//! 具体实现（LimeLlmProvider）留在主 crate。
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

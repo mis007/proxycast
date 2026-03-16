@@ -19,7 +19,7 @@
 ```rust
 //! AI 驱动的会话摘要服务
 
-use proxycast_core::general_chat::ChatMessage;
+use lime_core::general_chat::ChatMessage;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ pub struct AISummaryResponse {
 }
 
 pub struct AISummaryService {
-    // 使用 ProxyCast 的 provider pool
+    // 使用 Lime 的 provider pool
     provider_pool: Arc<ProviderPoolService>,
 }
 
@@ -223,6 +223,6 @@ impl SessionContextService {
 
 ## 参考资料
 
-- 研究报告：ProxyCast AI Agent 改进研究报告
+- 研究报告：Lime AI Agent 改进研究报告
 - Codex 上下文压缩：AI 摘要 + 保留最近消息
 - aster 上下文管理：渐进式工具响应移除 + 摘要

@@ -2,7 +2,7 @@
 //!
 //! 提供模拟键盘输入和剪贴板输出能力。
 
-use proxycast_core::config::VoiceOutputMode;
+use lime_core::config::VoiceOutputMode;
 use voice_core::{OutputHandler, OutputMode};
 
 /// 输出文字到系统

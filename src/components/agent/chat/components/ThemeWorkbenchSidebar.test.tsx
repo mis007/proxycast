@@ -1076,22 +1076,22 @@ describe("ThemeWorkbenchSidebar", () => {
         {
           taskId: "task-image-1",
           taskType: "image_generate",
-          path: ".proxycast/tasks/image_generate/a.json",
-          absolutePath: "/tmp/proxycast/.proxycast/tasks/image_generate/a.json",
+          path: ".lime/tasks/image_generate/a.json",
+          absolutePath: "/tmp/lime/.lime/tasks/image_generate/a.json",
           createdAt: Date.parse("2026-03-06T02:20:00Z"),
           timeLabel: "10:20",
         },
         {
           taskId: "task-image-2",
           taskType: "image_generate",
-          path: ".proxycast/tasks/image_generate/b.json",
+          path: ".lime/tasks/image_generate/b.json",
           createdAt: Date.parse("2026-03-06T02:21:00Z"),
           timeLabel: "10:21",
         },
         {
           taskId: "task-typesetting-1",
           taskType: "typesetting",
-          path: ".proxycast/tasks/typesetting/c.json",
+          path: ".lime/tasks/typesetting/c.json",
           createdAt: Date.parse("2026-03-06T02:22:00Z"),
           timeLabel: "10:22",
         },
@@ -1123,7 +1123,7 @@ describe("ThemeWorkbenchSidebar", () => {
     }
 
     expect(mockWriteClipboardText).toHaveBeenCalledWith(
-      "/tmp/proxycast/.proxycast/tasks/image_generate/a.json",
+      "/tmp/lime/.lime/tasks/image_generate/a.json",
     );
   });
 

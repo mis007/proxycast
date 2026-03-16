@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Claude Provider 是 ProxyCast 的综合性 Anthropic/Claude 插件，支持 **多种认证方式** 访问 Claude 模型。无论是官方 OAuth、Claude Code、Console、AWS Bedrock 还是第三方中转服务，都可以通过此插件统一管理。
+Claude Provider 是 Lime 的综合性 Anthropic/Claude 插件，支持 **多种认证方式** 访问 Claude 模型。无论是官方 OAuth、Claude Code、Console、AWS Bedrock 还是第三方中转服务，都可以通过此插件统一管理。
 
 ### 1.2 支持的认证方式
 
@@ -102,13 +102,13 @@ claude-provider/
   "name": "claude-provider",
   "version": "1.0.0",
   "description": "Claude Provider - 支持 OAuth、Claude Code、Console、Bedrock、CCR 多种认证方式",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/claude-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "claude-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "claude",
@@ -649,13 +649,13 @@ impl ClaudeProvider {
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { AuthMethodTabs } from './components/AuthMethodTabs';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -725,7 +725,7 @@ export default function ClaudeProviderUI({ sdk, pluginId }: PluginProps) {
 type AuthMethod = 'oauth' | 'claude_code' | 'console' | 'setup_token' | 'bedrock' | 'ccr';
 
 interface AuthMethodTabsProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -1251,5 +1251,5 @@ pnpm test
 
 - [Anthropic API 文档](https://docs.anthropic.com/)
 - [AWS Bedrock Claude](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-claude.html)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)
 - [claude-relay-service](https://github.com/aiclientproxy/claude-relay-service)

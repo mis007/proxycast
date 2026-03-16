@@ -7,7 +7,7 @@ export function ExperimentalBanner() {
       <span>
         实验功能，不影响核心使用。问题反馈：
         <a
-          href="https://github.com/aiclientproxy/proxycast/issues"
+          href="https://github.com/aiclientproxy/lime/issues"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-0.5 text-yellow-700 hover:text-yellow-900 underline ml-1"

@@ -12,7 +12,7 @@ pub use general_chat_migration::{
     migrate_general_chat_to_unified, GeneralChatMigrationStatus,
     GENERAL_CHAT_MIGRATION_COMPLETED_KEY,
 };
-pub use mcp_migration::{migrate_mcp_created_at_to_integer, migrate_mcp_proxycast_enabled};
+pub use mcp_migration::{migrate_mcp_created_at_to_integer, migrate_mcp_lime_enabled};
 pub use model_registry_migration::{
     check_model_registry_version, clear_model_registry_refresh_flag,
     is_model_registry_refresh_needed, mark_model_registry_refresh_needed,

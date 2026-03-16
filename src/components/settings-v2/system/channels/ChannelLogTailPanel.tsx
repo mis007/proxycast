@@ -119,7 +119,7 @@ export function ChannelLogTailPanel() {
 
   const handleClear = async () => {
     const confirmed = window.confirm(
-      "确认清空日志吗？\n这会清空当前内存日志和 ~/.proxycast/logs/proxycast.log，且无法恢复。",
+      "确认清空日志吗？\n这会清空当前内存日志和 ~/.lime/logs/lime.log，且无法恢复。",
     );
     if (!confirmed) {
       return;
@@ -143,7 +143,7 @@ export function ChannelLogTailPanel() {
         <div>
           <h3 className="text-sm font-medium">渠道日志 Tail</h3>
           <p className="text-xs text-muted-foreground">
-            数据源：~/.proxycast/logs/proxycast.log（每秒刷新）
+            数据源：~/.lime/logs/lime.log（每秒刷新）
           </p>
         </div>
         <div className="flex items-center gap-2">

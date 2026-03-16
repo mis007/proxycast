@@ -101,7 +101,7 @@ function normalizeSources(sources?: MemorySourcesConfig): MemorySourcesConfig {
       sources.project_rule_dirs.filter((item) => item.trim().length > 0)
         ? sources.project_rule_dirs
         : [".agents/rules"],
-    user_memory_path: sources?.user_memory_path ?? "~/.proxycast/AGENTS.md",
+    user_memory_path: sources?.user_memory_path ?? "~/.lime/AGENTS.md",
     project_local_memory_path:
       sources?.project_local_memory_path ?? "AGENTS.local.md",
   };
@@ -916,7 +916,7 @@ export function MemorySettings() {
                       }))
                     }
                     className={INPUT_CLASS_NAME}
-                    placeholder="例如 /Library/Application Support/ProxyCast/AGENTS.md"
+                    placeholder="例如 /Library/Application Support/Lime/AGENTS.md"
                   />
                 </label>
 
@@ -937,7 +937,7 @@ export function MemorySettings() {
                       }))
                     }
                     className={INPUT_CLASS_NAME}
-                    placeholder="例如 ~/.proxycast/AGENTS.md"
+                    placeholder="例如 ~/.lime/AGENTS.md"
                   />
                 </label>
 

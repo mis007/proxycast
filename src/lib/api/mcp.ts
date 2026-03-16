@@ -15,7 +15,7 @@ export interface McpServer {
     timeout?: number;
   };
   description?: string;
-  enabled_proxycast: boolean;
+  enabled_lime: boolean;
   enabled_claude: boolean;
   enabled_codex: boolean;
   enabled_gemini: boolean;
@@ -39,7 +39,7 @@ export interface McpServerInfo {
   config: McpServer["server_config"];
   is_running: boolean;
   server_info?: McpServerCapabilities;
-  enabled_proxycast: boolean;
+  enabled_lime: boolean;
   enabled_claude: boolean;
   enabled_codex: boolean;
   enabled_gemini: boolean;

@@ -87,7 +87,7 @@ impl ConnectionRouter {
     ///
     /// # 示例
     /// ```ignore
-    /// use proxycast_terminal::connections::{ConnectionRouter, ConnectionType};
+    /// use lime_terminal::connections::{ConnectionRouter, ConnectionType};
     ///
     /// assert_eq!(ConnectionRouter::route(""), ConnectionType::Local);
     /// assert_eq!(ConnectionRouter::route("local"), ConnectionType::Local);

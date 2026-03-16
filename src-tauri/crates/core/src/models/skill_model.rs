@@ -10,7 +10,7 @@ const SKILL_FRONTMATTER_LICENSE: &str = "license";
 const SKILL_FRONTMATTER_METADATA: &str = "metadata";
 const SKILL_FRONTMATTER_ALLOWED_TOOLS: &str = "allowed-tools";
 const SKILL_FRONTMATTER_ALLOWED_TOOLS_ALIAS: &str = "allowed_tools";
-const LEGACY_PROXYCAST_TOP_LEVEL_FIELDS: &[&str] = &[
+const LEGACY_LIME_TOP_LEVEL_FIELDS: &[&str] = &[
     "argument-hint",
     "argument_hint",
     "when-to-use",
@@ -32,7 +32,7 @@ pub const RESEARCH_SKILL_DIRECTORY: &str = "research";
 pub const TYPESETTING_SKILL_DIRECTORY: &str = "typesetting";
 pub const SOCIAL_POST_WITH_COVER_SKILL_DIRECTORY: &str = "social_post_with_cover";
 
-pub const DEFAULT_PROXYCAST_SKILL_DIRECTORIES: [&str; 10] = [
+pub const DEFAULT_LIME_SKILL_DIRECTORIES: [&str; 10] = [
     VIDEO_GENERATE_SKILL_DIRECTORY,
     BROADCAST_GENERATE_SKILL_DIRECTORY,
     COVER_GENERATE_SKILL_DIRECTORY,
@@ -240,7 +240,7 @@ pub fn parse_skill_manifest_from_content(content: &str) -> Result<ParsedSkillMan
     let allowed_tools = parse_allowed_tools_field(mapping, &mut validation_errors);
     let metadata = parse_metadata_field(mapping, &mut validation_errors);
 
-    for field in LEGACY_PROXYCAST_TOP_LEVEL_FIELDS {
+    for field in LEGACY_LIME_TOP_LEVEL_FIELDS {
         if yaml_mapping_get(mapping, field).is_some() {
             deprecated_fields.push((*field).to_string());
         }
@@ -454,9 +454,9 @@ impl SkillRepo {
 
 pub fn get_default_skill_repos() -> Vec<SkillRepo> {
     vec![
-        // ProxyCast 官方仓库（排第一位）
+        // Lime 官方仓库（排第一位）
         SkillRepo {
-            owner: "proxycast".to_string(),
+            owner: "lime".to_string(),
             name: "skills".to_string(),
             branch: "main".to_string(),
             enabled: true,
@@ -482,12 +482,12 @@ pub fn get_default_skill_repos() -> Vec<SkillRepo> {
     ]
 }
 
-pub fn is_default_proxycast_skill(directory: &str) -> bool {
-    DEFAULT_PROXYCAST_SKILL_DIRECTORIES.contains(&directory)
+pub fn is_default_lime_skill(directory: &str) -> bool {
+    DEFAULT_LIME_SKILL_DIRECTORIES.contains(&directory)
 }
 
 pub fn resolve_skill_source_kind(app_type: &AppType, directory: &str) -> SkillSourceKind {
-    if matches!(app_type, AppType::ProxyCast) && is_default_proxycast_skill(directory) {
+    if matches!(app_type, AppType::Lime) && is_default_lime_skill(directory) {
         SkillSourceKind::Builtin
     } else {
         SkillSourceKind::Other
@@ -501,43 +501,40 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    /// Feature: skills-platform-mvp, Property 1: Default Repositories Include ProxyCast Official
+    /// Feature: skills-platform-mvp, Property 1: Default Repositories Include Lime Official
     /// Validates: Requirements 1.1, 1.2, 1.3
     #[test]
-    fn test_default_repos_include_proxycast_official() {
+    fn test_default_repos_include_lime_official() {
         let repos = get_default_skill_repos();
 
         // 验证列表非空
         assert!(!repos.is_empty(), "默认仓库列表不应为空");
 
-        // 验证第一个仓库是 ProxyCast 官方仓库
+        // 验证第一个仓库是 Lime 官方仓库
         let first_repo = &repos[0];
-        assert_eq!(
-            first_repo.owner, "proxycast",
-            "第一个仓库的 owner 应为 proxycast"
-        );
+        assert_eq!(first_repo.owner, "lime", "第一个仓库的 owner 应为 lime");
         assert_eq!(first_repo.name, "skills", "第一个仓库的 name 应为 skills");
         assert_eq!(first_repo.branch, "main", "第一个仓库的 branch 应为 main");
-        assert!(first_repo.enabled, "ProxyCast 官方仓库应默认启用");
+        assert!(first_repo.enabled, "Lime 官方仓库应默认启用");
     }
 
-    // Property 1: Default Repositories Include ProxyCast Official (Property-Based Test)
+    // Property 1: Default Repositories Include Lime Official (Property-Based Test)
     // For any call to get_default_skill_repos(), the returned list SHALL contain
-    // a SkillRepo with owner="proxycast", name="skills", branch="main", and enabled=true,
+    // a SkillRepo with owner="lime", name="skills", branch="main", and enabled=true,
     // and this repo SHALL be the first item in the list.
     // Validates: Requirements 1.1, 1.2, 1.3
     proptest! {
         #[test]
-        fn prop_default_repos_proxycast_first(_seed in 0u64..1000) {
+        fn prop_default_repos_lime_first(_seed in 0u64..1000) {
             // 无论调用多少次，结果应该一致
             let repos = get_default_skill_repos();
 
             // Property: 列表非空
             prop_assert!(!repos.is_empty());
 
-            // Property: 第一个仓库是 ProxyCast 官方仓库
+            // Property: 第一个仓库是 Lime 官方仓库
             let first = &repos[0];
-            prop_assert_eq!(&first.owner, "proxycast");
+            prop_assert_eq!(&first.owner, "lime");
             prop_assert_eq!(&first.name, "skills");
             prop_assert_eq!(&first.branch, "main");
             prop_assert!(first.enabled);
@@ -545,40 +542,37 @@ mod tests {
     }
 
     #[test]
-    fn test_proxycast_repo_exists_in_list() {
+    fn test_lime_repo_exists_in_list() {
         let repos = get_default_skill_repos();
 
-        // 验证 ProxyCast 仓库存在于列表中
-        let proxycast_repo = repos
+        // 验证 Lime 仓库存在于列表中
+        let lime_repo = repos
             .iter()
-            .find(|r| r.owner == "proxycast" && r.name == "skills");
-        assert!(
-            proxycast_repo.is_some(),
-            "ProxyCast 官方仓库应存在于默认列表中"
-        );
+            .find(|r| r.owner == "lime" && r.name == "skills");
+        assert!(lime_repo.is_some(), "Lime 官方仓库应存在于默认列表中");
 
-        let repo = proxycast_repo.unwrap();
+        let repo = lime_repo.unwrap();
         assert_eq!(repo.branch, "main");
         assert!(repo.enabled);
     }
 
     #[test]
-    fn test_default_proxycast_skill_directories_include_embedded_defaults() {
-        assert!(is_default_proxycast_skill(VIDEO_GENERATE_SKILL_DIRECTORY));
-        assert!(is_default_proxycast_skill(
+    fn test_default_lime_skill_directories_include_embedded_defaults() {
+        assert!(is_default_lime_skill(VIDEO_GENERATE_SKILL_DIRECTORY));
+        assert!(is_default_lime_skill(
             SOCIAL_POST_WITH_COVER_SKILL_DIRECTORY
         ));
-        assert!(!is_default_proxycast_skill("custom-skill"));
+        assert!(!is_default_lime_skill("custom-skill"));
     }
 
     #[test]
-    fn test_resolve_skill_source_kind_only_marks_proxycast_defaults_as_builtin() {
+    fn test_resolve_skill_source_kind_only_marks_lime_defaults_as_builtin() {
         assert_eq!(
-            resolve_skill_source_kind(&AppType::ProxyCast, VIDEO_GENERATE_SKILL_DIRECTORY),
+            resolve_skill_source_kind(&AppType::Lime, VIDEO_GENERATE_SKILL_DIRECTORY),
             SkillSourceKind::Builtin
         );
         assert_eq!(
-            resolve_skill_source_kind(&AppType::ProxyCast, "custom-skill"),
+            resolve_skill_source_kind(&AppType::Lime, "custom-skill"),
             SkillSourceKind::Other
         );
         assert_eq!(

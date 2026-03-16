@@ -1,14 +1,15 @@
-use proxycast_agent::{
+use lime_agent::{
     execute_web_search_preflight_if_needed, resolve_request_tool_policy_with_mode, AsterAgentState,
     RequestToolPolicyMode, WebSearchExecutionTracker,
 };
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::database::init_database;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::database::init_database;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
 use uuid::Uuid;
 
 fn should_run_real_test() -> bool {
-    std::env::var("PROXYCAST_REAL_API_TEST").ok().as_deref() == Some("1")
+    lime_core::env_compat::var(&["LIME_REAL_API_TEST", "PROXYCAST_REAL_API_TEST"]).as_deref()
+        == Some("1")
 }
 
 fn resolve_model_name(
@@ -35,9 +36,9 @@ fn resolve_model_name(
 }
 
 fn resolve_codex_provider_and_model(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
 ) -> Result<(String, String), String> {
-    let explicit_model = std::env::var("PROXYCAST_REAL_MODEL").ok();
+    let explicit_model = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"]);
     let service = ApiKeyProviderService::new();
     let providers = service.get_all_providers(db)?;
 
@@ -57,7 +58,7 @@ fn resolve_codex_provider_and_model(
 }
 
 #[tokio::test]
-#[ignore = "真实联网测试：设置 PROXYCAST_REAL_API_TEST=1 后执行"]
+#[ignore = "真实联网测试：设置 LIME_REAL_API_TEST=1 后执行"]
 async fn test_real_web_search_preflight_short_input_continue() {
     if !should_run_real_test() {
         return;
@@ -66,7 +67,8 @@ async fn test_real_web_search_preflight_short_input_continue() {
     let db = init_database().expect("初始化数据库失败");
     let (provider_id, resolved_model) =
         resolve_codex_provider_and_model(&db).expect("解析 Codex Provider/模型失败");
-    let model_name = std::env::var("PROXYCAST_REAL_MODEL").unwrap_or(resolved_model);
+    let model_name = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"])
+        .unwrap_or(resolved_model);
     assert_eq!(
         model_name.trim(),
         "gpt-5.3-codex",
@@ -107,11 +109,11 @@ async fn test_real_web_search_preflight_short_input_continue() {
     let mut tool_names = Vec::new();
     for event in execution.events {
         match event {
-            proxycast_agent::TauriAgentEvent::ToolStart { tool_name, .. } => {
+            lime_agent::TauriAgentEvent::ToolStart { tool_name, .. } => {
                 tool_start_count += 1;
                 tool_names.push(tool_name);
             }
-            proxycast_agent::TauriAgentEvent::ToolEnd { .. } => {
+            lime_agent::TauriAgentEvent::ToolEnd { .. } => {
                 tool_end_count += 1;
             }
             _ => {}

@@ -102,7 +102,7 @@ impl AsrClient for BaiduClient {
             format: "wav".to_string(),
             rate: audio.sample_rate,
             channel: audio.channels,
-            cuid: "proxycast".to_string(),
+            cuid: "lime".to_string(),
             token,
             speech,
             len: wav_bytes.len(),

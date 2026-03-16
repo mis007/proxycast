@@ -47,7 +47,7 @@ impl Default for LogStore {
     fn default() -> Self {
         let log_dir = app_paths::best_effort_runtime_subdir("logs");
         let _ = fs::create_dir_all(&log_dir);
-        let log_file = log_dir.join("proxycast.log");
+        let log_file = log_dir.join("lime.log");
         let config = LogStoreConfig::default();
         Self {
             logs: VecDeque::new(),

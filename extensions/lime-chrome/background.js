@@ -22,17 +22,17 @@ let lastSettings = { ...DEFAULT_SETTINGS };
 
 function logInfo(message, payload) {
   if (payload === undefined) {
-    console.log(`[ProxycastBridge] ${message}`);
+    console.log(`[LimeBridge] ${message}`);
   } else {
-    console.log(`[ProxycastBridge] ${message}`, payload);
+    console.log(`[LimeBridge] ${message}`, payload);
   }
 }
 
 function logWarn(message, payload) {
   if (payload === undefined) {
-    console.warn(`[ProxycastBridge] ${message}`);
+    console.warn(`[LimeBridge] ${message}`);
   } else {
-    console.warn(`[ProxycastBridge] ${message}`, payload);
+    console.warn(`[LimeBridge] ${message}`, payload);
   }
 }
 
@@ -59,7 +59,7 @@ function buildObserverUrl(settings) {
 
   const normalized = serverUrl.replace(/\/$/, "");
   const profileKey = encodeURIComponent(settings.profileKey || "default");
-  return `${normalized}/proxycast-chrome-observer/${encodeURIComponent(bridgeKey)}?profileKey=${profileKey}`;
+  return `${normalized}/lime-chrome-observer/${encodeURIComponent(bridgeKey)}?profileKey=${profileKey}`;
 }
 
 async function connectObserver(forceReconnect = false) {

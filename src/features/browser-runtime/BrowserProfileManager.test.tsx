@@ -51,8 +51,8 @@ beforeEach(() => {
       site_scope: "seller.example.com",
       launch_url: "https://seller.example.com",
       transport_kind: "managed_cdp",
-      profile_dir: "/tmp/proxycast/chrome_profiles/shop_us",
-      managed_profile_dir: "/tmp/proxycast/chrome_profiles/shop_us",
+      profile_dir: "/tmp/lime/chrome_profiles/shop_us",
+      managed_profile_dir: "/tmp/lime/chrome_profiles/shop_us",
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
       last_used_at: null,
@@ -73,7 +73,7 @@ beforeEach(() => {
   });
   mockBrowserExecuteAction.mockResolvedValue({
     success: true,
-    backend: "proxycast_extension_bridge",
+    backend: "lime_extension_bridge",
     action: "navigate",
     request_id: "browser-1",
     attempts: [],
@@ -148,7 +148,7 @@ describe("BrowserProfileManager", () => {
 
     expect(container.textContent).toContain("附着模式当前设备未就绪");
     expect(container.textContent).toContain(
-      "请先在当前 Chrome 安装并连接 Proxycast Browser Bridge",
+      "请先在当前 Chrome 安装并连接 Lime Browser Bridge",
     );
   });
 
@@ -382,7 +382,7 @@ describe("BrowserProfileManager", () => {
     mockBrowserExecuteAction
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-1",
         attempts: [],
@@ -409,7 +409,7 @@ describe("BrowserProfileManager", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "switch_tab",
         request_id: "browser-switch-1",
         attempts: [],
@@ -424,7 +424,7 @@ describe("BrowserProfileManager", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-2",
         attempts: [],
@@ -465,7 +465,7 @@ describe("BrowserProfileManager", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(1, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "list_tabs",
       timeout_ms: 30000,
     });
@@ -483,7 +483,7 @@ describe("BrowserProfileManager", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(2, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "switch_tab",
       args: {
         target: "202",
@@ -493,7 +493,7 @@ describe("BrowserProfileManager", () => {
     });
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(3, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "list_tabs",
       timeout_ms: 30000,
     });
@@ -594,7 +594,7 @@ describe("BrowserProfileManager", () => {
     expect(mockGetChromeBridgeStatus).toHaveBeenCalled();
     expect(mockBrowserExecuteAction).toHaveBeenCalledWith({
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "navigate",
       args: {
         url: "https://weibo.com",
@@ -644,7 +644,7 @@ describe("BrowserProfileManager", () => {
     expect(mockLaunchBrowserSession).not.toHaveBeenCalled();
     expect(onMessage).toHaveBeenCalledWith({
       type: "error",
-      text: "启动资料失败: 没有检测到 profile_key=weibo_attach 的当前 Chrome 连接。请先在当前 Chrome 安装并连接 Proxycast Browser Bridge 扩展。",
+      text: "启动资料失败: 没有检测到 profile_key=weibo_attach 的当前 Chrome 连接。请先在当前 Chrome 安装并连接 Lime Browser Bridge 扩展。",
     });
   });
 });

@@ -1,40 +1,38 @@
 //! Aster 状态支持模块
 //!
 //! 提供可复用的会话配置构建、项目上下文 Prompt 构建、
-//! ProxyCast Skills 加载与 Agent 身份配置。
+//! Lime Skills 加载与 Agent 身份配置。
 
 use aster::agents::{AgentIdentity, SessionConfig};
 use aster::skills::{global_registry, load_skills_from_directory, SkillSource};
 use aster::tools::ToolRegistrationConfig;
-use proxycast_core::database::DbConnection;
-use proxycast_services::project_context_builder::ProjectContextBuilder;
+use lime_core::database::DbConnection;
+use lime_services::project_context_builder::ProjectContextBuilder;
 
-/// 重新加载 ProxyCast Skills
-pub fn reload_proxycast_skills() {
-    load_proxycast_skills();
+/// 重新加载 Lime Skills
+pub fn reload_lime_skills() {
+    load_lime_skills();
 }
 
-/// 创建 ProxyCast 专属的 Agent 身份配置
-pub fn create_proxycast_identity() -> AgentIdentity {
-    AgentIdentity::new("ProxyCast 助手")
+/// 创建 Lime 专属的 Agent 身份配置
+pub fn create_lime_identity() -> AgentIdentity {
+    AgentIdentity::new("Lime 助手")
         .with_language("Chinese")
-        .with_description(
-            "ProxyCast 是一个 AI 代理服务应用，帮助用户管理和使用各种 AI 模型的凭证。",
-        )
-        .with_custom_prompt(PROXYCAST_IDENTITY_PROMPT.to_string())
+        .with_description("Lime 是一个 AI 代理服务应用，帮助用户管理和使用各种 AI 模型的凭证。")
+        .with_custom_prompt(LIME_IDENTITY_PROMPT.to_string())
 }
 
-/// 创建 ProxyCast 的工具注册配置
+/// 创建 Lime 的工具注册配置
 ///
 /// 启用 Ask/LSP 回调，确保 ask/lsp 工具在 Agent 初始化时可用。
-pub fn create_proxycast_tool_config() -> ToolRegistrationConfig {
+pub fn create_lime_tool_config() -> ToolRegistrationConfig {
     ToolRegistrationConfig::new()
         .with_ask_callback(crate::create_ask_callback())
         .with_lsp_callback(crate::create_lsp_callback())
 }
 
-/// 加载 ProxyCast Skills 到 aster-rust 的 global_registry
-fn load_proxycast_skills() {
+/// 加载 Lime Skills 到 aster-rust 的 global_registry
+fn load_lime_skills() {
     let home = match dirs::home_dir() {
         Some(home_dir) => home_dir,
         None => {
@@ -43,10 +41,10 @@ fn load_proxycast_skills() {
         }
     };
 
-    let skills_dir = home.join(".proxycast").join("skills");
+    let skills_dir = home.join(".lime").join("skills");
     if !skills_dir.exists() {
         tracing::info!(
-            "[AsterAgent] ProxyCast Skills 目录不存在: {:?}，跳过加载",
+            "[AsterAgent] Lime Skills 目录不存在: {:?}，跳过加载",
             skills_dir
         );
         return;
@@ -56,7 +54,7 @@ fn load_proxycast_skills() {
     let skill_count = skills.len();
 
     if skill_count == 0 {
-        tracing::info!("[AsterAgent] ProxyCast Skills 目录为空，无 Skills 可加载");
+        tracing::info!("[AsterAgent] Lime Skills 目录为空，无 Skills 可加载");
         return;
     }
 
@@ -68,7 +66,7 @@ fn load_proxycast_skills() {
             tracing::debug!("[AsterAgent] 已注册 Skill: {}", skill_name);
         }
         tracing::info!(
-            "[AsterAgent] 成功加载 {} 个 ProxyCast Skills 到 global_registry",
+            "[AsterAgent] 成功加载 {} 个 Lime Skills 到 global_registry",
             skill_count
         );
     } else {
@@ -157,12 +155,12 @@ pub mod message_helpers {
     }
 }
 
-/// ProxyCast 专属的 Agent 身份提示词
-const PROXYCAST_IDENTITY_PROMPT: &str = r#"你是 ProxyCast 助手，一个专业、友好的 AI 技术伙伴。
+/// Lime 专属的 Agent 身份提示词
+const LIME_IDENTITY_PROMPT: &str = r#"你是 Lime 助手，一个专业、友好的 AI 技术伙伴。
 
-## 关于 ProxyCast
+## 关于 Lime
 
-ProxyCast 是一个 AI 代理服务应用，帮助用户：
+Lime 是一个 AI 代理服务应用，帮助用户：
 - 管理多个 AI 模型提供商的凭证（OpenAI、Claude、Gemini、Kiro 等）
 - 通过统一的 API 接口访问不同的 AI 模型
 - 实现凭证池的负载均衡和健康检查

@@ -26,8 +26,8 @@ function createInspection(
   return {
     content: "# 标题\n正文内容",
     metadata: {
-      proxycast_category: "social",
-      proxycast_workflow_ref: "references/workflow.json",
+      lime_category: "social",
+      lime_workflow_ref: "references/workflow.json",
     },
     allowedTools: ["web.search"],
     resourceSummary: {
@@ -105,7 +105,7 @@ describe("SkillContentDialog", () => {
   it("有检查结果时应渲染标准状态、元数据和 markdown 文本", () => {
     renderDialog();
     expect(document.body.textContent).toContain("标准");
-    expect(document.body.textContent).toContain("proxycast_category");
+    expect(document.body.textContent).toContain("lime_category");
     expect(document.body.textContent).toContain("web.search");
     expect(document.body.textContent).toContain("标题");
     expect(document.body.textContent).toContain("正文内容");

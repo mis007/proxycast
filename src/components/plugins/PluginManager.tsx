@@ -71,7 +71,7 @@ interface PluginInfo {
   status: string;
   path: string;
   hooks: string[];
-  min_proxycast_version?: string | null;
+  min_lime_version?: string | null;
   config_schema: Record<string, unknown> | null;
   config: PluginConfig;
   state: PluginState;
@@ -225,7 +225,7 @@ const escapeCsvValue = (
   return `"${escaped}"`;
 };
 
-const RUNTIME_FILTER_STORAGE_KEY = "proxycast.pluginDiagnostics.filters.v1";
+const RUNTIME_FILTER_STORAGE_KEY = "lime.pluginDiagnostics.filters.v1";
 const DEFAULT_TASK_PAGE_SIZE = 10;
 const TASK_PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 const TASK_TIME_RANGE_TO_MS: Record<
@@ -564,7 +564,7 @@ interface PluginManagerProps {
 }
 
 const WINDOWS_RELEASES_URL =
-  "https://github.com/aiclientproxy/proxycast/releases";
+  "https://github.com/aiclientproxy/lime/releases";
 
 export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
   const initialRuntimeFilters = useMemo(
@@ -937,7 +937,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
     let highestRequiredVersion: string | null = null;
 
     for (const plugin of plugins) {
-      const requiredVersion = plugin.min_proxycast_version?.trim();
+      const requiredVersion = plugin.min_lime_version?.trim();
       if (!requiredVersion) {
         continue;
       }
@@ -983,7 +983,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
         badgeText: "检查中",
         title: "正在检查 Windows 主程序版本",
         summary:
-          "插件中心负责扩展能力；如果需要更新 ProxyCast 主程序或切换安装包，也可以直接从这里进入。",
+          "插件中心负责扩展能力；如果需要更新 Lime 主程序或切换安装包，也可以直接从这里进入。",
       };
     }
 
@@ -994,7 +994,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
         badgeText: `发现新版本 ${versionInfo.latest}`,
         title: "建议先升级主程序，再继续安装或排查插件",
         summary: pluginVersionRequirementNotice
-          ? `当前已加载插件中有 ${pluginVersionRequirementNotice.affectedCount} 个插件要求 ProxyCast >= ${pluginVersionRequirementNotice.highestRequiredVersion}；优先从这里升级主程序会更直接。`
+          ? `当前已加载插件中有 ${pluginVersionRequirementNotice.affectedCount} 个插件要求 Lime >= ${pluginVersionRequirementNotice.highestRequiredVersion}；优先从这里升级主程序会更直接。`
           : "插件扩展不包含主程序升级；若你正在处理安装失败、运行时缺失或版本不兼容，优先从这里更新主程序会更直接。",
       };
     }
@@ -1004,7 +1004,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
         toneClassName: "border-amber-300 bg-amber-50/80",
         badgeClassName: "bg-amber-500 text-white hover:bg-amber-500",
         badgeText: "插件要求更高版本",
-        title: `部分已加载插件要求 ProxyCast >= ${pluginVersionRequirementNotice.highestRequiredVersion}`,
+        title: `部分已加载插件要求 Lime >= ${pluginVersionRequirementNotice.highestRequiredVersion}`,
         summary: `当前已加载插件中有 ${pluginVersionRequirementNotice.affectedCount} 个插件要求更高主程序版本。若安装、加载或运行异常，建议先升级 Windows 主程序。`,
       };
     }
@@ -1697,7 +1697,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
                 >
                   当前已加载插件中有{" "}
                   {pluginVersionRequirementNotice.affectedCount} 个插件要求更高主程序版本，
-                  最高要求 ProxyCast {"\u003e="}{" "}
+                  最高要求 Lime {"\u003e="}{" "}
                   {pluginVersionRequirementNotice.highestRequiredVersion}。
                 </div>
               )}

@@ -1,6 +1,6 @@
 //! Deep Link URL 解析模块
 //!
-//! 负责解析 `proxycast://connect` 协议的 URL，提取中转商配置参数。
+//! 负责解析 `lime://connect` 协议的 URL，提取中转商配置参数。
 //!
 //! ## 功能
 //!
@@ -11,9 +11,9 @@
 //! ## 使用示例
 //!
 //! ```rust
-//! use proxycast_core::connect::deep_link::{parse_deep_link, ConnectPayload, DeepLinkError};
+//! use lime_core::connect::deep_link::{parse_deep_link, ConnectPayload, DeepLinkError};
 //!
-//! let url = "proxycast://connect?relay=example&key=sk-xxx&name=MyKey";
+//! let url = "lime://connect?relay=example&key=sk-xxx&name=MyKey";
 //! match parse_deep_link(url) {
 //!     Ok(payload) => println!("Relay: {}, Key: {}", payload.relay, payload.key),
 //!     Err(e) => eprintln!("Error: {:?}", e),
@@ -26,7 +26,7 @@ use url::Url;
 
 /// Deep Link 解析结果
 ///
-/// 包含从 `proxycast://connect` URL 中提取的所有参数。
+/// 包含从 `lime://connect` URL 中提取的所有参数。
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConnectPayload {
     /// 中转商 ID（必填）
@@ -66,7 +66,7 @@ impl std::error::Error for DeepLinkError {}
 
 /// 解析 Deep Link URL
 ///
-/// 解析 `proxycast://connect` 格式的 URL，提取 relay、key、name 和 ref 参数。
+/// 解析 `lime://connect` 格式的 URL，提取 relay、key、name 和 ref 参数。
 ///
 /// # 参数
 ///
@@ -80,14 +80,14 @@ impl std::error::Error for DeepLinkError {}
 /// # 示例
 ///
 /// ```rust
-/// use proxycast_core::connect::deep_link::parse_deep_link;
+/// use lime_core::connect::deep_link::parse_deep_link;
 ///
 /// // 完整 URL
-/// let result = parse_deep_link("proxycast://connect?relay=example&key=sk-xxx&name=MyKey&ref=abc");
+/// let result = parse_deep_link("lime://connect?relay=example&key=sk-xxx&name=MyKey&ref=abc");
 /// assert!(result.is_ok());
 ///
 /// // 缺少 relay 参数
-/// let result = parse_deep_link("proxycast://connect?key=sk-xxx");
+/// let result = parse_deep_link("lime://connect?key=sk-xxx");
 /// assert!(result.is_err());
 /// ```
 pub fn parse_deep_link(url: &str) -> Result<ConnectPayload, DeepLinkError> {
@@ -95,9 +95,9 @@ pub fn parse_deep_link(url: &str) -> Result<ConnectPayload, DeepLinkError> {
     let parsed = Url::parse(url).map_err(|e| DeepLinkError::InvalidUrl(e.to_string()))?;
 
     // 验证协议
-    if parsed.scheme() != "proxycast" {
+    if parsed.scheme() != "lime" {
         return Err(DeepLinkError::InvalidUrl(format!(
-            "无效的协议: {}，期望 proxycast",
+            "无效的协议: {}，期望 lime",
             parsed.scheme()
         )));
     }
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_parse_valid_url_with_all_params() {
-        let url = "proxycast://connect?relay=example&key=sk-xxx&name=MyKey&ref=abc123";
+        let url = "lime://connect?relay=example&key=sk-xxx&name=MyKey&ref=abc123";
         let result = parse_deep_link(url).unwrap();
 
         assert_eq!(result.relay, "example");
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_parse_valid_url_with_required_params_only() {
-        let url = "proxycast://connect?relay=test-relay&key=sk-12345";
+        let url = "lime://connect?relay=test-relay&key=sk-12345";
         let result = parse_deep_link(url).unwrap();
 
         assert_eq!(result.relay, "test-relay");
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_parse_missing_relay() {
-        let url = "proxycast://connect?key=sk-xxx";
+        let url = "lime://connect?key=sk-xxx";
         let result = parse_deep_link(url);
 
         assert!(matches!(result, Err(DeepLinkError::MissingRelay)));
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_parse_missing_key() {
-        let url = "proxycast://connect?relay=example";
+        let url = "lime://connect?relay=example";
         let result = parse_deep_link(url);
 
         assert!(matches!(result, Err(DeepLinkError::MissingKey)));
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_relay() {
-        let url = "proxycast://connect?relay=&key=sk-xxx";
+        let url = "lime://connect?relay=&key=sk-xxx";
         let result = parse_deep_link(url);
 
         assert!(matches!(result, Err(DeepLinkError::MissingRelay)));
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_key() {
-        let url = "proxycast://connect?relay=example&key=";
+        let url = "lime://connect?relay=example&key=";
         let result = parse_deep_link(url);
 
         assert!(matches!(result, Err(DeepLinkError::MissingKey)));
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_path() {
-        let url = "proxycast://other?relay=example&key=sk-xxx";
+        let url = "lime://other?relay=example&key=sk-xxx";
         let result = parse_deep_link(url);
 
         assert!(matches!(result, Err(DeepLinkError::InvalidUrl(_))));
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_parse_url_encoded_params() {
-        let url = "proxycast://connect?relay=test%20relay&key=sk-xxx&name=My%20Key";
+        let url = "lime://connect?relay=test%20relay&key=sk-xxx&name=My%20Key";
         let result = parse_deep_link(url).unwrap();
 
         assert_eq!(result.relay, "test relay");
@@ -259,7 +259,7 @@ mod property_tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
-        /// Feature: proxycast-connect, Property 1: Deep Link URL Parsing Completeness
+        /// Feature: lime-connect, Property 1: Deep Link URL Parsing Completeness
         /// Validates: Requirements 1.1
         ///
         /// *For any* valid Deep Link URL containing relay and key parameters,
@@ -273,7 +273,7 @@ mod property_tests {
             ref_code in arb_ref_code(),
         ) {
             // 构建 URL
-            let mut url = format!("proxycast://connect?relay={relay}&key={key}");
+            let mut url = format!("lime://connect?relay={relay}&key={key}");
             if let Some(ref n) = name {
                 url.push_str(&format!("&name={}", urlencoding::encode(n)));
             }
@@ -296,7 +296,7 @@ mod property_tests {
             prop_assert_eq!(&payload.ref_code, &ref_code, "ref_code 不匹配");
         }
 
-        /// Feature: proxycast-connect, Property 2: Deep Link Invalid Parameter Handling
+        /// Feature: lime-connect, Property 2: Deep Link Invalid Parameter Handling
         /// Validates: Requirements 1.2, 1.3, 7.1
         ///
         /// *For any* Deep Link URL that is malformed, missing the relay parameter,
@@ -310,13 +310,13 @@ mod property_tests {
         ) {
             let url = match error_type {
                 // 缺少 relay 参数
-                0 => format!("proxycast://connect?key={key}"),
+                0 => format!("lime://connect?key={key}"),
                 // 缺少 key 参数
-                1 => format!("proxycast://connect?relay={relay}"),
+                1 => format!("lime://connect?relay={relay}"),
                 // 空 relay 参数
-                2 => format!("proxycast://connect?relay=&key={key}"),
+                2 => format!("lime://connect?relay=&key={key}"),
                 // 空 key 参数
-                _ => format!("proxycast://connect?relay={relay}&key="),
+                _ => format!("lime://connect?relay={relay}&key="),
             };
 
             let result = parse_deep_link(&url);
@@ -361,7 +361,7 @@ mod property_tests {
             relay in arb_relay_id(),
             key in arb_api_key(),
         ) {
-            let url = format!("proxycast://{path}?relay={relay}&key={key}");
+            let url = format!("lime://{path}?relay={relay}&key={key}");
             let result = parse_deep_link(&url);
 
             prop_assert!(

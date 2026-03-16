@@ -1,8 +1,8 @@
 //! CodeWhisperer 响应转换为 OpenAI 格式
 #![allow(dead_code)]
 
-use proxycast_core::models::codewhisperer::*;
-use proxycast_core::models::openai::*;
+use lime_core::models::codewhisperer::*;
+use lime_core::models::openai::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 

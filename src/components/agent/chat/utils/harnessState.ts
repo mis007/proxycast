@@ -167,8 +167,8 @@ const FILESYSTEM_TOOL_NAMES = new Set([
 const WEB_TOOL_RE = /^(websearch|webfetch)|browser|playwright/i;
 const HARNESS_OUTPUT_SIGNAL_LIMIT = 8;
 const SKILL_TOOL_NAMES = new Set(["skill", "threestageworkflow"]);
-const PROXYCAST_TOOL_METADATA_BEGIN = "[ProxyCast 工具元数据开始]";
-const PROXYCAST_TOOL_METADATA_END = "[ProxyCast 工具元数据结束]";
+const LIME_TOOL_METADATA_BEGIN = "[Lime 工具元数据开始]";
+const LIME_TOOL_METADATA_END = "[Lime 工具元数据结束]";
 
 function normalizeToolName(value: string): string {
   return value
@@ -358,17 +358,17 @@ function stripAuxiliaryOutput(raw?: string): string {
   if (!raw) return "";
 
   let normalized = raw;
-  const beginIndex = normalized.lastIndexOf(PROXYCAST_TOOL_METADATA_BEGIN);
-  const endIndex = normalized.lastIndexOf(PROXYCAST_TOOL_METADATA_END);
+  const beginIndex = normalized.lastIndexOf(LIME_TOOL_METADATA_BEGIN);
+  const endIndex = normalized.lastIndexOf(LIME_TOOL_METADATA_END);
 
   if (beginIndex >= 0 && endIndex >= beginIndex) {
     normalized =
       normalized.slice(0, beginIndex) +
-      normalized.slice(endIndex + PROXYCAST_TOOL_METADATA_END.length);
+      normalized.slice(endIndex + LIME_TOOL_METADATA_END.length);
   }
 
   normalized = normalized.replace(
-    /^\[ProxyCast Offload\]\s*完整输出已转存到文件：.+$/gm,
+    /^\[Lime Offload\]\s*完整输出已转存到文件：.+$/gm,
     "",
   );
 
@@ -512,14 +512,14 @@ function extractMetadata(
 
   const output = toolCall.result?.output;
   if (!output) return null;
-  const beginIndex = output.lastIndexOf(PROXYCAST_TOOL_METADATA_BEGIN);
-  const endIndex = output.lastIndexOf(PROXYCAST_TOOL_METADATA_END);
+  const beginIndex = output.lastIndexOf(LIME_TOOL_METADATA_BEGIN);
+  const endIndex = output.lastIndexOf(LIME_TOOL_METADATA_END);
   if (beginIndex < 0 || endIndex < beginIndex) {
     return null;
   }
 
   const raw = output
-    .slice(beginIndex + PROXYCAST_TOOL_METADATA_BEGIN.length, endIndex)
+    .slice(beginIndex + LIME_TOOL_METADATA_BEGIN.length, endIndex)
     .trim();
   if (!raw) return null;
 
@@ -746,7 +746,7 @@ function extractOutputSignal(
   const offloadFile =
     normalizeString(metadata?.offload_file) ||
     extractRegexValue(
-      /^\[ProxyCast Offload\]\s*完整输出已转存到文件：(.+)$/m,
+      /^\[Lime Offload\]\s*完整输出已转存到文件：(.+)$/m,
       output,
     );
   const artifactPath =
@@ -774,9 +774,9 @@ function extractOutputSignal(
     output.includes("[output truncated:") ||
     outputTruncatedFromSummary === true;
   const offloaded =
-    normalizeBoolean(metadata?.proxycast_offloaded) === true ||
+    normalizeBoolean(metadata?.lime_offloaded) === true ||
     !!offloadFile ||
-    output.includes("[ProxyCast Offload]");
+    output.includes("[Lime Offload]");
   const offloadOriginalChars = normalizeNumber(
     metadata?.offload_original_chars,
   );

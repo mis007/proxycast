@@ -1,6 +1,6 @@
 //! SubAgent 调度器集成（Tauri 桥接层）
 //!
-//! 纯逻辑已迁移到 `proxycast-agent` crate，
+//! 纯逻辑已迁移到 `lime-agent` crate，
 //! 本模块负责 Tauri 事件桥接。
 
 use std::sync::Arc;
@@ -13,25 +13,25 @@ use tauri::{AppHandle, Emitter};
 
 use crate::database::DbConnection;
 
-pub use proxycast_agent::subagent_scheduler::{
-    ProxyCastSubAgentExecutor, SchedulerEventEmitter, SubAgentProgressEvent, SubAgentRole,
+pub use lime_agent::subagent_scheduler::{
+    LimeSubAgentExecutor, SchedulerEventEmitter, SubAgentProgressEvent, SubAgentRole,
 };
 
-/// ProxyCast SubAgent 调度器（Tauri 桥接）
-pub struct ProxyCastScheduler {
+/// Lime SubAgent 调度器（Tauri 桥接）
+pub struct LimeScheduler {
     /// 内部纯逻辑调度器
-    inner: proxycast_agent::subagent_scheduler::ProxyCastScheduler,
+    inner: lime_agent::subagent_scheduler::LimeScheduler,
     /// Tauri AppHandle
     app_handle: Option<AppHandle>,
     /// 调度事件归属的会话 ID
     event_session_id: Option<String>,
 }
 
-impl ProxyCastScheduler {
+impl LimeScheduler {
     /// 创建新的调度器
     pub fn new(db: DbConnection) -> Self {
         Self {
-            inner: proxycast_agent::subagent_scheduler::ProxyCastScheduler::new(db),
+            inner: lime_agent::subagent_scheduler::LimeScheduler::new(db),
             app_handle: None,
             event_session_id: None,
         }

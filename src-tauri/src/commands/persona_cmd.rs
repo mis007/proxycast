@@ -25,7 +25,7 @@ use crate::models::project_model::{
     BrandPersona, BrandPersonaExtension, BrandPersonaTemplate, CreateBrandExtensionRequest,
     CreatePersonaRequest, Persona, PersonaTemplate, PersonaUpdate, UpdateBrandExtensionRequest,
 };
-use proxycast_services::persona_service::PersonaService;
+use lime_services::persona_service::PersonaService;
 
 // ============================================================================
 // Tauri 命令

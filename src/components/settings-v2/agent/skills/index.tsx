@@ -7,7 +7,7 @@ export function ExtensionsSettings() {
         <p className="text-sm leading-6 text-muted-foreground">
           管理 Skills 实验功能，不影响核心使用。
           <a
-            href="https://github.com/aiclientproxy/proxycast/issues"
+            href="https://github.com/aiclientproxy/lime/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="ml-1 text-primary hover:underline"

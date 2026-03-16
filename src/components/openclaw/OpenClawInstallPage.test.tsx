@@ -26,7 +26,7 @@ function buildDependencyStatus(
 ): OpenClawDependencyStatus {
   return {
     status: "ok",
-    version: "22.0.0",
+    version: "22.12.0",
     path: "/usr/local/bin/tool",
     message: "已就绪",
     autoInstallSupported: true,
@@ -69,8 +69,11 @@ function renderPage(
 
   const defaultProps: OpenClawInstallPageProps = {
     environmentStatus: buildEnvironmentStatus(),
+    runtimeCandidates: [],
+    preferredRuntimeId: null,
     desktopPlatform: "macos",
     busy: false,
+    switchingRuntime: false,
     installing: false,
     installingNode: false,
     installingGit: false,
@@ -83,6 +86,7 @@ function renderPage(
     onOpenDocs: () => {},
     onDownloadNode: () => {},
     onDownloadGit: () => {},
+    onSelectPreferredRuntime: () => {},
   };
 
   act(() => {
@@ -126,7 +130,7 @@ describe("OpenClawInstallPage", () => {
           status: "missing",
           version: null,
           path: null,
-          message: "未检测到 Node.js，需要安装 22.0.0+。",
+          message: "未检测到 Node.js，需要安装 22.12.0+。",
           autoInstallSupported: false,
         },
         git: {
@@ -170,7 +174,7 @@ describe("OpenClawInstallPage", () => {
           status: "missing",
           version: null,
           path: null,
-          message: "未检测到 Node.js，需要安装 22.0.0+。",
+          message: "未检测到 Node.js，需要安装 22.12.0+。",
           autoInstallSupported: true,
         },
         git: {
@@ -205,9 +209,9 @@ describe("OpenClawInstallPage", () => {
       environmentStatus: buildEnvironmentStatus({
         node: {
           status: "ok",
-          version: "22.0.0",
+          version: "22.12.0",
           path: "C:/Program Files/nodejs/node.exe",
-          message: "Node.js 已就绪：22.0.0",
+          message: "Node.js 已就绪：22.12.0",
           autoInstallSupported: false,
         },
         git: {
@@ -252,7 +256,7 @@ describe("OpenClawInstallPage", () => {
     );
     expect(container.textContent).toContain("待刷新");
     expect(container.textContent).toContain(
-      "已检测到 OpenClaw 包，但命令尚未生效。请先点击“重新检测”；若仍失败，请重启 ProxyCast 后再试。",
+      "已检测到 OpenClaw 包，但命令尚未生效。请先点击“重新检测”；若仍失败，请重启 Lime 后再试。",
     );
     expect(container.textContent).toContain("检测诊断");
     expect(container.textContent).toContain("C:/Program Files/nodejs/npm.cmd");

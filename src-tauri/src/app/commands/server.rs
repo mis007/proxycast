@@ -8,8 +8,8 @@ use crate::commands::provider_pool_cmd::ProviderPoolServiceState;
 use crate::commands::telemetry_cmd::TelemetryState;
 use crate::database;
 use chrono::{Duration, Utc};
-use proxycast_infra::telemetry::RequestStatus;
-use proxycast_server as server;
+use lime_infra::telemetry::RequestStatus;
+use lime_server as server;
 use std::collections::HashSet;
 
 /// 启动服务器

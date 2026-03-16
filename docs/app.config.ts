@@ -1,18 +1,18 @@
 export default {
   docus: {
-    title: "ProxyCast",
+    title: "Lime",
     description: "把你的 AI 客户端额度用到任何地方",
-    url: "https://aiclientproxy.github.io/proxycast",
+    url: "https://aiclientproxy.github.io/lime",
 
     image: "/images/logo-banner.svg",
 
     socials: {
-      github: "aiclientproxy/proxycast",
+      github: "aiclientproxy/lime",
     },
 
     header: {
       logo: true,
-      title: "ProxyCast",
+      title: "Lime",
       showLinkIcon: true,
     },
 
@@ -25,13 +25,13 @@ export default {
     footer: {
       credits: {
         icon: "",
-        text: "Made with 💜 by ProxyCast Team",
+        text: "Made with 💜 by Lime Team",
         href: "https://github.com/aiclientproxy",
       },
       textLinks: [
         {
           text: "GitHub",
-          href: "https://github.com/aiclientproxy/proxycast",
+          href: "https://github.com/aiclientproxy/lime",
           target: "_blank",
         },
       ],

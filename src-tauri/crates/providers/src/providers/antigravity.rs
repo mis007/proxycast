@@ -1357,7 +1357,7 @@ const OAUTH_SUCCESS_HTML: &str = r#"<!DOCTYPE html>
 <body>
     <div class="container">
         <h1>✓ 授权成功</h1>
-        <p>账号已添加到 ProxyCast</p>
+        <p>账号已添加到 Lime</p>
         <p class="email">EMAIL_PLACEHOLDER</p>
         <p style="margin-top: 20px; color: #999;">可以关闭此页面</p>
     </div>
@@ -1545,7 +1545,7 @@ pub async fn start_oauth_server_and_get_url(
                 // 保存凭证到应用数据目录
                 let creds_dir = dirs::data_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
-                    .join("proxycast")
+                    .join("lime")
                     .join("credentials")
                     .join("antigravity");
 
@@ -1766,7 +1766,7 @@ pub async fn start_oauth_login_with_port(
                 // 保存凭证到应用数据目录
                 let creds_dir = dirs::data_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
-                    .join("proxycast")
+                    .join("lime")
                     .join("credentials")
                     .join("antigravity");
 
@@ -1992,7 +1992,7 @@ pub async fn start_oauth_login(
                 // 保存凭证到应用数据目录
                 let creds_dir = dirs::data_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
-                    .join("proxycast")
+                    .join("lime")
                     .join("credentials")
                     .join("antigravity");
 
@@ -2129,7 +2129,7 @@ use crate::providers::ProviderError;
 use crate::streaming::traits::{
     reqwest_stream_to_stream_response, StreamFormat, StreamResponse, StreamingProvider,
 };
-use proxycast_core::models::openai::ChatCompletionRequest;
+use lime_core::models::openai::ChatCompletionRequest;
 
 #[async_trait]
 impl StreamingProvider for AntigravityProvider {

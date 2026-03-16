@@ -32,234 +32,234 @@ use crate::integration::shell_integration::ShellType;
 const SHELL_INTEGRATION_DIR: &str = "shell-integration";
 
 /// Bash 集成脚本内容
-const BASH_INTEGRATION_SCRIPT: &str = r#"# ProxyCast Shell Integration for Bash
+const BASH_INTEGRATION_SCRIPT: &str = r#"# Lime Shell Integration for Bash
 # This script provides shell integration features
 
 # 保存原始 PS1
-if [ -z "$_PROXYCAST_ORIG_PS1" ]; then
-    _PROXYCAST_ORIG_PS1="$PS1"
+if [ -z "$_LIME_ORIG_PS1" ]; then
+    _LIME_ORIG_PS1="$PS1"
 fi
 
 # OSC 7 - 报告当前工作目录
-__proxycast_osc7() {
+__lime_osc7() {
     printf '\033]7;file://%s%s\033\\' "${HOSTNAME:-localhost}" "$PWD"
 }
 
 # OSC 133 - 命令提示符标记
-__proxycast_prompt_start() {
+__lime_prompt_start() {
     printf '\033]133;A\033\\'
 }
 
-__proxycast_command_start() {
+__lime_command_start() {
     printf '\033]133;B\033\\'
 }
 
-__proxycast_command_executed() {
+__lime_command_executed() {
     printf '\033]133;C\033\\'
 }
 
-__proxycast_command_finished() {
+__lime_command_finished() {
     printf '\033]133;D;%s\033\\' "$?"
 }
 
 # 设置 PROMPT_COMMAND
-__proxycast_precmd() {
+__lime_precmd() {
     local exit_code=$?
-    __proxycast_command_finished
-    __proxycast_osc7
-    __proxycast_prompt_start
+    __lime_command_finished
+    __lime_osc7
+    __lime_prompt_start
     return $exit_code
 }
 
-__proxycast_preexec() {
-    __proxycast_command_executed
+__lime_preexec() {
+    __lime_command_executed
 }
 
 # 安装 preexec 钩子（如果可用）
 if [ -n "$BASH_VERSION" ]; then
     # 使用 DEBUG trap 模拟 preexec
-    __proxycast_debug_trap() {
+    __lime_debug_trap() {
         if [ -n "$COMP_LINE" ]; then
             return
         fi
         if [ "$BASH_COMMAND" = "$PROMPT_COMMAND" ]; then
             return
         fi
-        __proxycast_preexec
+        __lime_preexec
     }
     
-    trap '__proxycast_debug_trap' DEBUG
+    trap '__lime_debug_trap' DEBUG
 fi
 
 # 设置 PROMPT_COMMAND
 if [ -z "$PROMPT_COMMAND" ]; then
-    PROMPT_COMMAND="__proxycast_precmd"
+    PROMPT_COMMAND="__lime_precmd"
 else
-    PROMPT_COMMAND="__proxycast_precmd;$PROMPT_COMMAND"
+    PROMPT_COMMAND="__lime_precmd;$PROMPT_COMMAND"
 fi
 
 # 加载用户的 .bashrc（如果存在且我们是通过 --rcfile 启动的）
-if [ -n "$_PROXYCAST_LOAD_BASHRC" ] && [ -f "$HOME/.bashrc" ]; then
+if [ -n "$_LIME_LOAD_BASHRC" ] && [ -f "$HOME/.bashrc" ]; then
     source "$HOME/.bashrc"
 fi
 
 # 标记集成已加载
-export PROXYCAST_SHELL_INTEGRATION=1
+export LIME_SHELL_INTEGRATION=1
 "#;
 
 /// Zsh 集成脚本内容 (.zshrc)
-const ZSH_INTEGRATION_SCRIPT: &str = r#"# ProxyCast Shell Integration for Zsh
+const ZSH_INTEGRATION_SCRIPT: &str = r#"# Lime Shell Integration for Zsh
 # This script provides shell integration features
 
 # OSC 7 - 报告当前工作目录
-__proxycast_osc7() {
+__lime_osc7() {
     printf '\033]7;file://%s%s\033\\' "${HOST:-localhost}" "$PWD"
 }
 
 # OSC 133 - 命令提示符标记
-__proxycast_prompt_start() {
+__lime_prompt_start() {
     printf '\033]133;A\033\\'
 }
 
-__proxycast_command_start() {
+__lime_command_start() {
     printf '\033]133;B\033\\'
 }
 
-__proxycast_command_executed() {
+__lime_command_executed() {
     printf '\033]133;C\033\\'
 }
 
-__proxycast_command_finished() {
+__lime_command_finished() {
     printf '\033]133;D;%s\033\\' "$?"
 }
 
 # precmd 钩子 - 命令执行后
-__proxycast_precmd() {
+__lime_precmd() {
     local exit_code=$?
-    __proxycast_command_finished
-    __proxycast_osc7
-    __proxycast_prompt_start
+    __lime_command_finished
+    __lime_osc7
+    __lime_prompt_start
     return $exit_code
 }
 
 # preexec 钩子 - 命令执行前
-__proxycast_preexec() {
-    __proxycast_command_executed
+__lime_preexec() {
+    __lime_command_executed
 }
 
 # 注册钩子
 autoload -Uz add-zsh-hook
-add-zsh-hook precmd __proxycast_precmd
-add-zsh-hook preexec __proxycast_preexec
+add-zsh-hook precmd __lime_precmd
+add-zsh-hook preexec __lime_preexec
 
 # 加载用户的原始配置
-if [ -n "$_PROXYCAST_ORIG_ZDOTDIR" ]; then
-    if [ -f "$_PROXYCAST_ORIG_ZDOTDIR/.zshrc" ]; then
-        source "$_PROXYCAST_ORIG_ZDOTDIR/.zshrc"
+if [ -n "$_LIME_ORIG_ZDOTDIR" ]; then
+    if [ -f "$_LIME_ORIG_ZDOTDIR/.zshrc" ]; then
+        source "$_LIME_ORIG_ZDOTDIR/.zshrc"
     fi
 elif [ -f "$HOME/.zshrc" ]; then
     source "$HOME/.zshrc"
 fi
 
 # 标记集成已加载
-export PROXYCAST_SHELL_INTEGRATION=1
+export LIME_SHELL_INTEGRATION=1
 "#;
 
 /// Zsh .zshenv 内容（用于设置 ZDOTDIR）
-const ZSH_ZSHENV_SCRIPT: &str = r#"# ProxyCast Zsh Environment
+const ZSH_ZSHENV_SCRIPT: &str = r#"# Lime Zsh Environment
 # 保存原始 ZDOTDIR
-if [ -z "$_PROXYCAST_ORIG_ZDOTDIR" ]; then
-    export _PROXYCAST_ORIG_ZDOTDIR="${ZDOTDIR:-$HOME}"
+if [ -z "$_LIME_ORIG_ZDOTDIR" ]; then
+    export _LIME_ORIG_ZDOTDIR="${ZDOTDIR:-$HOME}"
 fi
 
 # 加载原始 .zshenv
-if [ -f "$_PROXYCAST_ORIG_ZDOTDIR/.zshenv" ]; then
-    source "$_PROXYCAST_ORIG_ZDOTDIR/.zshenv"
+if [ -f "$_LIME_ORIG_ZDOTDIR/.zshenv" ]; then
+    source "$_LIME_ORIG_ZDOTDIR/.zshenv"
 fi
 "#;
 
 /// Fish 集成脚本内容
-const FISH_INTEGRATION_SCRIPT: &str = r#"# ProxyCast Shell Integration for Fish
+const FISH_INTEGRATION_SCRIPT: &str = r#"# Lime Shell Integration for Fish
 # This script provides shell integration features
 
 # OSC 7 - 报告当前工作目录
-function __proxycast_osc7 --on-variable PWD
+function __lime_osc7 --on-variable PWD
     printf '\033]7;file://%s%s\033\\' (hostname) $PWD
 end
 
 # OSC 133 - 命令提示符标记
-function __proxycast_prompt_start
+function __lime_prompt_start
     printf '\033]133;A\033\\'
 end
 
-function __proxycast_command_executed
+function __lime_command_executed
     printf '\033]133;C\033\\'
 end
 
-function __proxycast_command_finished
+function __lime_command_finished
     printf '\033]133;D;%s\033\\' $status
 end
 
 # Fish 事件钩子
-function __proxycast_fish_prompt --on-event fish_prompt
-    __proxycast_command_finished
-    __proxycast_osc7
-    __proxycast_prompt_start
+function __lime_fish_prompt --on-event fish_prompt
+    __lime_command_finished
+    __lime_osc7
+    __lime_prompt_start
 end
 
-function __proxycast_fish_preexec --on-event fish_preexec
-    __proxycast_command_executed
+function __lime_fish_preexec --on-event fish_preexec
+    __lime_command_executed
 end
 
 # 初始化
-__proxycast_osc7
+__lime_osc7
 
 # 标记集成已加载
-set -gx PROXYCAST_SHELL_INTEGRATION 1
+set -gx LIME_SHELL_INTEGRATION 1
 "#;
 
 /// PowerShell 集成脚本内容
-const PWSH_INTEGRATION_SCRIPT: &str = r#"# ProxyCast Shell Integration for PowerShell
+const PWSH_INTEGRATION_SCRIPT: &str = r#"# Lime Shell Integration for PowerShell
 # This script provides shell integration features
 
 # OSC 7 - 报告当前工作目录
-function Send-ProxyCastOsc7 {
+function Send-LimeOsc7 {
     $hostname = [System.Net.Dns]::GetHostName()
     $pwd = $PWD.Path -replace '\\', '/'
     Write-Host -NoNewline "`e]7;file://$hostname$pwd`e\"
 }
 
 # OSC 133 - 命令提示符标记
-function Send-ProxyCastPromptStart {
+function Send-LimePromptStart {
     Write-Host -NoNewline "`e]133;A`e\"
 }
 
-function Send-ProxyCastCommandExecuted {
+function Send-LimeCommandExecuted {
     Write-Host -NoNewline "`e]133;C`e\"
 }
 
-function Send-ProxyCastCommandFinished {
+function Send-LimeCommandFinished {
     param([int]$ExitCode = 0)
     Write-Host -NoNewline "`e]133;D;$ExitCode`e\"
 }
 
 # 保存原始 prompt 函数
-if (-not (Test-Path Function:\__ProxyCastOriginalPrompt)) {
+if (-not (Test-Path Function:\__LimeOriginalPrompt)) {
     if (Test-Path Function:\prompt) {
-        Copy-Item Function:\prompt Function:\__ProxyCastOriginalPrompt
+        Copy-Item Function:\prompt Function:\__LimeOriginalPrompt
     } else {
-        function __ProxyCastOriginalPrompt { "PS $($PWD.Path)> " }
+        function __LimeOriginalPrompt { "PS $($PWD.Path)> " }
     }
 }
 
 # 自定义 prompt 函数
 function prompt {
     $exitCode = $LASTEXITCODE
-    Send-ProxyCastCommandFinished -ExitCode $exitCode
-    Send-ProxyCastOsc7
-    Send-ProxyCastPromptStart
+    Send-LimeCommandFinished -ExitCode $exitCode
+    Send-LimeOsc7
+    Send-LimePromptStart
     $LASTEXITCODE = $exitCode
-    __ProxyCastOriginalPrompt
+    __LimeOriginalPrompt
 }
 
 # PSReadLine 钩子（如果可用）
@@ -267,7 +267,7 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
     $existingHandler = (Get-PSReadLineOption).AddToHistoryHandler
     Set-PSReadLineOption -AddToHistoryHandler {
         param([string]$line)
-        Send-ProxyCastCommandExecuted
+        Send-LimeCommandExecuted
         if ($existingHandler) {
             return & $existingHandler $line
         }
@@ -276,7 +276,7 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 }
 
 # 标记集成已加载
-$env:PROXYCAST_SHELL_INTEGRATION = "1"
+$env:LIME_SHELL_INTEGRATION = "1"
 "#;
 
 /// Shell 集成脚本管理器
@@ -350,7 +350,7 @@ impl ShellScripts {
         fs::create_dir_all(&bash_dir)
             .map_err(|e| TerminalError::Internal(format!("创建 bash 目录失败: {e}")))?;
 
-        let script_path = bash_dir.join("proxycast.bash");
+        let script_path = bash_dir.join("lime.bash");
         fs::write(&script_path, BASH_INTEGRATION_SCRIPT)
             .map_err(|e| TerminalError::Internal(format!("写入 bash 脚本失败: {e}")))?;
 
@@ -390,7 +390,7 @@ impl ShellScripts {
         fs::create_dir_all(&fish_dir)
             .map_err(|e| TerminalError::Internal(format!("创建 fish 目录失败: {e}")))?;
 
-        let script_path = fish_dir.join("proxycast.fish");
+        let script_path = fish_dir.join("lime.fish");
         fs::write(&script_path, FISH_INTEGRATION_SCRIPT)
             .map_err(|e| TerminalError::Internal(format!("写入 fish 脚本失败: {e}")))?;
 
@@ -405,7 +405,7 @@ impl ShellScripts {
         fs::create_dir_all(&pwsh_dir)
             .map_err(|e| TerminalError::Internal(format!("创建 pwsh 目录失败: {e}")))?;
 
-        let script_path = pwsh_dir.join("proxycast.ps1");
+        let script_path = pwsh_dir.join("lime.ps1");
         fs::write(&script_path, PWSH_INTEGRATION_SCRIPT)
             .map_err(|e| TerminalError::Internal(format!("写入 pwsh 脚本失败: {e}")))?;
 
@@ -419,7 +419,7 @@ impl ShellScripts {
 
     /// 获取 Bash 集成脚本路径
     pub fn bash_script_path(&self) -> PathBuf {
-        self.integration_dir.join("bash").join("proxycast.bash")
+        self.integration_dir.join("bash").join("lime.bash")
     }
 
     /// 获取 Zsh 集成目录路径（用于 ZDOTDIR）
@@ -429,12 +429,12 @@ impl ShellScripts {
 
     /// 获取 Fish 集成脚本路径
     pub fn fish_script_path(&self) -> PathBuf {
-        self.integration_dir.join("fish").join("proxycast.fish")
+        self.integration_dir.join("fish").join("lime.fish")
     }
 
     /// 获取 PowerShell 集成脚本路径
     pub fn pwsh_script_path(&self) -> PathBuf {
-        self.integration_dir.join("pwsh").join("proxycast.ps1")
+        self.integration_dir.join("pwsh").join("lime.ps1")
     }
 
     /// 检查集成脚本是否已安装
@@ -569,9 +569,9 @@ impl ShellLaunchBuilder {
     /// 设置所有 Shell 类型共用的环境变量，包括：
     /// - TERM: 终端类型
     /// - COLORTERM: 颜色支持
-    /// - PROXYCAST_BLOCKID: 块 ID（与 WAVETERM_BLOCKID 兼容）
+    /// - LIME_BLOCKID: 块 ID（与 WAVETERM_BLOCKID 兼容）
     /// - WAVETERM_BLOCKID: Waveterm 兼容的块 ID
-    /// - PROXYCAST_VERSION: 应用版本
+    /// - LIME_VERSION: 应用版本
     /// - LANG: 语言设置（如果未设置）
     ///
     /// _Requirements: 17.2, 17.7_
@@ -579,10 +579,10 @@ impl ShellLaunchBuilder {
         let mut config = config
             .env("TERM", "xterm-256color")
             .env("COLORTERM", "truecolor")
-            .env("PROXYCAST_BLOCKID", &self.block_id)
+            .env("LIME_BLOCKID", &self.block_id)
             // Waveterm 兼容性
             .env("WAVETERM_BLOCKID", &self.block_id)
-            .env("PROXYCAST_VERSION", env!("CARGO_PKG_VERSION"));
+            .env("LIME_VERSION", env!("CARGO_PKG_VERSION"));
 
         // 设置 LANG（如果未设置）
         if std::env::var("LANG").is_err() {
@@ -621,7 +621,7 @@ impl ShellLaunchBuilder {
         Ok(config
             .arg("--rcfile")
             .arg(&script_path_str)
-            .env("_PROXYCAST_LOAD_BASHRC", "1"))
+            .env("_LIME_LOAD_BASHRC", "1"))
     }
 
     /// 配置 Zsh 启动
@@ -701,9 +701,9 @@ impl ShellLaunchBuilder {
 /// ## 标准环境变量
 /// - `TERM`: 终端类型（默认 xterm-256color）
 /// - `COLORTERM`: 颜色支持（默认 truecolor）
-/// - `PROXYCAST_BLOCKID`: 块 ID
+/// - `LIME_BLOCKID`: 块 ID
 /// - `WAVETERM_BLOCKID`: Waveterm 兼容的块 ID
-/// - `PROXYCAST_VERSION`: 应用版本
+/// - `LIME_VERSION`: 应用版本
 /// - `LANG`: 语言设置
 /// - `LC_ALL`: 区域设置
 ///
@@ -739,11 +739,11 @@ impl TerminalEnvConfig {
         config.set("COLORTERM", "truecolor");
 
         // 块标识
-        config.set("PROXYCAST_BLOCKID", block_id);
+        config.set("LIME_BLOCKID", block_id);
         config.set("WAVETERM_BLOCKID", block_id); // Waveterm 兼容
 
         // 版本信息
-        config.set("PROXYCAST_VERSION", env!("CARGO_PKG_VERSION"));
+        config.set("LIME_VERSION", env!("CARGO_PKG_VERSION"));
 
         // 语言设置（如果未设置）
         if std::env::var("LANG").is_err() {
@@ -869,12 +869,9 @@ mod tests {
         assert_eq!(config.shell_path, "/bin/bash");
         assert!(config.args.contains(&"--rcfile".to_string()));
         assert!(config.env.contains_key("TERM"));
-        assert!(config.env.contains_key("PROXYCAST_BLOCKID"));
+        assert!(config.env.contains_key("LIME_BLOCKID"));
         assert!(config.env.contains_key("WAVETERM_BLOCKID"));
-        assert_eq!(
-            config.env.get("_PROXYCAST_LOAD_BASHRC"),
-            Some(&"1".to_string())
-        );
+        assert_eq!(config.env.get("_LIME_LOAD_BASHRC"), Some(&"1".to_string()));
     }
 
     #[test]
@@ -950,15 +947,12 @@ mod tests {
 
         assert_eq!(config.get("TERM"), Some(&"xterm-256color".to_string()));
         assert_eq!(config.get("COLORTERM"), Some(&"truecolor".to_string()));
-        assert_eq!(
-            config.get("PROXYCAST_BLOCKID"),
-            Some(&"test-block".to_string())
-        );
+        assert_eq!(config.get("LIME_BLOCKID"), Some(&"test-block".to_string()));
         assert_eq!(
             config.get("WAVETERM_BLOCKID"),
             Some(&"test-block".to_string())
         );
-        assert!(config.contains("PROXYCAST_VERSION"));
+        assert!(config.contains("LIME_VERSION"));
     }
 
     #[test]

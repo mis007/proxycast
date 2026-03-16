@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::{broadcast, RwLock};
 
-use proxycast_core::websocket::{KiroTokenInfo, WsKiroEvent};
+use lime_core::websocket::{KiroTokenInfo, WsKiroEvent};
 
 /// Kiro 事件服务
 #[derive(Debug)]

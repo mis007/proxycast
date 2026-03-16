@@ -9,13 +9,13 @@ use tokio::sync::RwLock;
 use aster::agents::context::AgentContext;
 use aster::agents::subagent_scheduler::{SchedulerConfig, SchedulerExecutionResult, SubAgentTask};
 
-use crate::agent::subagent_scheduler::{ProxyCastScheduler, SubAgentRole};
+use crate::agent::subagent_scheduler::{LimeScheduler, SubAgentRole};
 use crate::database::DbConnection;
 
 /// SubAgent 调度器状态
 pub struct SubAgentSchedulerState {
     #[allow(dead_code)]
-    scheduler: Arc<RwLock<Option<ProxyCastScheduler>>>,
+    scheduler: Arc<RwLock<Option<LimeScheduler>>>,
 }
 
 impl SubAgentSchedulerState {
@@ -42,7 +42,7 @@ pub async fn init_subagent_scheduler(
     config: Option<SchedulerConfig>,
     session_id: Option<String>,
 ) -> Result<(), String> {
-    let mut scheduler = ProxyCastScheduler::new(db.inner().clone()).with_app_handle(app);
+    let mut scheduler = LimeScheduler::new(db.inner().clone()).with_app_handle(app);
     if let Some(session_id) = session_id.filter(|value| !value.trim().is_empty()) {
         scheduler = scheduler.with_event_session_id(session_id);
     }
@@ -66,7 +66,7 @@ pub async fn execute_subagent_tasks(
     role: Option<SubAgentRole>,
     session_id: Option<String>,
 ) -> Result<SchedulerExecutionResult, String> {
-    let mut scheduler = ProxyCastScheduler::new(db.inner().clone()).with_app_handle(app);
+    let mut scheduler = LimeScheduler::new(db.inner().clone()).with_app_handle(app);
     if let Some(session_id) = session_id.filter(|value| !value.trim().is_empty()) {
         scheduler = scheduler.with_event_session_id(session_id);
     }

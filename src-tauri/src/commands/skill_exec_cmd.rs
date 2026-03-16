@@ -40,16 +40,14 @@ use crate::database::DbConnection;
 use crate::services::execution_tracker_service::{ExecutionTracker, RunFinishDecision, RunSource};
 use crate::services::memory_profile_prompt_service::build_memory_profile_prompt;
 use crate::skills::TauriExecutionCallback;
-use proxycast_agent::event_converter::{
-    convert_agent_event, TauriArtifactSnapshot, TauriToolResult,
-};
-use proxycast_agent::WriteArtifactEventEmitter;
-use proxycast_skills::{
+use lime_agent::event_converter::{convert_agent_event, TauriArtifactSnapshot, TauriToolResult};
+use lime_agent::WriteArtifactEventEmitter;
+use lime_skills::{
     find_skill_by_name, get_skill_roots, load_skills_from_directory, ExecutionCallback,
     LoadedSkillDefinition,
 };
 #[cfg(test)]
-use proxycast_skills::{
+use lime_skills::{
     load_skill_from_file, parse_allowed_tools, parse_boolean, parse_skill_frontmatter,
 };
 
@@ -876,7 +874,7 @@ pub async fn execute_skill(
 async fn execute_skill_prompt(
     app_handle: &tauri::AppHandle,
     aster_state: &AsterAgentState,
-    skill: &proxycast_skills::LoadedSkillDefinition,
+    skill: &lime_skills::LoadedSkillDefinition,
     user_input: &str,
     execution_id: &str,
     session_id: &str,
@@ -1039,7 +1037,7 @@ async fn execute_skill_prompt(
 async fn execute_skill_workflow(
     app_handle: &tauri::AppHandle,
     aster_state: &AsterAgentState,
-    skill: &proxycast_skills::LoadedSkillDefinition,
+    skill: &lime_skills::LoadedSkillDefinition,
     user_input: &str,
     execution_id: &str,
     session_id: &str,
@@ -1434,8 +1432,8 @@ mod tests {
 name: test-skill
 description: A test skill
 metadata:
-  proxycast_model_preference: claude-sonnet-4-5-20250514
-  proxycast_provider_preference: claude
+  lime_model_preference: claude-sonnet-4-5-20250514
+  lime_provider_preference: claude
 ---
 
 # Test Skill
@@ -1616,8 +1614,8 @@ name: my-skill
 description: Test skill description
 allowed-tools: tool1, tool2
 metadata:
-  proxycast_model_preference: gpt-4
-  proxycast_provider_preference: openai
+  lime_model_preference: gpt-4
+  lime_provider_preference: openai
 ---
 
 # My Skill
@@ -1658,7 +1656,7 @@ Instructions here.
 name: workflow-skill
 description: Workflow skill
 metadata:
-  proxycast_workflow_ref: references/missing.json
+  lime_workflow_ref: references/missing.json
 ---
 
 # Workflow Skill
@@ -1673,7 +1671,7 @@ metadata:
             .standard_compliance
             .validation_errors
             .iter()
-            .any(|error| error.contains("metadata.proxycast_workflow_ref")));
+            .any(|error| error.contains("metadata.lime_workflow_ref")));
         assert!(skill.workflow_steps.is_empty());
     }
 
@@ -1753,7 +1751,7 @@ Valid content
 name: skill-invalid
 description: Invalid skill
 metadata:
-  proxycast_workflow_ref: references/missing.json
+  lime_workflow_ref: references/missing.json
 ---
 Invalid content
 "#,

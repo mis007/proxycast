@@ -262,7 +262,7 @@ mod tests {
             execution_mode: "prompt".to_string(),
             workflow_ref: None,
             workflow_steps: Vec::new(),
-            standard_compliance: proxycast_core::models::SkillStandardCompliance {
+            standard_compliance: lime_core::models::SkillStandardCompliance {
                 is_standard: true,
                 validation_errors: Vec::new(),
                 deprecated_fields: Vec::new(),

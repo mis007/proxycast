@@ -68,6 +68,6 @@ impl TerminalEventEmit for NoOpEmitter {
     }
 
     fn app_data_dir(&self) -> Result<PathBuf, String> {
-        Ok(PathBuf::from(".proxycast"))
+        Ok(PathBuf::from(".lime"))
     }
 }

@@ -16,7 +16,7 @@
 //!
 //! ## 安全说明
 //!
-//! 由于 ProxyCast 是开源软件，不使用签名验证。
+//! 由于 Lime 是开源软件，不使用签名验证。
 //! 中转商应通过检查 `key_prefix` 是否为自己下发的 Key 来验证请求。
 //!
 //! _Requirements: 5.3_
@@ -67,7 +67,7 @@ impl std::fmt::Display for CallbackStatus {
 /// 客户端信息
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClientInfo {
-    /// ProxyCast 版本
+    /// Lime 版本
     pub version: String,
     /// 平台（macos, windows, linux）
     pub platform: String,
@@ -268,10 +268,7 @@ impl WebhookSender {
             .client
             .post(url)
             .header("Content-Type", "application/json")
-            .header(
-                "User-Agent",
-                format!("ProxyCast/{}", env!("CARGO_PKG_VERSION")),
-            )
+            .header("User-Agent", format!("Lime/{}", env!("CARGO_PKG_VERSION")))
             .body(payload.to_string())
             .send()
             .await

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { openclawApi, type OpenClawGatewayStatus } from "@/lib/api/openclaw";
 import {
@@ -7,20 +7,24 @@ import {
   isOpenClawDashboardWindowOpen,
   openOpenClawDashboardWindow,
   reloadOpenClawDashboardWindow,
+  resolveOpenClawDashboardProfileKey,
 } from "@/lib/api/openclawDashboardWindow";
 import { openUrl } from "./openUrl";
 
 interface UseOpenClawDashboardWindowOptions {
   gatewayStatus: OpenClawGatewayStatus;
+  profileVersionKey?: string | null;
 }
 
 export function useOpenClawDashboardWindow({
   gatewayStatus,
+  profileVersionKey,
 }: UseOpenClawDashboardWindowOptions) {
   const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardWindowOpen, setDashboardWindowOpen] = useState(false);
   const [dashboardWindowBusy, setDashboardWindowBusy] = useState(false);
+  const lastDashboardProfileKeyRef = useRef<string | null>(null);
 
   const refreshDashboardUrl = useCallback(
     async ({ silent = true, showLoading = false } = {}) => {
@@ -72,11 +76,28 @@ export function useOpenClawDashboardWindow({
       return false;
     }
 
+    const profileKey =
+      resolveOpenClawDashboardProfileKey(profileVersionKey);
+    const shouldRecreate =
+      dashboardWindowOpen &&
+      lastDashboardProfileKeyRef.current !== null &&
+      lastDashboardProfileKeyRef.current !== profileKey;
+
     setDashboardWindowBusy(true);
     try {
-      const result = await openOpenClawDashboardWindow(url);
+      const result = await openOpenClawDashboardWindow(url, {
+        forceRecreate: shouldRecreate,
+        profileVersionKey,
+      });
+      lastDashboardProfileKeyRef.current = profileKey;
       await refreshDashboardWindowState();
-      toast.success(result.reused ? "Dashboard 桌面面板已聚焦。" : "Dashboard 桌面面板已打开。");
+      toast.success(
+        shouldRecreate
+          ? "Dashboard 桌面面板已按新版本重新打开。"
+          : result.reused
+            ? "Dashboard 桌面面板已聚焦。"
+            : "Dashboard 桌面面板已打开。",
+      );
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -84,7 +105,12 @@ export function useOpenClawDashboardWindow({
     } finally {
       setDashboardWindowBusy(false);
     }
-  }, [refreshDashboardWindowState, resolveDashboardUrl]);
+  }, [
+    dashboardWindowOpen,
+    profileVersionKey,
+    refreshDashboardWindowState,
+    resolveDashboardUrl,
+  ]);
 
   const handleFocusDashboardWindow = useCallback(async () => {
     setDashboardWindowBusy(true);
@@ -118,12 +144,31 @@ export function useOpenClawDashboardWindow({
 
     setDashboardWindowBusy(true);
     try {
-      const reloaded = await reloadOpenClawDashboardWindow(url);
+      const profileKey =
+        resolveOpenClawDashboardProfileKey(profileVersionKey);
+      const shouldRecreate =
+        dashboardWindowOpen &&
+        lastDashboardProfileKeyRef.current !== null &&
+        lastDashboardProfileKeyRef.current !== profileKey;
+      const reloaded = shouldRecreate
+        ? false
+        : await reloadOpenClawDashboardWindow(url);
       if (reloaded) {
+        lastDashboardProfileKeyRef.current = profileKey;
         toast.success("Dashboard 桌面面板已重载。");
       } else {
-        const result = await openOpenClawDashboardWindow(url);
-        toast.success(result.reused ? "Dashboard 桌面面板已聚焦。" : "Dashboard 桌面面板已打开。");
+        const result = await openOpenClawDashboardWindow(url, {
+          forceRecreate: shouldRecreate,
+          profileVersionKey,
+        });
+        lastDashboardProfileKeyRef.current = profileKey;
+        toast.success(
+          shouldRecreate
+            ? "Dashboard 桌面面板已按新版本重新打开。"
+            : result.reused
+              ? "Dashboard 桌面面板已聚焦。"
+              : "Dashboard 桌面面板已打开。",
+        );
       }
       await refreshDashboardWindowState();
       return true;
@@ -133,13 +178,19 @@ export function useOpenClawDashboardWindow({
     } finally {
       setDashboardWindowBusy(false);
     }
-  }, [refreshDashboardUrl, refreshDashboardWindowState]);
+  }, [
+    dashboardWindowOpen,
+    profileVersionKey,
+    refreshDashboardUrl,
+    refreshDashboardWindowState,
+  ]);
 
   const handleCloseDashboardWindow = useCallback(async () => {
     setDashboardWindowBusy(true);
     try {
       const closed = await closeOpenClawDashboardWindow();
       if (closed) {
+        lastDashboardProfileKeyRef.current = null;
         toast.success("Dashboard 桌面面板已关闭。");
       }
       await refreshDashboardWindowState();
@@ -154,6 +205,7 @@ export function useOpenClawDashboardWindow({
 
   const closeDashboardWindowSilently = useCallback(async () => {
     setDashboardWindowOpen(false);
+    lastDashboardProfileKeyRef.current = null;
     try {
       await closeOpenClawDashboardWindow();
     } catch (error) {

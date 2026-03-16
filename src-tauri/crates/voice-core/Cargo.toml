@@ -3,7 +3,7 @@ name = "voice-core"
 version = "0.1.0"
 edition = "2021"
 description = "语音输入核心库 - 音频录制、语音识别、文字输出"
-authors = ["ProxyCast Team"]
+authors = ["Lime Team"]
 license = "MIT"
 
 [features]

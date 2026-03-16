@@ -18,7 +18,7 @@ use serde::Serialize;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use proxycast_terminal::{SessionMetadata, TerminalSessionManager};
+use lime_terminal::{SessionMetadata, TerminalSessionManager};
 
 /// 终端会话管理器状态包装
 pub struct TerminalManagerState(pub Arc<RwLock<Option<TerminalSessionManager>>>);

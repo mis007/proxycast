@@ -175,9 +175,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   const selectedProviderLabel = selectedProvider?.label || providerType;
   const compactProviderType =
-    selectedProvider?.key || providerType || "proxycast-hub";
+    selectedProvider?.key || providerType || "lime-hub";
   const compactProviderLabel =
-    selectedProvider?.label || providerType || "ProxyCast Hub";
+    selectedProvider?.label || providerType || "Lime Hub";
   const normalizedTheme = (activeTheme || "").toLowerCase();
   const activeThemeLabel =
     THEME_LABEL_MAP[normalizedTheme] || activeTheme || "当前主题";

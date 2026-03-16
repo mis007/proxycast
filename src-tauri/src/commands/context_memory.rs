@@ -1,7 +1,7 @@
 //! 上下文记忆管理相关的 Tauri 命令
 
 use crate::config::GlobalConfigManagerState;
-use proxycast_services::context_memory_service::{
+use lime_services::context_memory_service::{
     ContextMemoryService, MemoryEntry, MemoryFileType, MemoryStats,
 };
 use serde::{Deserialize, Serialize};

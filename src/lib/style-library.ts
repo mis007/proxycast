@@ -46,9 +46,9 @@ export interface StyleLibraryProjectApplication {
   appliedAt: string;
 }
 
-export const STYLE_LIBRARY_STORAGE_KEY = "proxycast:style-library:v1";
+export const STYLE_LIBRARY_STORAGE_KEY = "lime:style-library:v1";
 export const STYLE_LIBRARY_APPLICATION_HISTORY_KEY =
-  "proxycast:style-library:applications:v1";
+  "lime:style-library:applications:v1";
 export const STYLE_LIBRARY_CHANGED_EVENT = "style-library-changed";
 const MAX_SAMPLE_TEXT_LENGTH = 12_000;
 const MAX_APPLICATION_HISTORY = 12;

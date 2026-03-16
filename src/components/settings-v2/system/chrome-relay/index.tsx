@@ -92,9 +92,9 @@ const ENGINE_DEFINITIONS: Record<SearchEngine, EngineDefinition> = {
     label: "Google",
     description: "独立 Profile 用于搜索偏好、语言和地区设置。",
     settingsUrl: "https://www.google.com/preferences?hl=zh-CN",
-    assistUrl: "https://www.google.com/search?q=proxycast+browser+assist",
-    bridgeTestUrl: "https://www.google.com/search?q=proxycast",
-    backendTestUrl: "https://www.google.com/search?q=proxycast+browser+backend",
+    assistUrl: "https://www.google.com/search?q=lime+browser+assist",
+    bridgeTestUrl: "https://www.google.com/search?q=lime",
+    backendTestUrl: "https://www.google.com/search?q=lime+browser+backend",
     profileKey: "search_google",
     settingsButtonLabel: "打开 Google 设置",
   },
@@ -113,19 +113,19 @@ const ENGINE_DEFINITIONS: Record<SearchEngine, EngineDefinition> = {
 
 const BACKEND_OPTIONS: BrowserBackendType[] = [
   "aster_compat",
-  "proxycast_extension_bridge",
+  "lime_extension_bridge",
   "cdp_direct",
 ];
 
 const BACKEND_LABELS: Record<BrowserBackendType, string> = {
   aster_compat: "Aster 协议适配",
-  proxycast_extension_bridge: "Proxycast 扩展桥接",
+  lime_extension_bridge: "Lime 扩展桥接",
   cdp_direct: "CDP 直连",
 };
 
 const BACKEND_DESCRIPTIONS: Record<BrowserBackendType, string> = {
   aster_compat: "优先复用现有 Aster 兼容链路，适合需要兼容旧协议接入的场景。",
-  proxycast_extension_bridge:
+  lime_extension_bridge:
     "通过浏览器扩展回传页面信息并执行命令，适合人工观察和轻量控制。",
   cdp_direct: "直接走 Chrome DevTools Protocol，适合实时调试与会话接管。",
 };
@@ -1187,7 +1187,7 @@ export function ChromeRelaySettings() {
         {!hasObserverConnected ? (
           <div className="rounded-[20px] border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-800">
             未检测到扩展 observer 连接。请在对应 Chrome Profile 安装并打开
-            Proxycast Browser Bridge 扩展，然后填入上面的 Observer WS 与 Bridge
+            Lime Browser Bridge 扩展，然后填入上面的 Observer WS 与 Bridge
             Key。
           </div>
         ) : null}

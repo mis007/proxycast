@@ -205,7 +205,7 @@ export class ContentAgent extends BaseAgent {
 ## 标题生成规则
 - 格式：[产品名] + [核心功能] + [使用场景]
 - 示例：
-  * "ProxyCast：创作者的 AI Agent 平台"
+  * "Lime：创作者的 AI Agent 平台"
   * "告别低效创作，一个工具搞定全流程"
   * "支持 9 大创作主题的 AI 内容平台"
 - 要求：

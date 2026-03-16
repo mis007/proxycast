@@ -3,9 +3,9 @@
 //! 提供会话上下文的持久化、恢复和智能管理功能，解决 AI 对话中的上下文丢失问题
 
 use crate::ai_summary_service::AISummaryService;
-use proxycast_core::database::dao::chat::{ChatDao, ChatMessage as UnifiedChatMessage, ChatMode};
-use proxycast_core::database::load_pending_general_session_messages;
-use proxycast_core::general_chat::{ChatMessage, MessageRole};
+use lime_core::database::dao::chat::{ChatDao, ChatMessage as UnifiedChatMessage, ChatMode};
+use lime_core::database::load_pending_general_session_messages;
+use lime_core::general_chat::{ChatMessage, MessageRole};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -601,10 +601,10 @@ pub struct SessionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::database::dao::chat::{
+    use lime_core::database::dao::chat::{
         ChatDao, ChatMessage as UnifiedChatMessage, ChatMode, ChatSession as UnifiedChatSession,
     };
-    use proxycast_core::general_chat::ChatSession;
+    use lime_core::general_chat::ChatSession;
     use rusqlite::Connection;
 
     fn setup_test_db() -> Connection {

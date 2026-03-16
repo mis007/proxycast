@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 const env = { ...process.env };
 delete env.TAURI_ENV_PLATFORM;
 
-env.PROXYCAST_BROWSER_BRIDGE = '1';
+env.LIME_BROWSER_BRIDGE = '1';
 
 const child = spawn('npx', ['vite'], {
   stdio: 'inherit',

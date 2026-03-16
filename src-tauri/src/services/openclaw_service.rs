@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::database::dao::api_key_provider::{ApiKeyProvider, ApiProviderType};
 use dirs::{data_dir, home_dir};
-use proxycast_core::openclaw_install::{
+use lime_core::openclaw_install::{
     build_openclaw_cleanup_command as core_build_openclaw_cleanup_command,
     build_openclaw_install_command as core_build_openclaw_install_command,
     build_winget_install_command as core_build_winget_install_command,
@@ -19,6 +19,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use std::cmp::Ordering;
 use std::collections::{HashSet, VecDeque};
 use std::ffi::OsString;
 #[cfg(target_os = "windows")]
@@ -27,6 +28,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::SystemTime;
+use sysinfo::{Pid, Signal, System};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio::net::TcpStream;
@@ -50,12 +52,14 @@ fn shell_escape(value: &str) -> String {
 const OPENCLAW_CN_PACKAGE: &str = "@qingchencloud/openclaw-zh@latest";
 const OPENCLAW_DEFAULT_PACKAGE: &str = "openclaw@latest";
 const NPM_MIRROR_CN: &str = "https://registry.npmmirror.com";
-const NODE_MIN_VERSION: (u64, u64, u64) = (22, 0, 0);
+const NODE_MIN_VERSION: (u64, u64, u64) = (22, 12, 0);
 const OPENCLAW_PROGRESS_LOG_LIMIT: usize = 400;
-const OPENCLAW_INSTALLER_USER_AGENT: &str = "ProxyCast-OpenClaw";
-const OPENCLAW_TEMP_CARGO_CHECK_DIR: &str = "/tmp/proxycast-cargo-check";
+const OPENCLAW_INSTALLER_USER_AGENT: &str = "Lime-OpenClaw";
+const OPENCLAW_TEMP_CARGO_CHECK_DIR: &str = "/tmp/lime-cargo-check";
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+static OPENCLAW_PREFERRED_RUNTIME_BIN_DIR: OnceLock<StdMutex<Option<PathBuf>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -170,6 +174,47 @@ pub struct UpdateInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct OpenClawRuntimeCandidate {
+    pub id: String,
+    pub source: String,
+    pub bin_dir: String,
+    pub node_path: String,
+    pub node_version: Option<String>,
+    pub npm_path: Option<String>,
+    pub npm_global_prefix: Option<String>,
+    pub openclaw_path: Option<String>,
+    pub openclaw_version: Option<String>,
+    pub openclaw_package_path: Option<String>,
+    pub is_active: bool,
+    pub is_preferred: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+struct OpenClawUpdateExecutionContext {
+    root: Option<PathBuf>,
+    install_kind: Option<String>,
+    package_manager: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct OpenClawDirectUpgradePlan {
+    runtime_source: String,
+    runtime_bin_dir: PathBuf,
+    package_manager: String,
+    package_spec: String,
+    command_line: String,
+}
+
+#[derive(Debug, Clone)]
+struct OpenClawDirectUpgradeResult {
+    runtime_source: String,
+    runtime_bin_dir: PathBuf,
+    package_manager: String,
+    package_spec: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChannelInfo {
     pub id: String,
     pub name: String,
@@ -251,6 +296,57 @@ impl OpenClawService {
 
     pub fn get_progress_logs(&self) -> Vec<InstallProgressEvent> {
         self.progress_logs.iter().cloned().collect()
+    }
+
+    fn clear_gateway_runtime_state(&mut self) {
+        self.gateway_process = None;
+        self.gateway_started_at = None;
+        self.gateway_status = GatewayStatus::Stopped;
+    }
+
+    pub async fn list_runtime_candidates(&self) -> Result<Vec<OpenClawRuntimeCandidate>, String> {
+        list_openclaw_runtime_candidates().await
+    }
+
+    pub async fn set_preferred_runtime(
+        &self,
+        runtime_id: Option<&str>,
+    ) -> Result<ActionResult, String> {
+        let normalized = runtime_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from);
+
+        let Some(runtime_bin_dir) = normalized else {
+            set_preferred_runtime_bin_dir(None);
+            return Ok(ActionResult {
+                success: true,
+                message: "已切换为自动选择执行环境。".to_string(),
+            });
+        };
+
+        let candidates = list_openclaw_runtime_candidates().await?;
+        let runtime_id = runtime_bin_dir.display().to_string();
+        let Some(candidate) = candidates.iter().find(|item| item.id == runtime_id) else {
+            return Ok(ActionResult {
+                success: false,
+                message: "未找到指定的 OpenClaw 执行环境，请重新检测后再试。".to_string(),
+            });
+        };
+
+        set_preferred_runtime_bin_dir(Some(runtime_bin_dir));
+        Ok(ActionResult {
+            success: true,
+            message: format!(
+                "已固定使用执行环境：{}{}。",
+                candidate.source,
+                candidate
+                    .node_version
+                    .as_deref()
+                    .map(|version| format!(" · Node {version}"))
+                    .unwrap_or_default()
+            ),
+        })
     }
 
     fn push_progress_log(&mut self, message: String, level: String) {
@@ -905,7 +1001,7 @@ impl OpenClawService {
 
         self.gateway_status = GatewayStatus::Starting;
 
-        let config_path = openclaw_proxycast_config_path();
+        let config_path = openclaw_lime_config_path();
         if let Some(app) = app {
             emit_install_progress(
                 app,
@@ -1041,79 +1137,97 @@ impl OpenClawService {
             emit_install_progress(app, "准备停止 Gateway。", "info");
         }
 
+        self.restore_auth_token_from_config();
+
         if let Some(mut child) = self.gateway_process.take() {
             if let Some(app) = app {
                 emit_install_progress(app, "正在终止当前托管的 Gateway 子进程。", "info");
             }
             let _ = child.kill().await;
             let _ = timeout(Duration::from_secs(3), child.wait()).await;
+        }
+
+        if self
+            .wait_for_gateway_shutdown(Duration::from_secs(3))
+            .await?
+        {
+            if let Some(app) = app {
+                emit_install_progress(app, "Gateway 已停止。", "info");
+            }
+            return Ok(ActionResult {
+                success: true,
+                message: "Gateway 已停止。".to_string(),
+            });
+        }
+
+        let stop_binaries = self.collect_gateway_stop_binaries().await?;
+        if stop_binaries.is_empty() {
+            if let Some(app) = app {
+                emit_install_progress(
+                    app,
+                    "未检测到可用的 OpenClaw 停止命令，将尝试按端口回收旧 Gateway。",
+                    "warn",
+                );
+            }
         } else {
-            let binary = find_command_in_shell("openclaw").await?;
-            if let Some(openclaw_path) = binary.as_deref() {
-                let mut cmd = Command::new(openclaw_path);
-                apply_binary_runtime_path(&mut cmd, openclaw_path);
-                cmd.arg("gateway")
-                    .arg("stop")
-                    .arg("--url")
-                    .arg(self.gateway_ws_url())
-                    .arg("--token")
-                    .arg(&self.gateway_auth_token)
-                    .env(OPENCLAW_CONFIG_ENV, openclaw_proxycast_config_path())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null());
-                match timeout(Duration::from_secs(5), cmd.status()).await {
-                    Ok(Ok(status)) if status.success() => {
-                        if let Some(app) = app {
-                            emit_install_progress(app, "已发送 Gateway 停止命令。", "info");
-                        }
+            for binary in &stop_binaries {
+                self.request_gateway_stop_via_binary(binary, app).await;
+                if self
+                    .wait_for_gateway_shutdown(Duration::from_secs(4))
+                    .await?
+                {
+                    if let Some(app) = app {
+                        emit_install_progress(app, "Gateway 已停止。", "info");
                     }
-                    Ok(Ok(status)) => {
-                        if let Some(app) = app {
-                            emit_install_progress(
-                                app,
-                                &format!("Gateway 停止命令返回异常状态: {:?}", status.code()),
-                                "warn",
-                            );
-                        }
-                    }
-                    Ok(Err(error)) => {
-                        if let Some(app) = app {
-                            emit_install_progress(
-                                app,
-                                &format!("执行 Gateway 停止命令失败: {error}"),
-                                "warn",
-                            );
-                        }
-                    }
-                    Err(_) => {
-                        if let Some(app) = app {
-                            emit_install_progress(
-                                app,
-                                "Gateway 停止命令超时，继续本地状态收敛。",
-                                "warn",
-                            );
-                        }
-                    }
+                    return Ok(ActionResult {
+                        success: true,
+                        message: "Gateway 已停止。".to_string(),
+                    });
                 }
             }
         }
 
-        self.gateway_status = GatewayStatus::Stopped;
-        self.gateway_started_at = None;
+        let reclaimed_by_pid = self.force_stop_gateway_listener_processes(app).await?;
+        if reclaimed_by_pid
+            && self
+                .wait_for_gateway_shutdown(Duration::from_secs(5))
+                .await?
+        {
+            if let Some(app) = app {
+                emit_install_progress(app, "Gateway 已停止。", "info");
+            }
+            return Ok(ActionResult {
+                success: true,
+                message: "Gateway 已停止。".to_string(),
+            });
+        }
+
+        self.refresh_process_state().await?;
+        let message = if self.check_port_open().await {
+            format!(
+                "Gateway 停止失败：端口 {} 仍被旧进程占用，升级已中止。请使用“立即重启生效”或结束旧 OpenClaw 进程后重试。",
+                self.gateway_port
+            )
+        } else {
+            "Gateway 停止流程已结束，但未能确认运行态完全退出，请重试。".to_string()
+        };
 
         if let Some(app) = app {
-            emit_install_progress(app, "Gateway 已停止。", "info");
+            emit_install_progress(app, &message, "error");
         }
 
         Ok(ActionResult {
-            success: true,
-            message: "Gateway 已停止。".to_string(),
+            success: false,
+            message,
         })
     }
 
     pub async fn restart_gateway(&mut self, app: &AppHandle) -> Result<ActionResult, String> {
         emit_install_progress(app, "开始重启 Gateway。", "info");
-        let _ = self.stop_gateway(Some(app)).await;
+        let stop_result = self.stop_gateway(Some(app)).await?;
+        if !stop_result.success {
+            return Ok(stop_result);
+        }
         emit_install_progress(app, "Gateway 停止阶段结束，开始重新启动。", "info");
         self.start_gateway(Some(app), Some(self.gateway_port)).await
     }
@@ -1172,39 +1286,21 @@ impl OpenClawService {
             .await?
             .and_then(|value| parse_openclaw_release_version(&value).or(Some(value)));
 
-        let mut command = Command::new(&binary);
-        apply_binary_runtime_path(&mut command, &binary);
-        let output = command
-            .arg("update")
-            .arg("status")
-            .arg("--json")
-            .env(OPENCLAW_CONFIG_ENV, openclaw_proxycast_config_path())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| format!("检查 OpenClaw 更新失败: {e}"))?;
+        let payload = match read_openclaw_update_status_payload(&binary).await {
+            Ok(payload) => payload,
+            Err(message) => {
+                return Ok(UpdateInfo {
+                    has_update: false,
+                    current_version,
+                    latest_version: None,
+                    channel: None,
+                    install_kind: None,
+                    package_manager: None,
+                    message: Some(message),
+                });
+            }
+        };
 
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-        if !output.status.success() {
-            let message = first_non_empty_str(&[stderr.as_str(), stdout.as_str()])
-                .map(str::to_string)
-                .or_else(|| Some(format!("检查更新失败，退出码: {:?}", output.status.code())));
-            return Ok(UpdateInfo {
-                has_update: false,
-                current_version,
-                latest_version: None,
-                channel: None,
-                install_kind: None,
-                package_manager: None,
-                message,
-            });
-        }
-
-        let payload: Value =
-            serde_json::from_slice(&output.stdout).map_err(|e| format!("解析更新状态失败: {e}"))?;
         Ok(UpdateInfo {
             has_update: payload
                 .pointer("/availability/available")
@@ -1244,8 +1340,10 @@ impl OpenClawService {
                 message: "未检测到 OpenClaw 可执行文件，请先安装。".to_string(),
             });
         };
+        let current_runtime_bin_dir = Path::new(&binary).parent().map(Path::to_path_buf);
 
         self.refresh_process_state().await?;
+        let gateway_was_running = self.gateway_status == GatewayStatus::Running;
         if self.gateway_status == GatewayStatus::Running {
             emit_install_progress(
                 app,
@@ -1272,12 +1370,81 @@ impl OpenClawService {
             );
         }
 
+        let update_status_payload = match read_openclaw_update_status_payload(&binary).await {
+            Ok(payload) => payload,
+            Err(message) => {
+                emit_install_progress(app, &message, "warn");
+                match attempt_direct_openclaw_package_upgrade(
+                    app,
+                    current_runtime_bin_dir.as_deref(),
+                    None,
+                    None,
+                )
+                .await
+                {
+                    Ok(result) => {
+                        set_preferred_runtime_bin_dir(Some(result.runtime_bin_dir.clone()));
+                        emit_install_progress(
+                            app,
+                            &format!(
+                                "已自动切换后续执行环境到 {}。",
+                                result.runtime_bin_dir.display()
+                            ),
+                            "info",
+                        );
+                        return self
+                            .finalize_successful_openclaw_update(
+                                app,
+                                gateway_was_running,
+                                Some(format!(
+                                    "OpenClaw 已通过 {} 的 {} 全局升级完成（{}）。",
+                                    result.runtime_source,
+                                    result.package_manager,
+                                    result.package_spec
+                                )),
+                            )
+                            .await;
+                    }
+                    Err(fallback_error) => {
+                        emit_install_progress(app, &fallback_error, "error");
+                        return Ok(ActionResult {
+                            success: false,
+                            message,
+                        });
+                    }
+                }
+            }
+        };
+        let update_context = extract_openclaw_update_execution_context(&update_status_payload);
+        if let Some(root) = update_context.root.as_ref().filter(|root| root.is_dir()) {
+            emit_install_progress(
+                app,
+                &format!("已切换到 OpenClaw 安装根目录执行升级：{}", root.display()),
+                "info",
+            );
+        }
+        if let Some(install_kind) = update_context.install_kind.as_deref() {
+            let package_manager = update_context
+                .package_manager
+                .as_deref()
+                .unwrap_or("默认包管理器");
+            emit_install_progress(
+                app,
+                &format!("检测到安装方式：{install_kind}（包管理器：{package_manager}）。"),
+                "info",
+            );
+        }
+
         let mut command = Command::new(&binary);
         apply_binary_runtime_path(&mut command, &binary);
+        if let Some(root) = update_context.root.as_ref().filter(|root| root.is_dir()) {
+            command.current_dir(root);
+        }
         let output = command
             .arg("update")
             .arg("--yes")
-            .env(OPENCLAW_CONFIG_ENV, openclaw_proxycast_config_path())
+            .arg("--json")
+            .env(OPENCLAW_CONFIG_ENV, openclaw_lime_config_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -1292,21 +1459,66 @@ impl OpenClawService {
         for line in &stderr_lines {
             emit_install_progress(app, line, classify_progress_level(line, "warn"));
         }
+        let stdout_payload = serde_json::from_slice::<Value>(&output.stdout).ok();
 
         if !output.status.success() {
-            let message = format_openclaw_update_failure_message(
-                stderr_lines
-                    .last()
-                    .map(String::as_str)
-                    .or_else(|| stdout_lines.last().map(String::as_str)),
+            let failure_detail = select_openclaw_update_failure_detail(
+                stdout_payload.as_ref(),
+                &stderr_lines,
+                &stdout_lines,
             );
-            emit_install_progress(app, &message, "error");
-            return Ok(ActionResult {
-                success: false,
-                message,
-            });
+            let message = format_openclaw_update_failure_message(failure_detail.as_deref());
+            emit_install_progress(app, &message, "warn");
+
+            match attempt_direct_openclaw_package_upgrade(
+                app,
+                current_runtime_bin_dir.as_deref(),
+                update_context.root.as_deref(),
+                update_context.package_manager.as_deref(),
+            )
+            .await
+            {
+                Ok(result) => {
+                    set_preferred_runtime_bin_dir(Some(result.runtime_bin_dir.clone()));
+                    emit_install_progress(
+                        app,
+                        &format!(
+                            "已自动切换后续执行环境到 {}。",
+                            result.runtime_bin_dir.display()
+                        ),
+                        "info",
+                    );
+                    return self
+                        .finalize_successful_openclaw_update(
+                            app,
+                            gateway_was_running,
+                            Some(format!(
+                                "OpenClaw 已通过 {} 的 {} 全局升级完成（{}）。",
+                                result.runtime_source, result.package_manager, result.package_spec
+                            )),
+                        )
+                        .await;
+                }
+                Err(fallback_error) => {
+                    emit_install_progress(app, &fallback_error, "error");
+                    return Ok(ActionResult {
+                        success: false,
+                        message,
+                    });
+                }
+            }
         }
 
+        self.finalize_successful_openclaw_update(app, gateway_was_running, None)
+            .await
+    }
+
+    async fn finalize_successful_openclaw_update(
+        &mut self,
+        app: &AppHandle,
+        gateway_was_running: bool,
+        success_message_override: Option<String>,
+    ) -> Result<ActionResult, String> {
         self.refresh_process_state().await?;
         let updated_version = self
             .read_openclaw_version()
@@ -1314,9 +1526,23 @@ impl OpenClawService {
             .ok()
             .flatten()
             .and_then(|value| parse_openclaw_release_version(&value).or(Some(value)));
-        let message = updated_version
-            .map(|version| format!("OpenClaw 已升级完成，当前版本 {version}。"))
-            .unwrap_or_else(|| "OpenClaw 已升级完成。".to_string());
+
+        if gateway_was_running {
+            emit_install_progress(app, "升级前 Gateway 处于运行态，开始自动恢复服务。", "info");
+            let restart_result = self
+                .start_gateway(Some(app), Some(self.gateway_port))
+                .await?;
+            if !restart_result.success {
+                return Ok(restart_result);
+            }
+        }
+
+        let message = success_message_override.unwrap_or_else(|| {
+            updated_version
+                .as_ref()
+                .map(|version| format!("OpenClaw 已升级完成，当前版本 {version}。"))
+                .unwrap_or_else(|| "OpenClaw 已升级完成。".to_string())
+        });
         emit_install_progress(app, &message, "info");
         Ok(ActionResult {
             success: true,
@@ -1403,7 +1629,7 @@ impl OpenClawService {
 
         let api_type = determine_api_type(provider.provider_type)?;
         let base_url = format_provider_base_url(provider)?;
-        let provider_key = format!("proxycast-{}", provider.id);
+        let provider_key = format!("lime-{}", provider.id);
 
         let normalized_models = if models.is_empty() {
             vec![SyncModelEntry {
@@ -1446,6 +1672,169 @@ impl OpenClawService {
             success: true,
             message: format!("已同步 Provider“{}”到 OpenClaw。", provider.name),
         })
+    }
+
+    async fn wait_for_gateway_shutdown(&mut self, max_wait: Duration) -> Result<bool, String> {
+        let start_at = tokio::time::Instant::now();
+        while start_at.elapsed() < max_wait {
+            self.refresh_process_state().await?;
+            if !self.check_port_open().await {
+                self.clear_gateway_runtime_state();
+                return Ok(true);
+            }
+            sleep(Duration::from_millis(250)).await;
+        }
+
+        self.refresh_process_state().await?;
+        if !self.check_port_open().await {
+            self.clear_gateway_runtime_state();
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
+    async fn collect_gateway_stop_binaries(&self) -> Result<Vec<PathBuf>, String> {
+        let mut binaries = Vec::new();
+
+        if let Some(binary) = find_command_in_shell("openclaw").await? {
+            binaries.push(PathBuf::from(binary));
+        }
+
+        let mut runtime_candidates = list_openclaw_runtime_candidates().await?;
+        runtime_candidates.sort_by(compare_openclaw_runtime_candidates);
+        binaries.extend(
+            runtime_candidates
+                .into_iter()
+                .filter_map(|candidate| candidate.openclaw_path.map(PathBuf::from)),
+        );
+
+        Ok(dedupe_paths(binaries))
+    }
+
+    async fn request_gateway_stop_via_binary(&self, binary_path: &Path, app: Option<&AppHandle>) {
+        let binary_label = binary_path.display().to_string();
+        if let Some(app) = app {
+            emit_install_progress(
+                app,
+                &format!("尝试通过 {} 停止 Gateway。", binary_label),
+                "info",
+            );
+        }
+
+        let mut command = Command::new(binary_path);
+        if let Some(binary) = binary_path.to_str() {
+            apply_binary_runtime_path(&mut command, binary);
+        } else {
+            apply_windows_no_window(&mut command);
+        }
+        let output = timeout(
+            Duration::from_secs(8),
+            command
+                .arg("gateway")
+                .arg("stop")
+                .arg("--url")
+                .arg(self.gateway_ws_url())
+                .arg("--token")
+                .arg(&self.gateway_auth_token)
+                .env(OPENCLAW_CONFIG_ENV, openclaw_lime_config_path())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output(),
+        )
+        .await;
+
+        match output {
+            Ok(Ok(result)) => {
+                for line in command_output_lines(&result.stdout) {
+                    if let Some(app) = app {
+                        emit_install_progress(app, &line, classify_progress_level(&line, "info"));
+                    }
+                }
+                for line in command_output_lines(&result.stderr) {
+                    if let Some(app) = app {
+                        emit_install_progress(app, &line, classify_progress_level(&line, "warn"));
+                    }
+                }
+
+                if let Some(app) = app {
+                    if result.status.success() {
+                        emit_install_progress(app, "已发送 Gateway 停止命令。", "info");
+                    } else {
+                        emit_install_progress(
+                            app,
+                            &format!("Gateway 停止命令返回异常状态: {:?}", result.status.code()),
+                            "warn",
+                        );
+                    }
+                }
+            }
+            Ok(Err(error)) => {
+                if let Some(app) = app {
+                    emit_install_progress(
+                        app,
+                        &format!("执行 Gateway 停止命令失败: {error}"),
+                        "warn",
+                    );
+                }
+            }
+            Err(_) => {
+                if let Some(app) = app {
+                    emit_install_progress(
+                        app,
+                        "Gateway 停止命令超时，继续尝试自动回收旧进程。",
+                        "warn",
+                    );
+                }
+            }
+        }
+    }
+
+    async fn force_stop_gateway_listener_processes(
+        &mut self,
+        app: Option<&AppHandle>,
+    ) -> Result<bool, String> {
+        let listener_pids = collect_listening_port_pids(self.gateway_port).await;
+        if listener_pids.is_empty() {
+            return Ok(false);
+        }
+
+        let mut system = System::new_all();
+        system.refresh_all();
+
+        let target_pids = collect_openclaw_process_family_pids(&system, &listener_pids);
+        if target_pids.is_empty() {
+            if let Some(app) = app {
+                emit_install_progress(
+                    app,
+                    &format!(
+                        "检测到端口 {} 仍被占用，但监听进程不是 OpenClaw，未执行自动终止。",
+                        self.gateway_port
+                    ),
+                    "warn",
+                );
+            }
+            return Ok(false);
+        }
+
+        if let Some(app) = app {
+            emit_install_progress(
+                app,
+                &format!(
+                    "检测到旧 Gateway 仍占用端口 {}，准备回收进程：{}。",
+                    self.gateway_port,
+                    target_pids
+                        .iter()
+                        .map(|pid| pid.as_u32().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                "warn",
+            );
+        }
+
+        terminate_sysinfo_processes(&mut system, &target_pids).await;
+        Ok(true)
     }
 
     async fn refresh_process_state(&mut self) -> Result<(), String> {
@@ -1514,7 +1903,7 @@ impl OpenClawService {
             .arg(self.gateway_ws_url())
             .arg("--token")
             .arg(&self.gateway_auth_token)
-            .env(OPENCLAW_CONFIG_ENV, openclaw_proxycast_config_path())
+            .env(OPENCLAW_CONFIG_ENV, openclaw_lime_config_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -1600,7 +1989,7 @@ impl OpenClawService {
             .arg("--token")
             .arg(&self.gateway_auth_token)
             .arg("--json")
-            .env(OPENCLAW_CONFIG_ENV, openclaw_proxycast_config_path())
+            .env(OPENCLAW_CONFIG_ENV, openclaw_lime_config_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -1643,7 +2032,7 @@ impl OpenClawService {
         let config_dir = openclaw_config_dir();
         std::fs::create_dir_all(&config_dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
 
-        let proxycast_config_path = openclaw_proxycast_config_path();
+        let lime_config_path = openclaw_lime_config_path();
         let mut config = read_base_openclaw_config()?;
         sanitize_runtime_config(&mut config);
 
@@ -1676,7 +2065,7 @@ impl OpenClawService {
 
         let content =
             serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {e}"))?;
-        std::fs::write(proxycast_config_path, content).map_err(|e| format!("写入配置失败: {e}"))?;
+        std::fs::write(lime_config_path, content).map_err(|e| format!("写入配置失败: {e}"))?;
         Ok(())
     }
 
@@ -1766,7 +2155,7 @@ impl OpenClawService {
         let binary = find_command_in_shell("openclaw")
             .await?
             .ok_or_else(|| "未检测到 OpenClaw 可执行文件，请先安装。".to_string())?;
-        let config_path = openclaw_proxycast_config_path();
+        let config_path = openclaw_lime_config_path();
         let command = gateway_start_args(self.gateway_port, &self.gateway_auth_token)
             .into_iter()
             .map(|arg| shell_escape(&arg))
@@ -1799,7 +2188,7 @@ impl OpenClawService {
         let binary = find_command_in_shell("openclaw")
             .await?
             .ok_or_else(|| "未检测到 OpenClaw 可执行文件，请先安装。".to_string())?;
-        let config_path = openclaw_proxycast_config_path();
+        let config_path = openclaw_lime_config_path();
         Ok(CommandPreview {
             title: "停止 Gateway".to_string(),
             command: format!(
@@ -1840,8 +2229,8 @@ fn openclaw_original_config_path() -> PathBuf {
     openclaw_config_dir().join("openclaw.json")
 }
 
-fn openclaw_proxycast_config_path() -> PathBuf {
-    openclaw_config_dir().join("openclaw.proxycast.json")
+fn openclaw_lime_config_path() -> PathBuf {
+    openclaw_config_dir().join("openclaw.lime.json")
 }
 
 #[cfg(any(target_os = "windows", test))]
@@ -1931,7 +2320,7 @@ fn dependency_setup_summary(dependency: DependencyKind) -> String {
 
 fn openclaw_installer_download_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let _ = app;
-    let app_data_dir = proxycast_core::app_paths::preferred_data_dir()
+    let app_data_dir = lime_core::app_paths::preferred_data_dir()
         .map_err(|e| format!("无法获取应用数据目录: {e}"))?;
     let dir = app_data_dir.join("downloads").join("openclaw-installers");
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建 OpenClaw 下载目录失败: {e}"))?;
@@ -1978,8 +2367,7 @@ fn build_environment_status(
     } else if openclaw.status == "needs_reload" {
         (
             "refresh_openclaw_env".to_string(),
-            "已检测到 OpenClaw 包，但命令尚未生效；请点击“重新检测”，必要时重启 ProxyCast。"
-                .to_string(),
+            "已检测到 OpenClaw 包，但命令尚未生效；请点击“重新检测”，必要时重启 Lime。".to_string(),
         )
     } else if openclaw.status != "ok" {
         (
@@ -2138,7 +2526,7 @@ async fn inspect_openclaw_package_reload_status() -> Result<Option<DependencySta
         version: package.version.clone(),
         path: Some(prefix.clone()),
         message: format!(
-            "已在 npm 全局目录检测到 {}{}，但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 ProxyCast，或确认 {prefix} 已加入 PATH。", package.name, version_suffix
+            "已在 npm 全局目录检测到 {}{}，但当前进程尚未解析到 openclaw 命令。请点击“重新检测”；若仍失败，请重启 Lime，或确认 {prefix} 已加入 PATH。", package.name, version_suffix
         ),
         auto_install_supported: false,
     }))
@@ -2389,9 +2777,9 @@ async fn trigger_macos_command_line_tools_install() -> Result<String, String> {
 }
 
 fn read_base_openclaw_config() -> Result<Value, String> {
-    let proxycast_path = openclaw_proxycast_config_path();
-    if proxycast_path.exists() {
-        return read_json_file(&proxycast_path);
+    let lime_path = openclaw_lime_config_path();
+    if lime_path.exists() {
+        return read_json_file(&lime_path);
     }
 
     let original_path = openclaw_original_config_path();
@@ -2584,20 +2972,195 @@ fn gateway_failure_line_score(line: &str) -> u8 {
     20
 }
 
-fn first_non_empty_str<'a>(candidates: &[&'a str]) -> Option<&'a str> {
-    candidates
-        .iter()
-        .copied()
-        .map(str::trim)
-        .find(|value| !value.is_empty())
-}
-
 fn command_output_lines(output: &[u8]) -> Vec<String> {
     String::from_utf8_lossy(output)
         .lines()
         .map(sanitize_progress_line)
         .filter(|line| !line.is_empty())
         .collect()
+}
+
+fn normalize_process_probe_text(value: &str) -> String {
+    value.replace('\\', "/").to_ascii_lowercase()
+}
+
+fn process_looks_like_openclaw_process(
+    process_name: &str,
+    exe_path: Option<&Path>,
+    command_args: &[OsString],
+) -> bool {
+    let process_name = normalize_process_probe_text(process_name);
+    let exe_path = exe_path
+        .map(|path| normalize_process_probe_text(&path.display().to_string()))
+        .unwrap_or_default();
+    let command_line = normalize_process_probe_text(
+        &command_args
+            .iter()
+            .map(|arg| arg.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
+
+    process_name.contains("openclaw")
+        || exe_path.contains("openclaw")
+        || command_line.contains("openclaw")
+}
+
+fn collect_openclaw_process_family_pids(system: &System, listener_pids: &[u32]) -> Vec<Pid> {
+    let mut target_pids = HashSet::new();
+
+    for listener_pid in listener_pids {
+        let pid = Pid::from_u32(*listener_pid);
+        let Some(process) = system.process(pid) else {
+            continue;
+        };
+        if !process_looks_like_openclaw_process(
+            &process.name().to_string_lossy(),
+            process.exe(),
+            process.cmd(),
+        ) {
+            continue;
+        }
+
+        target_pids.insert(pid);
+        let mut parent_pid = process.parent();
+        while let Some(next_parent) = parent_pid {
+            let Some(parent_process) = system.process(next_parent) else {
+                break;
+            };
+            if !process_looks_like_openclaw_process(
+                &parent_process.name().to_string_lossy(),
+                parent_process.exe(),
+                parent_process.cmd(),
+            ) {
+                break;
+            }
+
+            target_pids.insert(next_parent);
+            parent_pid = parent_process.parent();
+        }
+    }
+
+    let mut target_pids = target_pids.into_iter().collect::<Vec<_>>();
+    target_pids.sort_by_key(|pid| pid.as_u32());
+    target_pids
+}
+
+async fn terminate_sysinfo_processes(system: &mut System, target_pids: &[Pid]) {
+    for pid in target_pids {
+        if let Some(process) = system.process(*pid) {
+            let terminated = process.kill_with(Signal::Term).unwrap_or(false);
+            if !terminated {
+                let _ = process.kill();
+            }
+        }
+    }
+
+    sleep(Duration::from_millis(900)).await;
+    system.refresh_all();
+
+    for pid in target_pids {
+        if let Some(process) = system.process(*pid) {
+            let _ = process.kill();
+        }
+    }
+}
+
+fn parse_lsof_listener_pids(output: &str) -> Vec<u32> {
+    let mut pids = output
+        .lines()
+        .filter_map(|line| line.trim().parse::<u32>().ok())
+        .collect::<Vec<_>>();
+    pids.sort_unstable();
+    pids.dedup();
+    pids
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn parse_windows_netstat_listener_pids(output: &str, port: u16) -> Vec<u32> {
+    let mut pids = output
+        .lines()
+        .filter_map(|line| {
+            let columns = line.split_whitespace().collect::<Vec<_>>();
+            if columns.len() < 5 {
+                return None;
+            }
+
+            let local_address = columns.get(1).copied().unwrap_or_default();
+            let state = columns.get(3).copied().unwrap_or_default();
+            if !state.eq_ignore_ascii_case("LISTENING")
+                || !local_address.ends_with(&format!(":{port}"))
+            {
+                return None;
+            }
+
+            columns.last().and_then(|value| value.parse::<u32>().ok())
+        })
+        .collect::<Vec<_>>();
+    pids.sort_unstable();
+    pids.dedup();
+    pids
+}
+
+async fn collect_listening_port_pids(port: u16) -> Vec<u32> {
+    #[cfg(target_os = "windows")]
+    {
+        collect_listening_port_pids_windows(port).await
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        collect_listening_port_pids_unix(port).await
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn collect_listening_port_pids_unix(port: u16) -> Vec<u32> {
+    let mut command = Command::new("lsof");
+    apply_windows_no_window(&mut command);
+    let output = timeout(
+        Duration::from_secs(3),
+        command
+            .arg("-nP")
+            .arg(format!("-iTCP:{port}"))
+            .arg("-sTCP:LISTEN")
+            .arg("-t")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output(),
+    )
+    .await;
+
+    match output {
+        Ok(Ok(result)) if result.status.success() => {
+            parse_lsof_listener_pids(&String::from_utf8_lossy(&result.stdout))
+        }
+        _ => Vec::new(),
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn collect_listening_port_pids_windows(port: u16) -> Vec<u32> {
+    let mut command = Command::new("netstat");
+    apply_windows_no_window(&mut command);
+    let output = timeout(
+        Duration::from_secs(3),
+        command
+            .arg("-ano")
+            .arg("-p")
+            .arg("tcp")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output(),
+    )
+    .await;
+
+    match output {
+        Ok(Ok(result)) if result.status.success() => {
+            parse_windows_netstat_listener_pids(&String::from_utf8_lossy(&result.stdout), port)
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn parse_openclaw_release_version(value: &str) -> Option<String> {
@@ -2608,12 +3171,167 @@ fn parse_openclaw_release_version(value: &str) -> Option<String> {
         .and_then(|captures| captures.get(1).map(|value| value.as_str().to_string()))
 }
 
+async fn read_openclaw_update_status_payload(binary_path: &str) -> Result<Value, String> {
+    let mut command = Command::new(binary_path);
+    apply_binary_runtime_path(&mut command, binary_path);
+    let output = command
+        .arg("update")
+        .arg("status")
+        .arg("--json")
+        .env(OPENCLAW_CONFIG_ENV, openclaw_lime_config_path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(|e| format!("检查 OpenClaw 更新失败: {e}"))?;
+
+    let stdout_lines = command_output_lines(&output.stdout);
+    let stderr_lines = command_output_lines(&output.stderr);
+    let payload = serde_json::from_slice::<Value>(&output.stdout).map_err(|error| {
+        let detail = select_openclaw_update_failure_detail(None, &stderr_lines, &stdout_lines)
+            .unwrap_or_else(|| format!("解析更新状态失败: {error}"));
+        format_openclaw_update_failure_message(Some(detail.as_str()))
+    })?;
+
+    if !output.status.success() {
+        let detail =
+            select_openclaw_update_failure_detail(Some(&payload), &stderr_lines, &stdout_lines);
+        return Err(format_openclaw_update_failure_message(detail.as_deref()));
+    }
+
+    Ok(payload)
+}
+
+fn extract_openclaw_update_execution_context(payload: &Value) -> OpenClawUpdateExecutionContext {
+    OpenClawUpdateExecutionContext {
+        root: payload
+            .pointer("/update/root")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from),
+        install_kind: payload
+            .pointer("/update/installKind")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string),
+        package_manager: payload
+            .pointer("/update/packageManager")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string),
+    }
+}
+
+fn select_openclaw_update_failure_detail(
+    payload: Option<&Value>,
+    stderr_lines: &[String],
+    stdout_lines: &[String],
+) -> Option<String> {
+    if let Some(payload) = payload {
+        if let Some(reason) = payload.get("reason").and_then(Value::as_str) {
+            let root_suffix = payload
+                .get("root")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|root| format!(" ({root})"))
+                .unwrap_or_default();
+            return Some(format!("{reason}{root_suffix}"));
+        }
+
+        if let Some(message) = payload.get("message").and_then(Value::as_str) {
+            let trimmed = message.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+
+        if let Some(message) = payload
+            .pointer("/update/registry/error")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(message.to_string());
+        }
+    }
+
+    stderr_lines
+        .iter()
+        .chain(stdout_lines.iter())
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            let score = openclaw_update_failure_line_score(trimmed);
+            (score > 0).then_some((score, trimmed))
+        })
+        .max_by_key(|(score, _)| *score)
+        .map(|(_, line)| line.to_string())
+}
+
+fn openclaw_update_failure_line_score(line: &str) -> u8 {
+    if line.is_empty() {
+        return 0;
+    }
+
+    let normalized = line.to_ascii_lowercase();
+    if normalized.starts_with("updating openclaw")
+        || normalized.starts_with("update result")
+        || normalized.starts_with("total time")
+        || normalized.starts_with("root:")
+    {
+        return 0;
+    }
+
+    if normalized.contains("not-openclaw-root") {
+        return 100;
+    }
+
+    if normalized.contains("node.js") && normalized.contains("required") {
+        return 95;
+    }
+
+    if normalized.contains("fetch failed") || normalized.contains("network") {
+        return 90;
+    }
+
+    if normalized.contains("pnpm") && normalized.contains("not found")
+        || normalized.contains("npm") && normalized.contains("not found")
+    {
+        return 85;
+    }
+
+    if normalized.contains("already up to date") || normalized.contains("not modified") {
+        return 80;
+    }
+
+    if normalized.starts_with("reason:") {
+        return 70;
+    }
+
+    20
+}
+
 fn format_openclaw_update_failure_message(detail: Option<&str>) -> String {
     let Some(detail) = detail.map(str::trim).filter(|value| !value.is_empty()) else {
         return "OpenClaw 升级失败，请查看日志输出。".to_string();
     };
 
     let normalized = detail.to_ascii_lowercase();
+    if normalized.contains("not-openclaw-root") {
+        return "OpenClaw 升级失败：未在 OpenClaw 安装根目录执行更新。Lime 会优先切换到安装目录；如仍失败，请重新检测安装状态后重试。"
+            .to_string();
+    }
+
+    if normalized.contains("node.js") && normalized.contains("required") {
+        return format!(
+            "OpenClaw 升级失败：当前用于执行 openclaw 的 Node.js 版本过低，需要 {}+。请切换到满足要求的 Node.js 后重试。",
+            format_semver(NODE_MIN_VERSION)
+        );
+    }
+
     if normalized.contains("fetch failed") || normalized.contains("network") {
         return "OpenClaw 升级失败：当前无法访问更新源，请检查网络或代理设置后重试。".to_string();
     }
@@ -2622,7 +3340,289 @@ fn format_openclaw_update_failure_message(detail: Option<&str>) -> String {
         return "OpenClaw 当前已经是最新版本，无需升级。".to_string();
     }
 
+    if normalized.contains("pnpm") && normalized.contains("not found") {
+        return "OpenClaw 升级失败：当前安装方式依赖 pnpm，但系统未找到 pnpm。请先修复 Node.js / pnpm 环境后重试。"
+            .to_string();
+    }
+
+    if normalized.contains("npm") && normalized.contains("not found") {
+        return "OpenClaw 升级失败：当前安装方式依赖 npm，但系统未找到 npm。请先修复 Node.js / npm 环境后重试。"
+            .to_string();
+    }
+
     format!("OpenClaw 升级失败：{detail}")
+}
+
+async fn attempt_direct_openclaw_package_upgrade(
+    app: &AppHandle,
+    runtime_bin_dir_hint: Option<&Path>,
+    install_root_hint: Option<&Path>,
+    package_manager_hint: Option<&str>,
+) -> Result<OpenClawDirectUpgradeResult, String> {
+    let mut runtime_candidates = list_openclaw_runtime_candidates().await?;
+    runtime_candidates.sort_by(|left, right| {
+        let left_matches_root = install_root_hint
+            .map(|root| runtime_candidate_matches_install_root(left, root))
+            .unwrap_or(false);
+        let right_matches_root = install_root_hint
+            .map(|root| runtime_candidate_matches_install_root(right, root))
+            .unwrap_or(false);
+        let left_matches_bin = runtime_bin_dir_hint
+            .map(|hint| Path::new(&left.bin_dir) == hint)
+            .unwrap_or(false);
+        let right_matches_bin = runtime_bin_dir_hint
+            .map(|hint| Path::new(&right.bin_dir) == hint)
+            .unwrap_or(false);
+
+        right_matches_root
+            .cmp(&left_matches_root)
+            .then_with(|| right_matches_bin.cmp(&left_matches_bin))
+            .then_with(|| compare_openclaw_runtime_candidates(left, right))
+    });
+    let mut last_error = None;
+    let mut attempted = 0usize;
+
+    if let Some(install_root_hint) = install_root_hint {
+        emit_install_progress(
+            app,
+            &format!(
+                "官方 updater 报告的安装根目录为 {}，将优先匹配该安装来源执行兜底升级。",
+                install_root_hint.display()
+            ),
+            "info",
+        );
+    }
+
+    for candidate in runtime_candidates {
+        let Some(plan) = resolve_direct_openclaw_upgrade_plan(
+            app,
+            &candidate,
+            runtime_bin_dir_hint,
+            install_root_hint,
+            package_manager_hint,
+        )
+        .await?
+        else {
+            continue;
+        };
+
+        attempted += 1;
+        emit_install_progress(
+            app,
+            &format!(
+                "官方自更新未能完成，开始尝试全局包升级兜底：{} · {}。",
+                plan.runtime_source, plan.package_manager
+            ),
+            "warn",
+        );
+        emit_install_progress(
+            app,
+            &format!("目标执行环境：{}", plan.runtime_bin_dir.display()),
+            "info",
+        );
+        emit_install_progress(app, &format!("升级包：{}", plan.package_spec), "info");
+
+        let result = run_shell_command_with_progress(app, &plan.command_line).await?;
+        if result.success {
+            emit_install_progress(
+                app,
+                &format!(
+                    "已通过 {} 的 {} 全局安装方式完成兜底升级。",
+                    plan.runtime_source, plan.package_manager
+                ),
+                "info",
+            );
+            return Ok(OpenClawDirectUpgradeResult {
+                runtime_source: plan.runtime_source,
+                runtime_bin_dir: plan.runtime_bin_dir,
+                package_manager: plan.package_manager,
+                package_spec: plan.package_spec,
+            });
+        }
+
+        emit_install_progress(
+            app,
+            &format!(
+                "全局包升级兜底失败：{} · {}。",
+                plan.runtime_source, result.message
+            ),
+            "warn",
+        );
+        last_error = Some(result.message);
+    }
+
+    if attempted == 0 {
+        return Err("未检测到可用于全局升级的 OpenClaw 安装来源。".to_string());
+    }
+
+    Err(last_error.unwrap_or_else(|| "已自动尝试全局升级兜底，但仍未成功。".to_string()))
+}
+
+async fn resolve_direct_openclaw_upgrade_plan(
+    app: &AppHandle,
+    candidate: &OpenClawRuntimeCandidate,
+    runtime_bin_dir_hint: Option<&Path>,
+    install_root_hint: Option<&Path>,
+    package_manager_hint: Option<&str>,
+) -> Result<Option<OpenClawDirectUpgradePlan>, String> {
+    let runtime_bin_dir = PathBuf::from(&candidate.bin_dir);
+    let runtime_matches_hint = runtime_bin_dir_hint
+        .map(|hint| hint == runtime_bin_dir.as_path())
+        .unwrap_or(false);
+    let runtime_matches_install_root = install_root_hint
+        .map(|root| runtime_candidate_matches_install_root(candidate, root))
+        .unwrap_or(false);
+
+    if runtime_bin_dir_hint.is_some()
+        && !runtime_matches_hint
+        && !runtime_matches_install_root
+        && candidate.openclaw_path.is_none()
+        && candidate.openclaw_package_path.is_none()
+    {
+        return Ok(None);
+    }
+
+    if candidate.openclaw_path.is_none() && candidate.openclaw_package_path.is_none() {
+        return Ok(None);
+    }
+
+    let package_spec = resolve_openclaw_upgrade_package_spec(app, candidate).await?;
+    let registry = package_registry_for_package_spec(&package_spec);
+    let package_manager_hint = package_manager_hint
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let npm_path = candidate
+        .npm_path
+        .as_deref()
+        .map(PathBuf::from)
+        .or_else(|| find_command_in_bin_dir("npm", &runtime_bin_dir));
+    let pnpm_path = find_command_in_bin_dir("pnpm", &runtime_bin_dir);
+    let shell_platform = current_shell_platform();
+
+    let (package_manager, command_line) = match package_manager_hint.as_deref() {
+        Some("pnpm") => {
+            if let Some(pnpm_path) = pnpm_path.as_ref().and_then(|path| path.to_str()) {
+                (
+                    "pnpm".to_string(),
+                    build_openclaw_pnpm_install_command(
+                        shell_platform,
+                        pnpm_path,
+                        &package_spec,
+                        registry,
+                    ),
+                )
+            } else if let Some(npm_path) = npm_path.as_ref().and_then(|path| path.to_str()) {
+                (
+                    "npm".to_string(),
+                    build_openclaw_install_command(
+                        shell_platform,
+                        npm_path,
+                        candidate.npm_global_prefix.as_deref(),
+                        &package_spec,
+                        registry,
+                    ),
+                )
+            } else {
+                return Ok(None);
+            }
+        }
+        _ => {
+            if let Some(npm_path) = npm_path.as_ref().and_then(|path| path.to_str()) {
+                (
+                    "npm".to_string(),
+                    build_openclaw_install_command(
+                        shell_platform,
+                        npm_path,
+                        candidate.npm_global_prefix.as_deref(),
+                        &package_spec,
+                        registry,
+                    ),
+                )
+            } else if let Some(pnpm_path) = pnpm_path.as_ref().and_then(|path| path.to_str()) {
+                (
+                    "pnpm".to_string(),
+                    build_openclaw_pnpm_install_command(
+                        shell_platform,
+                        pnpm_path,
+                        &package_spec,
+                        registry,
+                    ),
+                )
+            } else {
+                return Ok(None);
+            }
+        }
+    };
+
+    Ok(Some(OpenClawDirectUpgradePlan {
+        runtime_source: candidate.source.clone(),
+        runtime_bin_dir,
+        package_manager,
+        package_spec,
+        command_line,
+    }))
+}
+
+async fn resolve_openclaw_upgrade_package_spec(
+    app: &AppHandle,
+    candidate: &OpenClawRuntimeCandidate,
+) -> Result<String, String> {
+    if let Some(prefix) = candidate.npm_global_prefix.as_deref() {
+        if let Some(package) = find_installed_openclaw_package_details(prefix) {
+            return Ok(format!("{}@latest", package.name));
+        }
+    }
+
+    if let Some(package_path) = candidate.openclaw_package_path.as_deref() {
+        if let Some(package_name) = infer_openclaw_package_name_from_path(Path::new(package_path)) {
+            return Ok(format!("{package_name}@latest"));
+        }
+    }
+
+    Ok(if should_use_china_package(app).await {
+        OPENCLAW_CN_PACKAGE.to_string()
+    } else {
+        OPENCLAW_DEFAULT_PACKAGE.to_string()
+    })
+}
+
+fn infer_openclaw_package_name_from_path(path: &Path) -> Option<&'static str> {
+    let normalized = path
+        .display()
+        .to_string()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    if normalized.contains("@qingchencloud/openclaw-zh") {
+        return Some("@qingchencloud/openclaw-zh");
+    }
+    if normalized.contains("/openclaw/package.json") {
+        return Some("openclaw");
+    }
+    None
+}
+
+fn package_registry_for_package_spec(package_spec: &str) -> Option<&'static str> {
+    package_spec
+        .starts_with("@qingchencloud/openclaw-zh@")
+        .then_some(NPM_MIRROR_CN)
+}
+
+fn runtime_candidate_matches_install_root(
+    candidate: &OpenClawRuntimeCandidate,
+    install_root_hint: &Path,
+) -> bool {
+    [
+        Some(candidate.bin_dir.as_str()),
+        Some(candidate.node_path.as_str()),
+        candidate.npm_path.as_deref(),
+        candidate.npm_global_prefix.as_deref(),
+        candidate.openclaw_path.as_deref(),
+        candidate.openclaw_package_path.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(PathBuf::from)
+    .any(|path| path.starts_with(install_root_hint))
 }
 
 fn format_gateway_start_failure_message(detail: Option<&str>) -> String {
@@ -2633,7 +3633,7 @@ fn format_gateway_start_failure_message(detail: Option<&str>) -> String {
     let normalized = detail.to_ascii_lowercase();
     if normalized.contains("invalid config") || normalized.contains("config invalid") {
         if normalized.contains("contextwindow") && normalized.contains("received null") {
-            return "Gateway 启动失败：当前 OpenClaw 配置包含空的 contextWindow 字段。ProxyCast 已修正后续配置写入，请重新启动；如仍失败，请重新同步模型配置。"
+            return "Gateway 启动失败：当前 OpenClaw 配置包含空的 contextWindow 字段。Lime 已修正后续配置写入，请重新启动；如仍失败，请重新同步模型配置。"
                 .to_string();
         }
         return "Gateway 启动失败：OpenClaw 配置文件无效，请重新同步模型配置后再试。".to_string();
@@ -2893,6 +3893,28 @@ fn build_openclaw_install_command(
     core_build_openclaw_install_command(platform, npm_path, npm_prefix, package, registry)
 }
 
+fn build_openclaw_pnpm_install_command(
+    platform: ShellPlatform,
+    pnpm_path: &str,
+    package: &str,
+    registry: Option<&str>,
+) -> String {
+    let mut command = format!(
+        "{}{} add -g {}",
+        shell_path_assignment_for(platform, pnpm_path),
+        shell_command_escape_for(platform, pnpm_path),
+        shell_command_escape_for(platform, package),
+    );
+
+    if let Some(registry) = registry {
+        command.push(' ');
+        command.push_str("--registry=");
+        command.push_str(&shell_command_escape_for(platform, registry));
+    }
+
+    command
+}
+
 #[allow(dead_code)]
 fn resolve_windows_dependency_install_plan(
     dependency: DependencyKind,
@@ -2946,6 +3968,84 @@ fn apply_windows_no_window(_command: &mut Command) {
     }
 }
 
+fn preferred_runtime_bin_dir_store() -> &'static StdMutex<Option<PathBuf>> {
+    OPENCLAW_PREFERRED_RUNTIME_BIN_DIR.get_or_init(|| StdMutex::new(None))
+}
+
+fn get_preferred_runtime_bin_dir() -> Option<PathBuf> {
+    preferred_runtime_bin_dir_store()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
+}
+
+fn set_preferred_runtime_bin_dir(next: Option<PathBuf>) {
+    let mut guard = preferred_runtime_bin_dir_store()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    *guard = next.filter(|path| !path.as_os_str().is_empty());
+}
+
+fn command_uses_node_runtime(command_name: &str) -> bool {
+    matches!(command_name, "node" | "npm" | "npx" | "openclaw")
+}
+
+fn find_command_in_bin_dir(command_name: &str, bin_dir: &Path) -> Option<PathBuf> {
+    select_preferred_path_candidate(find_all_commands_in_paths(
+        command_name,
+        &[bin_dir.to_path_buf()],
+    ))
+}
+
+async fn collect_preferred_runtime_command_dirs(
+    command_name: &str,
+    preferred_bin_dir: &Path,
+) -> Result<Vec<PathBuf>, String> {
+    let mut dirs = Vec::new();
+    let mut seen = HashSet::new();
+
+    let mut push_dir = |dir: PathBuf| {
+        if dir.as_os_str().is_empty() || !dir.exists() {
+            return;
+        }
+        if seen.insert(dir.clone()) {
+            dirs.push(dir);
+        }
+    };
+
+    push_dir(preferred_bin_dir.to_path_buf());
+
+    if command_name == "openclaw" {
+        if let Some(npm_path) = find_command_in_bin_dir("npm", preferred_bin_dir)
+            .and_then(|path| path.to_str().map(str::to_string))
+        {
+            if let Some(prefix) = detect_npm_global_prefix(&npm_path).await {
+                for dir in npm_global_command_dirs(&prefix) {
+                    push_dir(dir);
+                }
+            }
+        }
+    }
+
+    Ok(dirs)
+}
+
+async fn collect_preferred_runtime_command_candidates(
+    command_name: &str,
+) -> Result<Vec<PathBuf>, String> {
+    if !command_uses_node_runtime(command_name) {
+        return Ok(Vec::new());
+    }
+
+    let Some(preferred_bin_dir) = get_preferred_runtime_bin_dir() else {
+        return Ok(Vec::new());
+    };
+
+    let search_dirs =
+        collect_preferred_runtime_command_dirs(command_name, &preferred_bin_dir).await?;
+    Ok(find_all_commands_in_paths(command_name, &search_dirs))
+}
+
 async fn find_command_in_shell(command_name: &str) -> Result<Option<String>, String> {
     let mut candidates = collect_standard_command_candidates(command_name).await?;
 
@@ -2968,12 +4068,29 @@ async fn find_command_in_standard_locations(command_name: &str) -> Result<Option
 }
 
 async fn collect_standard_command_candidates(command_name: &str) -> Result<Vec<PathBuf>, String> {
+    collect_standard_command_candidates_with_preference(command_name, true).await
+}
+
+async fn collect_standard_command_candidates_without_preference(
+    command_name: &str,
+) -> Result<Vec<PathBuf>, String> {
+    collect_standard_command_candidates_with_preference(command_name, false).await
+}
+
+async fn collect_standard_command_candidates_with_preference(
+    command_name: &str,
+    include_preferred_runtime: bool,
+) -> Result<Vec<PathBuf>, String> {
     #[cfg(target_os = "windows")]
     {
         let _ = refresh_windows_path_from_registry();
     }
 
     let mut candidates = Vec::new();
+
+    if include_preferred_runtime {
+        candidates.extend(collect_preferred_runtime_command_candidates(command_name).await?);
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -2989,15 +4106,7 @@ async fn select_command_path(
     command_name: &str,
     candidates: Vec<PathBuf>,
 ) -> Result<Option<PathBuf>, String> {
-    let mut deduped = Vec::with_capacity(candidates.len());
-    let mut seen = HashSet::new();
-    for candidate in candidates {
-        if seen.insert(candidate.clone()) {
-            deduped.push(candidate);
-        }
-    }
-
-    select_command_candidate(command_name, deduped).await
+    select_command_candidate(command_name, dedupe_paths(candidates)).await
 }
 
 #[cfg(target_os = "windows")]
@@ -3034,6 +4143,15 @@ async fn select_command_candidate(
         return Ok(None);
     }
 
+    let has_preferred_runtime =
+        command_uses_node_runtime(command_name) && get_preferred_runtime_bin_dir().is_some();
+    if let Some(candidate) = select_preferred_runtime_candidate(command_name, &candidates).await? {
+        return Ok(Some(candidate));
+    }
+    if has_preferred_runtime {
+        return Ok(None);
+    }
+
     if command_name == "node" {
         return select_best_node_candidate(candidates).await;
     }
@@ -3043,6 +4161,37 @@ async fn select_command_candidate(
     }
 
     Ok(candidates.into_iter().next())
+}
+
+async fn select_preferred_runtime_candidate(
+    command_name: &str,
+    candidates: &[PathBuf],
+) -> Result<Option<PathBuf>, String> {
+    if !command_uses_node_runtime(command_name) {
+        return Ok(None);
+    }
+
+    let Some(preferred_bin_dir) = get_preferred_runtime_bin_dir() else {
+        return Ok(None);
+    };
+
+    let preferred_dirs =
+        collect_preferred_runtime_command_dirs(command_name, &preferred_bin_dir).await?;
+    if preferred_dirs.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(select_preferred_path_candidate(
+        candidates
+            .iter()
+            .filter(|candidate| {
+                candidate
+                    .parent()
+                    .is_some_and(|parent| preferred_dirs.iter().any(|dir| dir.as_path() == parent))
+            })
+            .cloned()
+            .collect(),
+    ))
 }
 
 fn find_all_commands_in_known_locations(command_name: &str) -> Vec<PathBuf> {
@@ -3260,6 +4409,203 @@ fn read_package_version(manifest_path: &Path) -> Option<String> {
     manifest.version.filter(|item| !item.trim().is_empty())
 }
 
+fn dedupe_paths(candidates: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut deduped = Vec::with_capacity(candidates.len());
+    let mut seen = HashSet::new();
+    for candidate in candidates {
+        if seen.insert(candidate.clone()) {
+            deduped.push(candidate);
+        }
+    }
+    deduped
+}
+
+async fn list_openclaw_runtime_candidates() -> Result<Vec<OpenClawRuntimeCandidate>, String> {
+    let node_candidates =
+        dedupe_paths(collect_standard_command_candidates_without_preference("node").await?);
+    let preferred_bin_dir = get_preferred_runtime_bin_dir().filter(|dir| dir.is_dir());
+    let auto_selected_node = select_best_node_candidate(node_candidates.clone()).await?;
+    let active_bin_dir = preferred_bin_dir.clone().or_else(|| {
+        auto_selected_node
+            .as_ref()
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+    });
+
+    let mut runtimes = Vec::new();
+    let mut seen_bin_dirs = HashSet::new();
+    for node_path in node_candidates {
+        let Some(bin_dir) = node_path.parent().map(Path::to_path_buf) else {
+            continue;
+        };
+        if !seen_bin_dirs.insert(bin_dir.clone()) {
+            continue;
+        }
+
+        runtimes.push(
+            inspect_openclaw_runtime_candidate(
+                &bin_dir,
+                preferred_bin_dir.as_deref(),
+                active_bin_dir.as_deref(),
+            )
+            .await,
+        );
+    }
+
+    runtimes.sort_by(compare_openclaw_runtime_candidates);
+    Ok(runtimes)
+}
+
+async fn inspect_openclaw_runtime_candidate(
+    bin_dir: &Path,
+    preferred_bin_dir: Option<&Path>,
+    active_bin_dir: Option<&Path>,
+) -> OpenClawRuntimeCandidate {
+    let node_path = find_command_in_bin_dir("node", bin_dir).unwrap_or_else(|| {
+        #[cfg(target_os = "windows")]
+        let node_name = "node.exe";
+        #[cfg(not(target_os = "windows"))]
+        let node_name = "node";
+
+        bin_dir.join(node_name)
+    });
+
+    let npm_path = find_command_in_bin_dir("npm", bin_dir);
+    let npm_path_string = npm_path.as_ref().map(|path| path.display().to_string());
+    let npm_global_prefix = match npm_path_string.as_deref() {
+        Some(path) => detect_npm_global_prefix(path).await,
+        None => None,
+    };
+    let openclaw_path = resolve_runtime_openclaw_path(bin_dir, npm_global_prefix.as_deref());
+    let openclaw_package_path = npm_global_prefix
+        .as_deref()
+        .and_then(find_installed_openclaw_package_details)
+        .map(|package| package.path.display().to_string());
+
+    OpenClawRuntimeCandidate {
+        id: bin_dir.display().to_string(),
+        source: infer_openclaw_runtime_source(bin_dir),
+        bin_dir: bin_dir.display().to_string(),
+        node_path: node_path.display().to_string(),
+        node_version: read_display_version_text(&node_path).await,
+        npm_path: npm_path_string,
+        npm_global_prefix,
+        openclaw_path: openclaw_path
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        openclaw_version: match openclaw_path.as_deref() {
+            Some(path) => read_display_version_text(path).await,
+            None => None,
+        },
+        openclaw_package_path,
+        is_active: active_bin_dir.is_some_and(|path| path == bin_dir),
+        is_preferred: preferred_bin_dir.is_some_and(|path| path == bin_dir),
+    }
+}
+
+fn resolve_runtime_openclaw_path(
+    bin_dir: &Path,
+    npm_global_prefix: Option<&str>,
+) -> Option<PathBuf> {
+    find_command_in_bin_dir("openclaw", bin_dir).or_else(|| {
+        npm_global_prefix.and_then(|prefix| {
+            select_preferred_path_candidate(find_all_commands_in_paths(
+                "openclaw",
+                &npm_global_command_dirs(prefix),
+            ))
+        })
+    })
+}
+
+async fn read_display_version_text(binary_path: &Path) -> Option<String> {
+    let path = binary_path.to_str()?;
+    let version_text = read_command_version_text(path, &["--version"]).await.ok()?;
+    let version_text = version_text.trim();
+    if version_text.is_empty() {
+        return None;
+    }
+
+    Some(
+        parse_semver_from_text(version_text)
+            .map(format_semver)
+            .unwrap_or_else(|| version_text.to_string()),
+    )
+}
+
+fn infer_openclaw_runtime_source(bin_dir: &Path) -> String {
+    let normalized = bin_dir
+        .display()
+        .to_string()
+        .replace('\\', "/")
+        .to_lowercase();
+
+    if normalized.contains("/.nvm/") {
+        return "nvm".to_string();
+    }
+    if normalized.contains("/phpwebstudy/") {
+        return "PhpWebStudy".to_string();
+    }
+    if normalized.contains("/.volta/") {
+        return "Volta".to_string();
+    }
+    if normalized.contains("/.fnm/") {
+        return "fnm".to_string();
+    }
+    if normalized.contains("/.asdf/") {
+        return "asdf".to_string();
+    }
+    if normalized.contains("/mise/") {
+        return "mise".to_string();
+    }
+    if normalized.contains("/opt/homebrew/") {
+        return "Homebrew".to_string();
+    }
+    if normalized.ends_with("/usr/local/bin")
+        || normalized.ends_with("/usr/bin")
+        || normalized.ends_with("/bin")
+        || normalized.contains("/program files/nodejs")
+        || normalized.contains("/program files (x86)/nodejs")
+    {
+        return "系统".to_string();
+    }
+
+    "PATH".to_string()
+}
+
+fn compare_openclaw_runtime_candidates(
+    left: &OpenClawRuntimeCandidate,
+    right: &OpenClawRuntimeCandidate,
+) -> Ordering {
+    right
+        .is_active
+        .cmp(&left.is_active)
+        .then_with(|| right.is_preferred.cmp(&left.is_preferred))
+        .then_with(|| {
+            right
+                .openclaw_path
+                .is_some()
+                .cmp(&left.openclaw_path.is_some())
+        })
+        .then_with(|| {
+            compare_optional_semver_desc(
+                left.node_version.as_deref(),
+                right.node_version.as_deref(),
+            )
+        })
+        .then_with(|| left.bin_dir.cmp(&right.bin_dir))
+}
+
+fn compare_optional_semver_desc(left: Option<&str>, right: Option<&str>) -> Ordering {
+    match (
+        left.and_then(parse_semver_from_text),
+        right.and_then(parse_semver_from_text),
+    ) {
+        (Some(left), Some(right)) => right.cmp(&left),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
+}
+
 async fn collect_environment_diagnostics() -> EnvironmentDiagnostics {
     let npm_path = find_command_in_standard_locations("npm")
         .await
@@ -3338,15 +4684,43 @@ fn collect_supplemental_openclaw_search_dirs(npm_global_prefix: Option<&str>) ->
 async fn select_best_node_candidate(candidates: Vec<PathBuf>) -> Result<Option<PathBuf>, String> {
     let mut versioned = Vec::with_capacity(candidates.len());
     for candidate in candidates {
+        let openclaw_signal = match candidate.parent() {
+            Some(bin_dir) => inspect_node_runtime_openclaw_signal(bin_dir).await,
+            None => 0,
+        };
         let version = read_binary_semver(&candidate).await;
-        versioned.push((candidate, version));
+        versioned.push((candidate, openclaw_signal, version));
     }
-    Ok(select_best_semver_candidate(versioned))
+    Ok(select_best_node_runtime_candidate(versioned))
 }
 
 async fn select_node_runtime_candidate(
     candidates: Vec<PathBuf>,
 ) -> Result<Option<PathBuf>, String> {
+    let mut runtime_ranked = Vec::with_capacity(candidates.len());
+    for candidate in &candidates {
+        let openclaw_signal = match candidate.parent() {
+            Some(bin_dir) => inspect_node_runtime_openclaw_signal(bin_dir).await,
+            None => 0,
+        };
+        let version = match sibling_node_path(candidate) {
+            Some(node_path) => read_binary_semver(&node_path).await,
+            None => None,
+        };
+        runtime_ranked.push((candidate.clone(), openclaw_signal, version));
+    }
+
+    if let Some(candidate) = select_best_node_runtime_candidate(runtime_ranked.clone()) {
+        let candidate_signal = runtime_ranked
+            .iter()
+            .find(|(path, _, _)| path == &candidate)
+            .map(|(_, signal, _)| *signal)
+            .unwrap_or(0);
+        if candidate_signal > 0 {
+            return Ok(Some(candidate));
+        }
+    }
+
     let preferred_node =
         select_best_node_candidate(find_all_commands_in_known_locations("node")).await?;
     if let Some(preferred_bin_dir) = preferred_node.as_deref().and_then(Path::parent) {
@@ -3361,16 +4735,67 @@ async fn select_node_runtime_candidate(
         }
     }
 
-    let mut versioned = Vec::with_capacity(candidates.len());
-    for candidate in &candidates {
-        let version = match sibling_node_path(candidate) {
-            Some(node_path) => read_binary_semver(&node_path).await,
-            None => None,
-        };
-        versioned.push((candidate.clone(), version));
+    Ok(
+        select_best_node_runtime_candidate(runtime_ranked)
+            .or_else(|| candidates.into_iter().next()),
+    )
+}
+
+async fn inspect_node_runtime_openclaw_signal(bin_dir: &Path) -> u8 {
+    if find_command_in_bin_dir("openclaw", bin_dir).is_some() {
+        return 3;
     }
 
-    Ok(select_best_semver_candidate(versioned).or_else(|| candidates.into_iter().next()))
+    let Some(npm_path) =
+        find_command_in_bin_dir("npm", bin_dir).and_then(|path| path.to_str().map(str::to_string))
+    else {
+        return 0;
+    };
+
+    let Some(prefix) = detect_npm_global_prefix(&npm_path).await else {
+        return 0;
+    };
+
+    if select_preferred_path_candidate(find_all_commands_in_paths(
+        "openclaw",
+        &npm_global_command_dirs(&prefix),
+    ))
+    .is_some()
+    {
+        return 3;
+    }
+
+    if find_installed_openclaw_package_details(&prefix).is_some() {
+        return 2;
+    }
+
+    0
+}
+
+fn select_best_node_runtime_candidate(
+    candidates: Vec<(PathBuf, u8, Option<(u64, u64, u64)>)>,
+) -> Option<PathBuf> {
+    candidates
+        .into_iter()
+        .max_by(
+            |(left_path, left_signal, left_version), (right_path, right_signal, right_version)| {
+                left_signal
+                    .cmp(right_signal)
+                    .then_with(|| left_version.cmp(right_version))
+                    .then_with(|| {
+                        let preferred = select_preferred_path_candidate(vec![
+                            left_path.clone(),
+                            right_path.clone(),
+                        ]);
+                        match preferred.as_ref() {
+                            Some(path) if path == left_path => std::cmp::Ordering::Greater,
+                            Some(path) if path == right_path => std::cmp::Ordering::Less,
+                            _ => std::cmp::Ordering::Equal,
+                        }
+                    })
+            },
+        )
+        .map(|(path, _, _)| path)
 }
 
 fn sibling_node_path(command_path: &Path) -> Option<PathBuf> {
@@ -3623,22 +5048,27 @@ fn format_semver(version: (u64, u64, u64)) -> String {
 mod tests {
     use super::{
         apply_gateway_runtime_defaults, build_environment_status, build_openclaw_cleanup_command,
-        build_openclaw_install_command, build_winget_install_command, command_bin_dir_for,
-        determine_api_type, extract_gateway_auth_token, find_installed_openclaw_package,
-        format_gateway_start_failure_message, format_provider_base_url, gateway_start_args,
-        has_api_version, npm_global_command_dirs_for, npm_global_node_modules_dirs_for,
-        parse_semver_from_text, resolve_windows_dependency_install_plan, sanitize_runtime_config,
+        build_openclaw_install_command, build_openclaw_pnpm_install_command,
+        build_winget_install_command, command_bin_dir_for, determine_api_type,
+        extract_gateway_auth_token, find_installed_openclaw_package,
+        format_gateway_start_failure_message, format_openclaw_update_failure_message,
+        format_provider_base_url, gateway_start_args, has_api_version,
+        infer_openclaw_package_name_from_path, npm_global_command_dirs_for,
+        npm_global_node_modules_dirs_for, package_registry_for_package_spec,
+        parse_semver_from_text, resolve_windows_dependency_install_plan,
+        runtime_candidate_matches_install_root, sanitize_runtime_config,
         select_best_semver_candidate, select_gateway_start_failure_detail,
-        select_preferred_path_candidate, shell_command_escape_for, shell_npm_prefix_assignment_for,
-        shell_path_assignment_for, trim_trailing_slash, windows_dependency_action_result,
-        windows_dependency_setup_message, windows_install_block_result,
-        windows_manual_install_message, DependencyKind, DependencyStatus, EnvironmentDiagnostics,
-        ShellPlatform, WindowsDependencyInstallPlan, NPM_MIRROR_CN, OPENCLAW_CN_PACKAGE,
-        OPENCLAW_DEFAULT_PACKAGE,
+        select_openclaw_update_failure_detail, select_preferred_path_candidate,
+        shell_command_escape_for, shell_npm_prefix_assignment_for, shell_path_assignment_for,
+        trim_trailing_slash, windows_dependency_action_result, windows_dependency_setup_message,
+        windows_install_block_result, windows_manual_install_message, DependencyKind,
+        DependencyStatus, EnvironmentDiagnostics, OpenClawRuntimeCandidate, ShellPlatform,
+        WindowsDependencyInstallPlan, NPM_MIRROR_CN, OPENCLAW_CN_PACKAGE, OPENCLAW_DEFAULT_PACKAGE,
     };
     use crate::database::dao::api_key_provider::{ApiKeyProvider, ApiProviderType, ProviderGroup};
     use chrono::Utc;
     use serde_json::{json, Value};
+    use std::ffi::OsString;
     use std::fs;
     use std::path::PathBuf;
 
@@ -3745,14 +5175,14 @@ mod tests {
         let config = json!({
             "gateway": {
                 "auth": {
-                    "token": "proxycast-token"
+                    "token": "lime-token"
                 }
             }
         });
 
         assert_eq!(
             extract_gateway_auth_token(&config).as_deref(),
-            Some("proxycast-token")
+            Some("lime-token")
         );
     }
 
@@ -3773,7 +5203,7 @@ mod tests {
     fn applies_gateway_runtime_defaults_for_current_openclaw() {
         let mut config = json!({});
 
-        apply_gateway_runtime_defaults(&mut config, 18790, "proxycast-token");
+        apply_gateway_runtime_defaults(&mut config, 18790, "lime-token");
 
         assert_eq!(
             config.pointer("/gateway/mode").and_then(Value::as_str),
@@ -3791,13 +5221,13 @@ mod tests {
             config
                 .pointer("/gateway/auth/token")
                 .and_then(Value::as_str),
-            Some("proxycast-token")
+            Some("lime-token")
         );
         assert_eq!(
             config
                 .pointer("/gateway/remote/token")
                 .and_then(Value::as_str),
-            Some("proxycast-token")
+            Some("lime-token")
         );
         assert_eq!(
             config.pointer("/gateway/port").and_then(Value::as_u64),
@@ -3808,7 +5238,7 @@ mod tests {
     #[test]
     fn gateway_start_args_include_new_runtime_guards() {
         assert_eq!(
-            gateway_start_args(18790, "proxycast-token"),
+            gateway_start_args(18790, "lime-token"),
             vec![
                 "gateway",
                 "--allow-unconfigured",
@@ -3817,11 +5247,66 @@ mod tests {
                 "--auth",
                 "token",
                 "--token",
-                "proxycast-token",
+                "lime-token",
                 "--port",
                 "18790",
             ]
         );
+    }
+
+    #[test]
+    fn parses_lsof_listener_pid_output() {
+        assert_eq!(
+            super::parse_lsof_listener_pids("1201\n1202\nbad\n1201\n"),
+            vec![1201, 1202]
+        );
+    }
+
+    #[test]
+    fn parses_windows_netstat_listener_pid_output() {
+        let output = "\
+  TCP    127.0.0.1:18790      0.0.0.0:0      LISTENING      31234\n\
+  TCP    [::]:18790           [::]:0         LISTENING      31235\n\
+  TCP    127.0.0.1:18791      0.0.0.0:0      LISTENING      39999\n";
+
+        assert_eq!(
+            super::parse_windows_netstat_listener_pids(output, 18790),
+            vec![31234, 31235]
+        );
+    }
+
+    #[test]
+    fn detects_openclaw_process_from_node_command_line() {
+        let args = vec![
+            OsString::from("/Users/demo/.nvm/versions/node/v23.4.0/bin/.openclaw-a1b2c3/openclaw"),
+            OsString::from("gateway"),
+            OsString::from("--port"),
+            OsString::from("18790"),
+        ];
+        let node_path = PathBuf::from("/Users/demo/.nvm/versions/node/v23.4.0/bin/node");
+
+        assert!(super::process_looks_like_openclaw_process(
+            "node",
+            Some(node_path.as_path()),
+            &args,
+        ));
+    }
+
+    #[test]
+    fn ignores_unrelated_listener_process() {
+        let args = vec![
+            OsString::from("/usr/local/bin/python3"),
+            OsString::from("-m"),
+            OsString::from("http.server"),
+            OsString::from("18790"),
+        ];
+        let python_path = PathBuf::from("/usr/local/bin/python3");
+
+        assert!(!super::process_looks_like_openclaw_process(
+            "python3",
+            Some(python_path.as_path()),
+            &args,
+        ));
     }
 
     #[test]
@@ -3849,7 +5334,7 @@ mod tests {
         let mut config = json!({
             "models": {
                 "providers": {
-                    "proxycast-openai": {
+                    "lime-openai": {
                         "models": [
                             {
                                 "id": "gpt-5",
@@ -3870,11 +5355,11 @@ mod tests {
         sanitize_runtime_config(&mut config);
 
         assert!(config
-            .pointer("/models/providers/proxycast-openai/models/0/contextWindow")
+            .pointer("/models/providers/lime-openai/models/0/contextWindow")
             .is_none());
         assert_eq!(
             config
-                .pointer("/models/providers/proxycast-openai/models/1/contextWindow")
+                .pointer("/models/providers/lime-openai/models/1/contextWindow")
                 .and_then(Value::as_u64),
             Some(400_000)
         );
@@ -3885,13 +5370,13 @@ mod tests {
         let lines = vec![
             "Config invalid".to_string(),
             "Run: openclaw doctor --fix".to_string(),
-            "Invalid config at /Users/demo/.openclaw/openclaw.proxycast.json:\\n- models.providers.proxycast-openai.models.0.contextWindow: Invalid input: expected number, received null".to_string(),
+            "Invalid config at /Users/demo/.openclaw/openclaw.lime.json:\\n- models.providers.lime-openai.models.0.contextWindow: Invalid input: expected number, received null".to_string(),
         ];
 
         assert_eq!(
             select_gateway_start_failure_detail(&lines),
             Some(
-                "Invalid config at /Users/demo/.openclaw/openclaw.proxycast.json:\\n- models.providers.proxycast-openai.models.0.contextWindow: Invalid input: expected number, received null"
+                "Invalid config at /Users/demo/.openclaw/openclaw.lime.json:\\n- models.providers.lime-openai.models.0.contextWindow: Invalid input: expected number, received null"
             )
         );
     }
@@ -3900,9 +5385,43 @@ mod tests {
     fn formats_gateway_start_failure_for_invalid_context_window_config() {
         assert_eq!(
             format_gateway_start_failure_message(Some(
-                "Invalid config at /Users/demo/.openclaw/openclaw.proxycast.json:\\n- models.providers.proxycast-openai.models.0.contextWindow: Invalid input: expected number, received null"
+                "Invalid config at /Users/demo/.openclaw/openclaw.lime.json:\\n- models.providers.lime-openai.models.0.contextWindow: Invalid input: expected number, received null"
             )),
-            "Gateway 启动失败：当前 OpenClaw 配置包含空的 contextWindow 字段。ProxyCast 已修正后续配置写入，请重新启动；如仍失败，请重新同步模型配置。"
+            "Gateway 启动失败：当前 OpenClaw 配置包含空的 contextWindow 字段。Lime 已修正后续配置写入，请重新启动；如仍失败，请重新同步模型配置。"
+        );
+    }
+
+    #[test]
+    fn selects_update_failure_reason_from_json_payload() {
+        let payload = json!({
+            "status": "error",
+            "reason": "not-openclaw-root",
+            "root": "/Users/demo/.nvm"
+        });
+
+        assert_eq!(
+            select_openclaw_update_failure_detail(Some(&payload), &[], &[]),
+            Some("not-openclaw-root (/Users/demo/.nvm)".to_string())
+        );
+    }
+
+    #[test]
+    fn formats_openclaw_update_failure_for_invalid_root() {
+        assert_eq!(
+            format_openclaw_update_failure_message(Some(
+                "not-openclaw-root (/Users/demo/.nvm)"
+            )),
+            "OpenClaw 升级失败：未在 OpenClaw 安装根目录执行更新。Lime 会优先切换到安装目录；如仍失败，请重新检测安装状态后重试。"
+        );
+    }
+
+    #[test]
+    fn formats_openclaw_update_failure_for_node_version_requirement() {
+        assert_eq!(
+            format_openclaw_update_failure_message(Some(
+                "openclaw: Node.js v22.12+ is required (current: v18.20.2)."
+            )),
+            "OpenClaw 升级失败：当前用于执行 openclaw 的 Node.js 版本过低，需要 22.12.0+。请切换到满足要求的 Node.js 后重试。"
         );
     }
 
@@ -3950,7 +5469,7 @@ mod tests {
         let env = build_environment_status(
             DependencyStatus {
                 status: "ok".to_string(),
-                version: Some("22.0.0".to_string()),
+                version: Some("22.12.0".to_string()),
                 path: Some("/usr/local/bin/node".to_string()),
                 message: "node ok".to_string(),
                 auto_install_supported: true,
@@ -4092,6 +5611,84 @@ mod tests {
     }
 
     #[test]
+    fn windows_pnpm_install_command_uses_global_add_syntax() {
+        let command = build_openclaw_pnpm_install_command(
+            ShellPlatform::Windows,
+            r"C:\Users\demo\AppData\Local\pnpm\pnpm.cmd",
+            "@qingchencloud/openclaw-zh@latest",
+            Some(NPM_MIRROR_CN),
+        );
+
+        assert_eq!(
+            command,
+            concat!(
+                "set \"PATH=C:\\Users\\demo\\AppData\\Local\\pnpm;%PATH%\" && ",
+                "\"C:\\Users\\demo\\AppData\\Local\\pnpm\\pnpm.cmd\" add -g \"@qingchencloud/openclaw-zh@latest\" ",
+                "--registry=\"https://registry.npmmirror.com\""
+            )
+        );
+    }
+
+    #[test]
+    fn infers_openclaw_package_name_from_manifest_path() {
+        assert_eq!(
+            infer_openclaw_package_name_from_path(
+                PathBuf::from(
+                    "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/openclaw/package.json",
+                )
+                .as_path()
+            ),
+            Some("openclaw")
+        );
+        assert_eq!(
+            infer_openclaw_package_name_from_path(PathBuf::from(
+                "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/@qingchencloud/openclaw-zh/package.json",
+            )
+            .as_path()),
+            Some("@qingchencloud/openclaw-zh")
+        );
+    }
+
+    #[test]
+    fn china_package_upgrade_uses_npmmirror_registry() {
+        assert_eq!(
+            package_registry_for_package_spec("@qingchencloud/openclaw-zh@latest"),
+            Some(NPM_MIRROR_CN)
+        );
+        assert_eq!(package_registry_for_package_spec("openclaw@latest"), None);
+    }
+
+    #[test]
+    fn runtime_candidate_prefers_install_root_match_over_current_binary_hint() {
+        let candidate = OpenClawRuntimeCandidate {
+            id: "/Users/demo/.nvm/versions/node/v23.4.0/bin".to_string(),
+            source: "nvm".to_string(),
+            bin_dir: "/Users/demo/.nvm/versions/node/v23.4.0/bin".to_string(),
+            node_path: "/Users/demo/.nvm/versions/node/v23.4.0/bin/node".to_string(),
+            node_version: Some("23.4.0".to_string()),
+            npm_path: Some("/Users/demo/.nvm/versions/node/v23.4.0/bin/npm".to_string()),
+            npm_global_prefix: Some("/Users/demo/.nvm/versions/node/v23.4.0".to_string()),
+            openclaw_path: Some("/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw".to_string()),
+            openclaw_version: Some("2026.3.8".to_string()),
+            openclaw_package_path: Some(
+                "/Users/demo/.nvm/versions/node/v23.4.0/lib/node_modules/@qingchencloud/openclaw-zh/package.json"
+                    .to_string(),
+            ),
+            is_active: false,
+            is_preferred: false,
+        };
+
+        assert!(runtime_candidate_matches_install_root(
+            &candidate,
+            PathBuf::from("/Users/demo/.nvm").as_path()
+        ));
+        assert!(!runtime_candidate_matches_install_root(
+            &candidate,
+            PathBuf::from("/Users/demo/Library/PhpWebStudy").as_path()
+        ));
+    }
+
+    #[test]
     fn preferred_path_candidate_prioritizes_windows_executable_extensions() {
         let preferred = select_preferred_path_candidate(vec![
             PathBuf::from(r"C:\nvm4w\nodejs\openclaw"),
@@ -4142,7 +5739,7 @@ mod tests {
     #[test]
     fn finds_openclaw_package_from_global_npm_prefix() {
         let temp_dir =
-            std::env::temp_dir().join(format!("proxycast-openclaw-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("lime-openclaw-test-{}", std::process::id()));
         let package_dir = temp_dir.join("node_modules").join("openclaw");
         fs::create_dir_all(&package_dir).unwrap();
         fs::write(
@@ -4223,7 +5820,7 @@ mod tests {
                 status: "missing".to_string(),
                 version: None,
                 path: None,
-                message: "未检测到 Node.js，需要安装 22.0.0+。".to_string(),
+                message: "未检测到 Node.js，需要安装 22.12.0+。".to_string(),
                 auto_install_supported: false,
             },
         );
@@ -4256,7 +5853,7 @@ mod tests {
                 status: "missing".to_string(),
                 version: None,
                 path: None,
-                message: "未检测到 Node.js，需要安装 22.0.0+。".to_string(),
+                message: "未检测到 Node.js，需要安装 22.12.0+。".to_string(),
                 auto_install_supported: false,
             },
             &DependencyStatus {
@@ -4279,9 +5876,9 @@ mod tests {
         let result = windows_install_block_result(
             &DependencyStatus {
                 status: "ok".to_string(),
-                version: Some("22.0.0".to_string()),
+                version: Some("22.12.0".to_string()),
                 path: Some("C:\\Program Files\\nodejs\\node.exe".to_string()),
-                message: "Node.js 已就绪：22.0.0".to_string(),
+                message: "Node.js 已就绪：22.12.0".to_string(),
                 auto_install_supported: false,
             },
             &DependencyStatus {

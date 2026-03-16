@@ -354,11 +354,11 @@ export function SplashScreen({
 
           <Hero>
             <LogoWrap>
-              <Logo src="/logo.png" alt="ProxyCast" />
+              <Logo src="/logo.png" alt="Lime" />
             </LogoWrap>
 
             <CopyBlock>
-              <AppName>ProxyCast</AppName>
+              <AppName>Lime</AppName>
               <Subtitle>
                 正在准备创作工作台与本地运行状态，保持当前节奏，不打断你的上下文。
               </Subtitle>

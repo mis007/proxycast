@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use proxycast_core::app_paths;
-use proxycast_core::database::dao::browser_profile::{
+use lime_core::app_paths;
+use lime_core::database::dao::browser_profile::{
     BrowserProfileDao, BrowserProfileRecord, BrowserProfileTransportKind, UpsertBrowserProfileInput,
 };
 use rusqlite::Connection;

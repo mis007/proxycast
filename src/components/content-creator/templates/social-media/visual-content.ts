@@ -23,7 +23,7 @@ export const visualContentTemplate: ContentTemplate = {
   titleExamples: [
     "Agent 炒作 一图看懂",
     "5 个 AI 创作工具的关键差异",
-    "ProxyCast 完全使用指南",
+    "Lime 完全使用指南",
   ],
 
   contentStructure: {

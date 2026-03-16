@@ -1,6 +1,6 @@
 //! Claude Custom Provider (自定义 Claude API)
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
-use proxycast_core::models::openai::{ChatCompletionRequest, ContentPart, MessageContent};
+use lime_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::models::openai::{ChatCompletionRequest, ContentPart, MessageContent};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -132,17 +132,17 @@ impl ClaudeCustomProvider {
     }
 
     fn convert_openai_tool_to_anthropic(
-        tool: &proxycast_core::models::openai::Tool,
+        tool: &lime_core::models::openai::Tool,
     ) -> Option<serde_json::Value> {
         match tool {
-            proxycast_core::models::openai::Tool::Function { function } => {
+            lime_core::models::openai::Tool::Function { function } => {
                 let input_schema = function
                     .parameters
                     .clone()
                     .unwrap_or_else(|| serde_json::json!({"type":"object","properties":{}}));
                 let extension = input_schema
-                    .get("x-proxycast")
-                    .or_else(|| input_schema.get("x_proxycast"))
+                    .get("x-lime")
+                    .or_else(|| input_schema.get("x_lime"))
                     .cloned()
                     .unwrap_or_else(|| serde_json::json!({}));
                 let mut input_examples = extension
@@ -152,7 +152,7 @@ impl ClaudeCustomProvider {
                     .cloned()
                     .unwrap_or_default();
                 if input_examples.is_empty() {
-                    input_examples = proxycast_core::tool_calling::resolve_tool_input_examples(
+                    input_examples = lime_core::tool_calling::resolve_tool_input_examples(
                         &function.name,
                         &input_schema,
                     );
@@ -747,7 +747,7 @@ impl StreamingProvider for ClaudeCustomProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::models::openai::{FunctionDef, Tool};
+    use lime_core::models::openai::{FunctionDef, Tool};
 
     #[test]
     fn test_convert_openai_tool_to_anthropic_keeps_metadata() {
@@ -760,7 +760,7 @@ mod tests {
                     "properties": {
                         "title": {"type": "string"}
                     },
-                    "x-proxycast": {
+                    "x-lime": {
                         "input_examples": [{"title":"Billing issue"}],
                         "allowed_callers": ["assistant", "code_execution"]
                     }

@@ -3,7 +3,7 @@
 //! 管理语音输入配置、ASR 凭证与润色指令。
 //! 不依赖 Tauri，可被主 crate 以桥接方式复用。
 
-use proxycast_core::config::{
+use lime_core::config::{
     load_config, save_config, AsrCredentialEntry, AsrProviderType, VoiceInputConfig,
     VoiceInstruction, VoiceOutputMode,
 };

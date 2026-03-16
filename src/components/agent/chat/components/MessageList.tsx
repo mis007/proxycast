@@ -86,7 +86,7 @@ const MessageListInner: React.FC<MessageListProps> = ({
   turns = [],
   threadItems = [],
   currentTurnId = null,
-  assistantLabel = "ProxyCast",
+  assistantLabel = "Lime",
   onDeleteMessage,
   onEditMessage,
   onA2UISubmit,
@@ -239,7 +239,7 @@ const MessageListInner: React.FC<MessageListProps> = ({
           ) : showIdentity ? (
             <img
               src={logoImg}
-              alt="ProxyCast"
+              alt="Lime"
               style={{
                 width: 45,
                 height: 45,
@@ -501,7 +501,7 @@ const MessageListInner: React.FC<MessageListProps> = ({
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground opacity-50">
             <img
               src={logoImg}
-              alt="ProxyCast"
+              alt="Lime"
               className="w-12 h-12 mb-4 opacity-20"
             />
             <p className="text-lg font-medium">开始一段新的对话吧</p>

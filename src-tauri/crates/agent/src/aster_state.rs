@@ -2,22 +2,22 @@
 //!
 //! 管理 Aster Agent 实例和相关状态
 //! 提供 Tauri 应用与 Aster 框架的桥接
-//! 支持从 ProxyCast 凭证池自动选择凭证
+//! 支持从 Lime 凭证池自动选择凭证
 //!
 //! ## 重要：SessionStore 注入
 //!
-//! 为了让 Aster Agent 的消息存储到 ProxyCast 数据库，必须在创建 Agent 时
-//! 注入 `ProxyCastSessionStore`。使用 `init_agent_with_db()` 方法而不是 `init_agent()`。
+//! 为了让 Aster Agent 的消息存储到 Lime 数据库，必须在创建 Agent 时
+//! 注入 `LimeSessionStore`。使用 `init_agent_with_db()` 方法而不是 `init_agent()`。
 //!
 //! ## Agent 身份配置
 //!
-//! 通过 Aster 框架的 `AgentIdentity` API 设置 ProxyCast 专属的 Agent 身份，
+//! 通过 Aster 框架的 `AgentIdentity` API 设置 Lime 专属的 Agent 身份，
 //! 包括名称、语言偏好、产品描述等。这是架构层面的正确做法，
 //! 而不是简单地追加提示词。
 //!
 //! ## Skills 集成
 //!
-//! Agent 初始化时会自动加载 `~/.proxycast/skills/` 目录下的 Skills 到
+//! Agent 初始化时会自动加载 `~/.lime/skills/` 目录下的 Skills 到
 //! aster-rust 的 global_registry，使 AI 能够自动发现和调用这些 Skills。
 //!
 //! 参考文档：`docs/prd/chat-architecture-redesign.md`
@@ -35,13 +35,13 @@ use tokio_util::sync::CancellationToken;
 
 use crate::credential_bridge::{create_aster_provider, AsterProviderConfig, CredentialBridge};
 use crate::queued_turn::QueuedTurnSnapshot;
-use proxycast_core::database::DbConnection;
-use proxycast_services::aster_session_store::ProxyCastSessionStore;
+use lime_core::database::DbConnection;
+use lime_services::aster_session_store::LimeSessionStore;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
-async fn configure_proxycast_native_file_tools(agent: &Agent) {
+async fn configure_lime_native_file_tools(agent: &Agent) {
     let shared_history = create_shared_history();
     let registry_arc = agent.tool_registry().clone();
     let mut registry = registry_arc.write().await;
@@ -52,7 +52,7 @@ async fn configure_proxycast_native_file_tools(agent: &Agent) {
         EditTool::new(shared_history).with_require_read_before_edit(false),
     ));
     // 覆盖默认 SkillTool，避免通用对话默认暴露全部本地 Skills。
-    registry.register(Box::new(crate::tools::ProxycastSkillTool::new()));
+    registry.register(Box::new(crate::tools::LimeSkillTool::new()));
 }
 
 /// 会话级 turn 排队任务
@@ -358,7 +358,7 @@ impl AsterAgentState {
         }
 
         let home_dir = dirs::home_dir().ok_or_else(|| "无法获取用户目录".to_string())?;
-        Ok(home_dir.join(".proxycast").join("aster"))
+        Ok(home_dir.join(".lime").join("aster"))
     }
 
     fn ensure_aster_runtime_dirs() -> Result<PathBuf, String> {
@@ -395,9 +395,9 @@ impl AsterAgentState {
 
     /// 初始化 Agent（带数据库连接）
     ///
-    /// 创建 Agent 并注入 ProxyCastSessionStore，确保消息存储到 ProxyCast 数据库。
-    /// 同时设置 ProxyCast 专属的 Agent 身份（名称、语言、描述）。
-    /// 自动加载 `~/.proxycast/skills/` 目录下的 Skills 到 aster-rust 的 global_registry。
+    /// 创建 Agent 并注入 LimeSessionStore，确保消息存储到 Lime 数据库。
+    /// 同时设置 Lime 专属的 Agent 身份（名称、语言、描述）。
+    /// 自动加载 `~/.lime/skills/` 目录下的 Skills 到 aster-rust 的 global_registry。
     ///
     /// **推荐使用此方法**而不是 `init_agent()`。
     ///
@@ -418,11 +418,11 @@ impl AsterAgentState {
         let mut agent_guard = self.agent.write().await;
         if agent_guard.is_none() {
             // 创建 SessionStore
-            let session_store = Arc::new(ProxyCastSessionStore::new(db.clone()));
-            tracing::info!("[AsterAgent] 创建 ProxyCastSessionStore 成功");
+            let session_store = Arc::new(LimeSessionStore::new(db.clone()));
+            tracing::info!("[AsterAgent] 创建 LimeSessionStore 成功");
 
             // 创建 Agent（启用 Ask/LSP 回调）并注入 SessionStore
-            let tool_config = crate::create_proxycast_tool_config();
+            let tool_config = crate::create_lime_tool_config();
             let agent = Agent::with_tool_config(tool_config).with_session_store(session_store);
 
             // 验证 session_store 是否被正确设置
@@ -432,13 +432,13 @@ impl AsterAgentState {
                 has_store
             );
 
-            // 使用异步方法设置 ProxyCast 专属身份
-            let identity = crate::create_proxycast_identity();
+            // 使用异步方法设置 Lime 专属身份
+            let identity = crate::create_lime_identity();
             agent.set_identity(identity).await;
-            configure_proxycast_native_file_tools(&agent).await;
+            configure_lime_native_file_tools(&agent).await;
 
-            // 加载 ProxyCast Skills 到 aster-rust 的 global_registry
-            crate::reload_proxycast_skills();
+            // 加载 Lime Skills 到 aster-rust 的 global_registry
+            crate::reload_lime_skills();
 
             *agent_guard = Some(agent);
 
@@ -446,7 +446,7 @@ impl AsterAgentState {
             self.initialized_cache.store(true, Ordering::Relaxed);
 
             tracing::info!(
-                "[AsterAgent] Agent 初始化成功，已注入 ProxyCastSessionStore、ProxyCast 身份和 Skills"
+                "[AsterAgent] Agent 初始化成功，已注入 LimeSessionStore、Lime 身份和 Skills"
             );
         } else {
             // 更新缓存
@@ -456,22 +456,22 @@ impl AsterAgentState {
         Ok(())
     }
 
-    /// 重新加载 ProxyCast Skills
+    /// 重新加载 Lime Skills
     ///
     /// 当用户安装或卸载 Skills 后调用此方法刷新 registry。
-    pub fn reload_proxycast_skills() {
-        crate::reload_proxycast_skills();
+    pub fn reload_lime_skills() {
+        crate::reload_lime_skills();
     }
 
     /// 初始化 Agent（无数据库版本）
     ///
-    /// **警告**：此方法创建的 Agent 不会将消息存储到 ProxyCast 数据库，
+    /// **警告**：此方法创建的 Agent 不会将消息存储到 Lime 数据库，
     /// 消息会存储到 Aster 默认的 `~/.aster/sessions.db`。
     ///
     /// 建议使用 `init_agent_with_db()` 代替。
     #[deprecated(
         since = "0.1.0",
-        note = "请使用 init_agent_with_db() 以确保消息存储到 ProxyCast 数据库"
+        note = "请使用 init_agent_with_db() 以确保消息存储到 Lime 数据库"
     )]
     pub async fn init_agent(&self) -> Result<(), String> {
         let mut agent_guard = self.agent.write().await;
@@ -542,7 +542,7 @@ impl AsterAgentState {
 
     /// 从凭证池配置 Provider
     ///
-    /// 自动从 ProxyCast 凭证池选择可用凭证并配置 Aster Provider
+    /// 自动从 Lime 凭证池选择可用凭证并配置 Aster Provider
     ///
     /// # 参数
     /// - `db`: 数据库连接
@@ -827,7 +827,7 @@ impl AsterAgentState {
 
     /// 注册 MCP 桥接客户端
     ///
-    /// 将 ProxyCast 托管的 MCP 客户端注册到 Aster Agent 的 ExtensionManager，
+    /// 将 Lime 托管的 MCP 客户端注册到 Aster Agent 的 ExtensionManager，
     /// 使 Agent 能够直接调用该 MCP 服务器提供的工具。
     ///
     /// # 参数
@@ -1105,12 +1105,12 @@ description: {}
         }
     }
 
-    /// 测试：reload_proxycast_skills 不会 panic（即使目录不存在）
+    /// 测试：reload_lime_skills 不会 panic（即使目录不存在）
     #[test]
-    fn test_reload_proxycast_skills_no_panic() {
-        // 这个测试确保 reload_proxycast_skills 在各种情况下都不会 panic
-        // 即使 ~/.proxycast/skills/ 目录不存在
-        AsterAgentState::reload_proxycast_skills();
+    fn test_reload_lime_skills_no_panic() {
+        // 这个测试确保 reload_lime_skills 在各种情况下都不会 panic
+        // 即使 ~/.lime/skills/ 目录不存在
+        AsterAgentState::reload_lime_skills();
         // 如果没有 panic，测试通过
     }
 }

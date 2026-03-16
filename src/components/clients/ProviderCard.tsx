@@ -10,7 +10,7 @@ function getProviderTypeFromName(name: string, category: string): string {
 
   // 精确匹配
   if (lowerName.includes("智谱") || lowerName.includes("glm")) return "zhipu";
-  if (lowerName.includes("proxycast")) return "proxycast";
+  if (lowerName.includes("lime")) return "lime";
   if (lowerName.includes("deepseek")) return "deepseek";
   if (lowerName.includes("kimi")) return "kimi";
   if (lowerName.includes("minimax")) return "minimax";
@@ -54,14 +54,14 @@ export function ProviderCard({
   switching = false,
 }: ProviderCardProps) {
   const [showConfirm, setShowConfirm] = useState(false);
-  const isProxyCast =
-    provider.category === "custom" && provider.name === "ProxyCast";
+  const isLime =
+    provider.category === "custom" && provider.name === "Lime";
 
   const handleClick = () => {
     if (isCurrent || switching) return;
 
     // 对于关键配置，显示确认对话框
-    if (provider.category === "official" || isProxyCast) {
+    if (provider.category === "official" || isLime) {
       setShowConfirm(true);
     } else {
       onSwitch();
@@ -125,7 +125,7 @@ export function ProviderCard({
                 </span>
               )}
             </div>
-            {isProxyCast ? (
+            {isLime ? (
               <p className="text-xs text-blue-600 dark:text-blue-400 truncate">
                 凭证池 → 标准 API
               </p>

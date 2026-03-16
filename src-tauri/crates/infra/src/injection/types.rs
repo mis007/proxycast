@@ -1,12 +1,12 @@
 //! 参数注入类型定义
 //!
-//! 基础类型（InjectionMode, InjectionRule）从 proxycast-core 重新导出。
+//! 基础类型（InjectionMode, InjectionRule）从 lime-core 重新导出。
 //! 本模块定义注入器（Injector）和注入结果等 infra 层特有类型。
 
 use serde::{Deserialize, Serialize};
 
 // 从 core 重新导出基础类型
-pub use proxycast_core::models::injection_types::{InjectionMode, InjectionRule};
+pub use lime_core::models::injection_types::{InjectionMode, InjectionRule};
 
 /// 允许注入的参数白名单
 /// 这些参数是安全的，不会影响请求的核心行为

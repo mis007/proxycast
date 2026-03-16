@@ -1,4 +1,4 @@
-//! ProxyCast Connect 命令模块
+//! Lime Connect 命令模块
 //!
 //! 提供 Deep Link 协议处理和中转商 API Key 管理的 Tauri 命令。
 //!

@@ -1,6 +1,6 @@
-# ProxyCast Homebrew Tap
+# Lime Homebrew Tap
 
-ProxyCast 的 Homebrew Cask 分发仓库。
+Lime 的 Homebrew Cask 分发仓库。
 
 ## 安装
 
@@ -8,20 +8,20 @@ ProxyCast 的 Homebrew Cask 分发仓库。
 # 添加 tap
 brew tap terryso/tap
 
-# 安装 ProxyCast
-brew install --cask proxycast
+# 安装 Lime
+brew install --cask lime
 ```
 
 ## 更新
 
 ```bash
-brew upgrade --cask proxycast
+brew upgrade --cask lime
 ```
 
 ## 卸载
 
 ```bash
-brew uninstall --cask proxycast
+brew uninstall --cask lime
 ```
 
 ## 维护说明
@@ -29,8 +29,8 @@ brew uninstall --cask proxycast
 ### 手动更新版本
 
 1. 下载新版本的 DMG 文件
-2. 计算 sha256: `shasum -a 256 ProxyCast_x.x.x_aarch64.dmg`
-3. 更新 `Casks/proxycast.rb` 中的 `version` 和 `sha256`
+2. 计算 sha256: `shasum -a 256 Lime_x.x.x_aarch64.dmg`
+3. 更新 `Casks/lime.rb` 中的 `version` 和 `sha256`
 4. 推送到仓库
 
 ### 自动化更新

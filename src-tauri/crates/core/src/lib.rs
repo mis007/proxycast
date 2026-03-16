@@ -1,4 +1,4 @@
-//! ProxyCast Core Crate
+//! Lime Core Crate
 //!
 //! 包含纯数据类型、基础模块和无外部业务依赖的独立模块。
 //!
@@ -21,6 +21,7 @@ pub mod app_bootstrap;
 pub mod app_paths;
 pub mod app_utils;
 pub mod data;
+pub mod env_compat;
 pub mod logger;
 pub mod models;
 pub mod tray_format;

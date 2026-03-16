@@ -12,7 +12,7 @@ use crate::database::DbConnection;
 use crate::services::workspace_health_service::ensure_workspace_ready_with_auto_relocate;
 use crate::workspace::WorkspaceManager;
 use chrono::Utc;
-use proxycast_browser_runtime::CdpSessionState;
+use lime_browser_runtime::CdpSessionState;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
@@ -30,7 +30,7 @@ pub async fn execute_job(
     app_handle: &Option<AppHandle>,
 ) -> Result<JobExecutionResult, String> {
     match job.execution_mode {
-        proxycast_core::config::AutomationExecutionMode::LogOnly => Ok(JobExecutionResult {
+        lime_core::config::AutomationExecutionMode::LogOnly => Ok(JobExecutionResult {
             output: "Log only mode".to_string(),
             output_data: Some(json!({
                 "kind": "log_only",
@@ -41,8 +41,8 @@ pub async fn execute_job(
             session_id: None,
             browser_session: None,
         }),
-        proxycast_core::config::AutomationExecutionMode::Intelligent
-        | proxycast_core::config::AutomationExecutionMode::Skill => {
+        lime_core::config::AutomationExecutionMode::Intelligent
+        | lime_core::config::AutomationExecutionMode::Skill => {
             let payload = serde_json::from_value::<AutomationPayload>(job.payload.clone())
                 .map_err(|e| format!("解析自动化任务负载失败: {e}"))?;
             match payload {

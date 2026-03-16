@@ -15,7 +15,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{SinkExt, StreamExt};
-use proxycast_core::LogStore;
+use lime_core::LogStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -38,8 +38,8 @@ impl WsHandlerState {
         config: WsConfig,
         api_key: String,
         logs: Arc<RwLock<LogStore>>,
-        db: Option<proxycast_core::database::DbConnection>,
-        scheduler: Option<proxycast_agent::ProxyCastScheduler>,
+        db: Option<lime_core::database::DbConnection>,
+        scheduler: Option<lime_agent::LimeScheduler>,
     ) -> Self {
         let rpc_state = RpcHandlerState::new(db, scheduler, logs.clone());
         Self {

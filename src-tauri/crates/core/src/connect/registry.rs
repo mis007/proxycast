@@ -11,7 +11,7 @@
 //! ## 使用示例
 //!
 //! ```rust,ignore
-//! use proxycast_core::connect::registry::{RelayRegistry, RelayInfo};
+//! use lime_core::connect::registry::{RelayRegistry, RelayInfo};
 //!
 //! let registry = RelayRegistry::new(cache_path);
 //! registry.load_from_remote().await?;
@@ -654,7 +654,7 @@ mod property_tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
-        /// Feature: proxycast-connect, Property 3: Registry Lookup Consistency
+        /// Feature: lime-connect, Property 3: Registry Lookup Consistency
         /// Validates: Requirements 2.3, 2.4
         ///
         /// *For any* RelayRegistry and relay ID, if the ID exists in the registry

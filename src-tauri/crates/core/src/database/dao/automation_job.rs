@@ -357,7 +357,7 @@ mod tests {
                 success: false,
                 message: "写入本地文件失败: permission denied".to_string(),
                 channel: Some("local_file".to_string()),
-                target: Some("/tmp/proxycast/output.json".to_string()),
+                target: Some("/tmp/lime/output.json".to_string()),
                 output_kind: "json".to_string(),
                 output_schema: "json".to_string(),
                 output_format: "json".to_string(),

@@ -383,7 +383,7 @@ export function useDeepLink(): UseDeepLinkReturn {
           console.log("[useDeepLink] 收到 Deep Link URL:", urls);
 
           for (const url of urls) {
-            if (url.startsWith("proxycast://connect")) {
+            if (url.startsWith("lime://connect")) {
               try {
                 // 调用后端处理 Deep Link
                 const result = await safeInvoke<DeepLinkResult>(

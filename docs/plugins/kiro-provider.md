@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Kiro Provider 是 ProxyCast 的 OAuth Provider 插件，用于对接 **AWS CodeWhisperer** (Kiro IDE) 服务。它将 Anthropic/OpenAI 协议请求转换为 CodeWhisperer 协议，并处理复杂的风控逻辑。
+Kiro Provider 是 Lime 的 OAuth Provider 插件，用于对接 **AWS CodeWhisperer** (Kiro IDE) 服务。它将 Anthropic/OpenAI 协议请求转换为 CodeWhisperer 协议，并处理复杂的风控逻辑。
 
 ### 1.2 核心能力
 
@@ -85,13 +85,13 @@ kiro-provider/
   "name": "kiro-provider",
   "version": "1.0.0",
   "description": "Kiro (AWS CodeWhisperer) OAuth Provider - 支持 Claude 模型",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/kiro-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "kiro-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "kiro",
@@ -596,13 +596,13 @@ impl CwToAnthropicTranslator {
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { KiroForm } from './components/KiroForm';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -676,7 +676,7 @@ type BrowserMode = 'system' | 'playwright';
 type OAuthProvider = 'google' | 'github' | 'builder_id';
 
 interface KiroFormProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -737,7 +737,7 @@ interface LoginModeProps {
   oauthProvider: OAuthProvider;
   setOAuthProvider: (provider: OAuthProvider) => void;
   playwrightStatus?: PlaywrightStatus;
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
 }
 
@@ -910,7 +910,7 @@ export function BrowserModeSelector({ value, onChange, playwrightStatus }: Brows
 interface CredentialListProps {
   credentials: Credential[];
   onRefresh: () => void;
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
 }
 
 export function CredentialList({ credentials, onRefresh, sdk }: CredentialListProps) {
@@ -1252,4 +1252,4 @@ pnpm test
 
 - [AWS CodeWhisperer 文档](https://docs.aws.amazon.com/codewhisperer/)
 - [Kiro IDE](https://kiro.dev/)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)

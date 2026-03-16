@@ -373,7 +373,7 @@ describe("tryExecuteSlashSkillCommand 社媒主链路", () => {
 });
 
 describe("tryExecuteSlashSkillCommand 浏览器工具链路", () => {
-  it("收到 tool_end error 时应清洗 ProxyCast 元数据块", async () => {
+  it("收到 tool_end error 时应清洗 Lime 元数据块", async () => {
     let messages: Message[] = [buildBaseMessage("assistant-skill-1")];
 
     const setMessages = (next: Message[] | ((prev: Message[]) => Message[])) => {
@@ -421,12 +421,12 @@ describe("tryExecuteSlashSkillCommand 浏览器工具链路", () => {
             error: [
               "CDP 会话已断开，请重试",
               "",
-              "[ProxyCast 工具元数据开始]",
+              "[Lime 工具元数据开始]",
               JSON.stringify({
                 reported_success: false,
                 exit_code: 1,
               }),
-              "[ProxyCast 工具元数据结束]",
+              "[Lime 工具元数据结束]",
             ].join("\n"),
           },
         },
@@ -477,7 +477,7 @@ describe("tryExecuteSlashSkillCommand 浏览器工具链路", () => {
 
     expect(toolCall?.status).toBe("failed");
     expect(toolCall?.result?.error).toBe("CDP 会话已断开，请重试");
-    expect(toolCall?.result?.error).not.toContain("ProxyCast 工具元数据");
+    expect(toolCall?.result?.error).not.toContain("Lime 工具元数据");
     expect(toolCall?.result?.metadata).toMatchObject({
       reported_success: false,
       exit_code: 1,

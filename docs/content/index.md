@@ -1,12 +1,12 @@
 ---
-title: ProxyCast 文档中心
+title: Lime 文档中心
 description: 创作类 AI Agent 平台文档，从灵感到发布的一站式指南
 navigation: false
 ---
 
-# ProxyCast 文档中心
+# Lime 文档中心
 
-ProxyCast 是创作类 AI Agent 平台。  
+Lime 是创作类 AI Agent 平台。  
 你可以在同一个工作台里完成对话、创作、图片生成、项目沉淀与资源复用。
 
 ## 从这里开始

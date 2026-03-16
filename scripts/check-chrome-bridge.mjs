@@ -7,10 +7,10 @@
 import WebSocket from 'ws';
 
 const SERVER_URL = 'ws://127.0.0.1:8999';
-const BRIDGE_KEY = 'Proxycast-key11';
+const BRIDGE_KEY = 'Lime-key11';
 
 // 连接 Observer 通道查看状态
-const observerUrl = `${SERVER_URL}/proxycast-chrome-observer/${BRIDGE_KEY}?profileKey=test`;
+const observerUrl = `${SERVER_URL}/lime-chrome-observer/${BRIDGE_KEY}?profileKey=test`;
 console.log(`[检查] 连接 Observer 通道: ${observerUrl}`);
 
 const ws = new WebSocket(observerUrl);

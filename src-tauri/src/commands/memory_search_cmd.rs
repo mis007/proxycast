@@ -3,13 +3,13 @@
 //! Provides Tauri commands for semantic and hybrid search
 
 use crate::database::DbConnection;
-use proxycast_core::database::lock_db;
-use proxycast_memory::models::{
+use lime_core::database::lock_db;
+use lime_memory::models::{
     MemoryCategory, MemoryMetadata, MemorySource, MemoryType, UnifiedMemory,
 };
-use proxycast_memory::search;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_memory::search;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::provider_pool_service::ProviderPoolService;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -129,7 +129,7 @@ pub async fn unified_memory_semantic_search(
             "openai",
             None::<&str>,
             None::<&str>,
-            None::<&proxycast_core::models::client_type::ClientType>,
+            None::<&lime_core::models::client_type::ClientType>,
         )
         .await
     {
@@ -143,12 +143,11 @@ pub async fn unified_memory_semantic_search(
     };
 
     let api_key = match credential.credential {
-        proxycast_core::models::provider_pool_model::CredentialData::OpenAIKey {
+        lime_core::models::provider_pool_model::CredentialData::OpenAIKey { api_key, .. } => {
+            api_key
+        }
+        lime_core::models::provider_pool_model::CredentialData::AnthropicKey {
             api_key, ..
-        } => api_key,
-        proxycast_core::models::provider_pool_model::CredentialData::AnthropicKey {
-            api_key,
-            ..
         } => api_key,
         _ => {
             return Err(String::from(
@@ -157,7 +156,7 @@ pub async fn unified_memory_semantic_search(
         }
     };
 
-    let query_embedding = proxycast_embedding::get_embedding(&options.query, &api_key, None)
+    let query_embedding = lime_embedding::get_embedding(&options.query, &api_key, None)
         .await
         .map_err(|e| format!("Failed to get embedding: {e}"))?;
 
@@ -201,7 +200,7 @@ pub async fn unified_memory_hybrid_search(
             "openai",
             None::<&str>,
             None::<&str>,
-            None::<&proxycast_core::models::client_type::ClientType>,
+            None::<&lime_core::models::client_type::ClientType>,
         )
         .await
     {
@@ -216,12 +215,11 @@ pub async fn unified_memory_hybrid_search(
 
     // Extract API key from credential
     let api_key = match credential.credential {
-        proxycast_core::models::provider_pool_model::CredentialData::OpenAIKey {
+        lime_core::models::provider_pool_model::CredentialData::OpenAIKey { api_key, .. } => {
+            api_key
+        }
+        lime_core::models::provider_pool_model::CredentialData::AnthropicKey {
             api_key, ..
-        } => api_key,
-        proxycast_core::models::provider_pool_model::CredentialData::AnthropicKey {
-            api_key,
-            ..
         } => api_key,
         _ => {
             return Err(String::from(
@@ -233,7 +231,7 @@ pub async fn unified_memory_hybrid_search(
     tracing::debug!("[Hybrid Search] Using API key from provider pool");
 
     // Get query embedding
-    let query_embedding = proxycast_embedding::get_embedding(&options.query, &api_key, None)
+    let query_embedding = lime_embedding::get_embedding(&options.query, &api_key, None)
         .await
         .map_err(|e| format!("Failed to get embedding: {e}"))?;
 

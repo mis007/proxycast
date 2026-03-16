@@ -96,7 +96,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             name TEXT NOT NULL,
             server_config TEXT NOT NULL,
             description TEXT,
-            enabled_proxycast INTEGER DEFAULT 0,
+            enabled_lime INTEGER DEFAULT 0,
             enabled_claude INTEGER DEFAULT 0,
             enabled_codex INTEGER DEFAULT 0,
             enabled_gemini INTEGER DEFAULT 0,
@@ -353,7 +353,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
     )?;
 
     // ============================================================================
-    // ProxyCast Connect 相关表
+    // Lime Connect 相关表
     // ============================================================================
 
     // ============================================================================
@@ -1471,7 +1471,7 @@ mod tests {
                 "shop_us",
                 "美区资料",
                 "https://seller.example.com/",
-                "/tmp/proxycast/chrome_profiles/shop_us",
+                "/tmp/lime/chrome_profiles/shop_us",
                 "2026-03-15T00:00:00Z",
             ),
         )
@@ -1502,7 +1502,7 @@ mod tests {
         assert_eq!(upgraded.0, "managed_cdp");
         assert_eq!(
             upgraded.1.as_deref(),
-            Some("/tmp/proxycast/chrome_profiles/shop_us")
+            Some("/tmp/lime/chrome_profiles/shop_us")
         );
     }
 }

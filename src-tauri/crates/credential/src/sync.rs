@@ -3,10 +3,10 @@
 //! 负责将凭证池变更同步到 YAML 配置文件
 //! 实现凭证的添加、删除、更新操作与配置文件的同步
 
-use proxycast_core::config::{
+use lime_core::config::{
     expand_tilde, ApiKeyEntry, Config, ConfigError, ConfigManager, CredentialEntry, YamlService,
 };
-use proxycast_core::models::provider_pool_model::{
+use lime_core::models::provider_pool_model::{
     CredentialData, PoolProviderType, ProviderCredential,
 };
 use std::path::PathBuf;
@@ -156,7 +156,7 @@ impl CredentialSyncService {
                 base_url,
                 model_aliases,
             } => {
-                use proxycast_core::models::vertex_model::VertexModelAlias;
+                use lime_core::models::vertex_model::VertexModelAlias;
                 let models: Vec<VertexModelAlias> = model_aliases
                     .iter()
                     .map(|(alias, name)| VertexModelAlias {
@@ -164,7 +164,7 @@ impl CredentialSyncService {
                         name: name.clone(),
                     })
                     .collect();
-                let entry = proxycast_core::models::vertex_model::VertexApiKeyEntry {
+                let entry = lime_core::models::vertex_model::VertexApiKeyEntry {
                     id: credential.uuid.clone(),
                     api_key: api_key.clone(),
                     base_url: base_url.clone(),
@@ -179,7 +179,7 @@ impl CredentialSyncService {
                 base_url,
                 excluded_models,
             } => {
-                use proxycast_core::config::GeminiApiKeyEntry;
+                use lime_core::config::GeminiApiKeyEntry;
                 let entry = GeminiApiKeyEntry {
                     id: credential.uuid.clone(),
                     api_key: api_key.clone(),
@@ -440,7 +440,7 @@ impl CredentialSyncService {
                     .iter_mut()
                     .find(|e| e.id == credential.uuid)
                 {
-                    use proxycast_core::models::vertex_model::VertexModelAlias;
+                    use lime_core::models::vertex_model::VertexModelAlias;
                     entry.api_key = api_key.clone();
                     entry.base_url = base_url.clone();
                     entry.models = model_aliases

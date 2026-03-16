@@ -4,13 +4,13 @@
 
 ## 架构说明
 
-ProxyCast Connect 模块，实现中转商生态合作方案。
+Lime Connect 模块，实现中转商生态合作方案。
 通过 Deep Link 协议实现一键配置功能，支持中转商品牌展示。
 API Key 直接集成到凭证池系统，无需单独存储。
 
 ## 功能概述
 
-1. **Deep Link 处理** - 解析 `proxycast://connect` 协议 URL
+1. **Deep Link 处理** - 解析 `lime://connect` 协议 URL
 2. **中转商注册表** - 从 GitHub 加载和管理中转商信息
 3. **统计回调** - 向中转商发送配置结果回调（Webhook）
 

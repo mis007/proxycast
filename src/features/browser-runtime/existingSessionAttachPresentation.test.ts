@@ -27,10 +27,10 @@ describe("existingSessionAttachPresentation", () => {
     expect(presentation.statusInfo.label).toBe("等待桥接");
     expect(presentation.placeholder).toContain("附着当前 Chrome");
     expect(presentation.embeddedControlHint).toContain(
-      "请先连接 Proxycast Browser Bridge 扩展",
+      "请先连接 Lime Browser Bridge 扩展",
     );
     expect(presentation.liveViewHint).toContain(
-      "请先连接 Proxycast Browser Bridge 扩展",
+      "请先连接 Lime Browser Bridge 扩展",
     );
   });
 

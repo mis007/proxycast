@@ -1,6 +1,6 @@
 use super::{args_or_default, parse_optional_nested_arg};
 use crate::dev_bridge::DevBridgeState;
-use proxycast_memory::{MemoryCategory, MemoryMetadata, MemorySource, MemoryType, UnifiedMemory};
+use lime_memory::{MemoryCategory, MemoryMetadata, MemorySource, MemoryType, UnifiedMemory};
 use rusqlite::{params_from_iter, types::Value};
 use serde_json::Value as JsonValue;
 

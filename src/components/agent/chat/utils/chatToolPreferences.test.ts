@@ -25,7 +25,7 @@ describe("chatToolPreferences", () => {
 
   it("通用对话主题不应继承 legacy 全局偏好", () => {
     localStorage.setItem(
-      "proxycast.chat.tool_preferences.v1",
+      "lime.chat.tool_preferences.v1",
       JSON.stringify({ webSearch: true, thinking: true }),
     );
 
@@ -36,7 +36,7 @@ describe("chatToolPreferences", () => {
 
   it("非通用主题仍可回退 legacy 全局偏好", () => {
     localStorage.setItem(
-      "proxycast.chat.tool_preferences.v1",
+      "lime.chat.tool_preferences.v1",
       JSON.stringify({ webSearch: true, thinking: true, task: true, subagent: true }),
     );
 

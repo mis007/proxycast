@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  ArrowUpCircle,
   Loader2,
   MonitorSmartphone,
+  RefreshCw,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -15,6 +17,7 @@ import { useProviderModels } from "@/hooks/useProviderModels";
 import { useApiKeyProvider } from "@/hooks/useApiKeyProvider";
 import { getRegistryIdFromType } from "@/lib/constants/providerMappings";
 import {
+  copyTextToClipboard,
   detectDesktopPlatform,
   type DesktopPlatform,
 } from "@/lib/crashDiagnostic";
@@ -36,6 +39,7 @@ import {
   type OpenClawHealthInfo,
   type OpenClawInstallProgressEvent,
   type OpenClawNodeCheckResult,
+  type OpenClawRuntimeCandidate,
   type OpenClawSyncModelEntry,
   type OpenClawUpdateInfo,
 } from "@/lib/api/openclaw";
@@ -51,6 +55,7 @@ import { OpenClawRuntimePage } from "./OpenClawRuntimePage";
 import { OpenClawSceneNav } from "./OpenClawSceneNav";
 import {
   type OpenClawOperationKind,
+  type OpenClawOperationHistoryEntry,
   type OpenClawOperationState,
   type OpenClawScene,
   type OpenClawSceneDefinition,
@@ -62,6 +67,7 @@ import { openUrl } from "./openUrl";
 import { useOpenClawDashboardWindow } from "./useOpenClawDashboardWindow";
 import {
   openClawPanelClassName,
+  openClawPrimaryButtonClassName,
   openClawSecondaryButtonClassName,
   openClawSubPanelClassName,
 } from "./openclawStyles";
@@ -151,6 +157,175 @@ function formatBinaryStatus(
     : failureLabel;
 }
 
+type OpenClawRefreshSnapshot = {
+  appliedRuntimeId: string | null;
+  environment: OpenClawEnvironmentStatus;
+  runtimes: OpenClawRuntimeCandidate[];
+  updateInfo: OpenClawUpdateInfo | null;
+  gatewayStatus: OpenClawGatewayStatus;
+  gatewayPort: number;
+  healthInfo: OpenClawHealthInfo | null;
+  channels: OpenClawChannelInfo[];
+  dashboardWindowOpen: boolean;
+};
+
+type OpenClawSnapshotVersionState = {
+  runtimeCandidate: OpenClawRuntimeCandidate | null;
+  installedVersion: string | null;
+  runningVersion: string | null;
+  versionMismatch: boolean;
+};
+
+function selectCurrentRuntimeCandidate(
+  runtimeCandidates: OpenClawRuntimeCandidate[],
+  preferredRuntimeId: string | null,
+): OpenClawRuntimeCandidate | null {
+  return (
+    (preferredRuntimeId
+      ? runtimeCandidates.find((candidate) => candidate.id === preferredRuntimeId)
+      : null) ||
+    runtimeCandidates.find((candidate) => candidate.isPreferred) ||
+    runtimeCandidates.find((candidate) => candidate.isActive) ||
+    null
+  );
+}
+
+function runtimeCandidateHasOpenClawInstallation(
+  candidate: OpenClawRuntimeCandidate | null | undefined,
+): boolean {
+  return Boolean(
+    candidate?.openclawVersion ||
+      candidate?.openclawPath ||
+      candidate?.openclawPackagePath,
+  );
+}
+
+function formatRuntimeCandidateLabel(
+  candidate: OpenClawRuntimeCandidate | null | undefined,
+): string {
+  if (!candidate) {
+    return "自动选择";
+  }
+
+  return `${candidate.source} · Node ${candidate.nodeVersion || "未识别"}`;
+}
+
+function formatRuntimeCandidateOpenClawSummary(
+  candidate: OpenClawRuntimeCandidate | null | undefined,
+): string {
+  if (!candidate) {
+    return "未识别执行环境";
+  }
+
+  if (candidate.openclawVersion) {
+    return `${formatRuntimeCandidateLabel(candidate)} · OpenClaw ${candidate.openclawVersion}`;
+  }
+
+  if (candidate.openclawPath) {
+    return `${formatRuntimeCandidateLabel(candidate)} · 已检测到 OpenClaw 命令`;
+  }
+
+  if (candidate.openclawPackagePath) {
+    return `${formatRuntimeCandidateLabel(candidate)} · 已检测到 OpenClaw 包`;
+  }
+
+  return `${formatRuntimeCandidateLabel(candidate)} · 未检测到 OpenClaw`;
+}
+
+function trimOpenClawVersion(version: string | null | undefined): string | null {
+  const trimmed = version?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeComparableOpenClawVersion(
+  version: string | null | undefined,
+): string | null {
+  const trimmed = trimOpenClawVersion(version);
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed
+    .replace(/^v/i, "")
+    .replace(/-zh(?:\.\d+)?$/i, "")
+    .trim();
+}
+
+function resolveInstalledOpenClawVersion(params: {
+  updateInfo?: OpenClawUpdateInfo | null;
+  environmentStatus?: OpenClawEnvironmentStatus | null;
+  runtimeCandidate?: OpenClawRuntimeCandidate | null;
+}): string | null {
+  return (
+    trimOpenClawVersion(params.updateInfo?.currentVersion) ||
+    trimOpenClawVersion(params.runtimeCandidate?.openclawVersion) ||
+    trimOpenClawVersion(params.environmentStatus?.openclaw.version)
+  );
+}
+
+function resolveRunningOpenClawVersion(params: {
+  gatewayRunning: boolean;
+  healthInfo?: OpenClawHealthInfo | null;
+}): string | null {
+  if (!params.gatewayRunning) {
+    return null;
+  }
+
+  return trimOpenClawVersion(params.healthInfo?.version);
+}
+
+function hasOpenClawVersionMismatch(params: {
+  gatewayRunning: boolean;
+  installedVersion: string | null;
+  runningVersion: string | null;
+}): boolean {
+  if (!params.gatewayRunning) {
+    return false;
+  }
+
+  const installedComparable = normalizeComparableOpenClawVersion(
+    params.installedVersion,
+  );
+  const runningComparable = normalizeComparableOpenClawVersion(
+    params.runningVersion,
+  );
+
+  return Boolean(
+    installedComparable &&
+      runningComparable &&
+      installedComparable !== runningComparable,
+  );
+}
+
+function resolveSnapshotOpenClawVersionState(
+  snapshot: OpenClawRefreshSnapshot,
+): OpenClawSnapshotVersionState {
+  const runtimeCandidate = selectCurrentRuntimeCandidate(
+    snapshot.runtimes,
+    snapshot.appliedRuntimeId,
+  );
+  const installedVersion = resolveInstalledOpenClawVersion({
+    updateInfo: snapshot.updateInfo,
+    environmentStatus: snapshot.environment,
+    runtimeCandidate,
+  });
+  const runningVersion = resolveRunningOpenClawVersion({
+    gatewayRunning: snapshot.gatewayStatus === "running",
+    healthInfo: snapshot.healthInfo,
+  });
+
+  return {
+    runtimeCandidate,
+    installedVersion,
+    runningVersion,
+    versionMismatch: hasOpenClawVersionMismatch({
+      gatewayRunning: snapshot.gatewayStatus === "running",
+      installedVersion,
+      runningVersion,
+    }),
+  };
+}
+
 function buildCompatibleProviders(
   providers: ReturnType<typeof useApiKeyProvider>["providers"],
 ): ConfiguredProvider[] {
@@ -207,6 +382,7 @@ function buildOpenClawRepairPrompt(
   systemInfo: {
     os: string;
     userAgent: string;
+    runtime: string;
     installPath: string;
     nodeStatus: string;
     gitStatus: string;
@@ -239,11 +415,12 @@ function buildOpenClawRepairPrompt(
     "1. 判断最可能的根因",
     "2. 给出最小可执行的修复步骤",
     "3. 如果需要修改环境变量、Node/npm、PATH、全局包冲突，请明确指出",
-    "4. 如果可以在当前 ProxyCast / Tauri 项目中修复，也请给出具体修改建议",
+    "4. 如果可以在当前 Lime / Tauri 项目中修复，也请给出具体修改建议",
     "",
     "当前系统信息：",
     `- 操作系统: ${systemInfo.os}`,
     `- User Agent: ${systemInfo.userAgent}`,
+    `- 执行环境: ${systemInfo.runtime}`,
     `- OpenClaw 安装路径: ${systemInfo.installPath}`,
     `- Node.js 状态: ${systemInfo.nodeStatus}`,
     `- Git 状态: ${systemInfo.gitStatus}`,
@@ -255,6 +432,12 @@ function buildOpenClawRepairPrompt(
     "以下是完整日志：",
     logText,
   ].join("\n");
+}
+
+function buildOpenClawRawLogsText(logs: OpenClawInstallProgressEvent[]): string {
+  return logs.length > 0
+    ? logs.map((log) => `[${log.level.toUpperCase()}] ${log.message}`).join("\n")
+    : "";
 }
 
 function renderBlockedPage(
@@ -289,6 +472,14 @@ function resolveOpenClawSubpage(
 ): OpenClawSubpage {
   if (operationState.running && operationState.kind) {
     return progressSubpageByAction[operationState.kind];
+  }
+
+  if (
+    operationState.kind &&
+    operationState.message &&
+    candidate === progressSubpageByAction[operationState.kind]
+  ) {
+    return candidate;
   }
 
   if (!installed) {
@@ -348,7 +539,11 @@ export function OpenClawPage({
   );
   const selectedModelId = useOpenClawStore((state) => state.selectedModelId);
   const gatewayPort = useOpenClawStore((state) => state.gatewayPort);
+  const preferredRuntimeId = useOpenClawStore(
+    (state) => state.preferredRuntimeId,
+  );
   const lastSynced = useOpenClawStore((state) => state.lastSynced);
+  const recentOperation = useOpenClawStore((state) => state.recentOperation);
   const setSelectedProviderId = useOpenClawStore(
     (state) => state.setSelectedProviderId,
   );
@@ -356,7 +551,13 @@ export function OpenClawPage({
     (state) => state.setSelectedModelId,
   );
   const setGatewayPort = useOpenClawStore((state) => state.setGatewayPort);
+  const setPreferredRuntimeId = useOpenClawStore(
+    (state) => state.setPreferredRuntimeId,
+  );
   const setLastSynced = useOpenClawStore((state) => state.setLastSynced);
+  const setRecentOperation = useOpenClawStore(
+    (state) => state.setRecentOperation,
+  );
   const clearLastSynced = useOpenClawStore((state) => state.clearLastSynced);
 
   const [fallbackSubpage, setFallbackSubpage] =
@@ -375,15 +576,20 @@ export function OpenClawPage({
     useState<OpenClawGatewayStatus>("stopped");
   const [healthInfo, setHealthInfo] = useState<OpenClawHealthInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<OpenClawUpdateInfo | null>(null);
+  const [runtimeCandidates, setRuntimeCandidates] = useState<
+    OpenClawRuntimeCandidate[]
+  >([]);
   const [channels, setChannels] = useState<OpenClawChannelInfo[]>([]);
   const [installLogs, setInstallLogs] = useState<
     OpenClawInstallProgressEvent[]
   >([]);
+  const installLogsRef = useRef<OpenClawInstallProgressEvent[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [switchingRuntime, setSwitchingRuntime] = useState(false);
   const [cleaningTemp, setCleaningTemp] = useState(false);
   const [handingOffToAgent, setHandingOffToAgent] = useState(false);
   const [operationState, setOperationState] = useState<OpenClawOperationState>({
@@ -417,15 +623,9 @@ export function OpenClawPage({
   const installed = installedStatus?.installed ?? false;
   const gatewayRunning = gatewayStatus === "running";
   const gatewayStarting = gatewayStatus === "starting";
-  const canStartGateway = installed && !gatewayRunning && !gatewayStarting;
-  const canStopGateway = installed && gatewayStatus !== "stopped";
-  const canRestartGateway = installed && gatewayRunning;
   const updating = operationState.running && operationState.kind === "update";
   const hasSelectedConfig =
     Boolean(selectedProvider) && selectedModelId.trim().length > 0;
-  const canSync = installed && hasSelectedConfig;
-  const canStartFromConfigure =
-    canStartGateway && (hasSelectedConfig || !!lastSynced);
   const missingInstallDependencies = useMemo(() => {
     if (!environmentStatus) {
       return [] as string[];
@@ -447,6 +647,189 @@ export function OpenClawPage({
 
     return `Windows 下请先手动安装 ${missingInstallDependencies.join(" / ")}，完成后点击“重新检测”，再安装 OpenClaw。`;
   }, [environmentStatus, isWindowsPlatform, missingInstallDependencies]);
+  const currentRuntimeCandidate = useMemo(
+    () => selectCurrentRuntimeCandidate(runtimeCandidates, preferredRuntimeId),
+    [preferredRuntimeId, runtimeCandidates],
+  );
+  const currentRuntimeSummary = useMemo(() => {
+    if (!currentRuntimeCandidate) {
+      return preferredRuntimeId
+        ? "已固定执行环境，但当前未检测到对应运行时"
+        : "自动选择执行环境";
+    }
+
+    return `${currentRuntimeCandidate.source} · Node ${
+      currentRuntimeCandidate.nodeVersion || "未识别"
+    }${
+      currentRuntimeCandidate.openclawVersion
+        ? ` · OpenClaw ${currentRuntimeCandidate.openclawVersion}`
+        : ""
+    }`;
+  }, [currentRuntimeCandidate, preferredRuntimeId]);
+  const currentRuntimeHasOpenClawInstallation = useMemo(
+    () => runtimeCandidateHasOpenClawInstallation(currentRuntimeCandidate),
+    [currentRuntimeCandidate],
+  );
+  const recommendedUpdateRuntimeCandidate = useMemo(() => {
+    if (currentRuntimeHasOpenClawInstallation) {
+      return currentRuntimeCandidate;
+    }
+
+    return (
+      runtimeCandidates.find((candidate) =>
+        runtimeCandidateHasOpenClawInstallation(candidate),
+      ) || null
+    );
+  }, [
+    currentRuntimeCandidate,
+    currentRuntimeHasOpenClawInstallation,
+    runtimeCandidates,
+  ]);
+  const updateRuntimeRequiresSwitch = useMemo(() => {
+    if (currentRuntimeHasOpenClawInstallation) {
+      return false;
+    }
+
+    return Boolean(
+      recommendedUpdateRuntimeCandidate &&
+        recommendedUpdateRuntimeCandidate.id !== currentRuntimeCandidate?.id,
+    );
+  }, [
+    currentRuntimeCandidate?.id,
+    currentRuntimeHasOpenClawInstallation,
+    recommendedUpdateRuntimeCandidate,
+  ]);
+  const updateRuntimeReady = useMemo(
+    () =>
+      currentRuntimeHasOpenClawInstallation ||
+      Boolean(recommendedUpdateRuntimeCandidate),
+    [currentRuntimeHasOpenClawInstallation, recommendedUpdateRuntimeCandidate],
+  );
+  const updateRuntimeNotice = useMemo(() => {
+    if (updateRuntimeRequiresSwitch && recommendedUpdateRuntimeCandidate) {
+      return {
+        tone: "warning" as const,
+        title: "升级前会自动切到已安装 OpenClaw 的执行环境",
+        description: `当前执行环境没有检测到 OpenClaw。推荐使用 ${formatRuntimeCandidateOpenClawSummary(
+          recommendedUpdateRuntimeCandidate,
+        )}；点击“智能升级”时 Lime 也会自动切换。`,
+        actionLabel: "立即切换",
+      };
+    }
+
+    if (!updateRuntimeReady) {
+      return {
+        tone: "error" as const,
+        title: "当前还没识别到可升级的执行环境",
+        description:
+          "未在任何运行时中检测到 OpenClaw 命令或安装包。智能升级仍会尝试自动识别，但建议先重新检测或完成安装。",
+      };
+    }
+
+    return null;
+  }, [
+    recommendedUpdateRuntimeCandidate,
+    updateRuntimeReady,
+    updateRuntimeRequiresSwitch,
+  ]);
+  const softInstalled = useMemo(
+    () =>
+      environmentStatus?.openclaw.status === "needs_reload" &&
+      (gatewayRunning ||
+        gatewayStarting ||
+        Boolean(updateInfo?.currentVersion) ||
+        Boolean(currentRuntimeCandidate?.openclawPath) ||
+        Boolean(currentRuntimeCandidate?.openclawVersion)),
+    [
+      currentRuntimeCandidate?.openclawPath,
+      currentRuntimeCandidate?.openclawVersion,
+      environmentStatus?.openclaw.status,
+      gatewayRunning,
+      gatewayStarting,
+      updateInfo?.currentVersion,
+    ],
+  );
+  const installedVersion = useMemo(
+    () =>
+      resolveInstalledOpenClawVersion({
+        updateInfo,
+        environmentStatus,
+        runtimeCandidate: currentRuntimeCandidate,
+      }),
+    [currentRuntimeCandidate, environmentStatus, updateInfo],
+  );
+  const runningVersion = useMemo(
+    () =>
+      resolveRunningOpenClawVersion({
+        gatewayRunning,
+        healthInfo,
+      }),
+    [gatewayRunning, healthInfo],
+  );
+  const versionMismatch = useMemo(
+    () =>
+      hasOpenClawVersionMismatch({
+        gatewayRunning,
+        installedVersion,
+        runningVersion,
+      }),
+    [gatewayRunning, installedVersion, runningVersion],
+  );
+  const versionStatusSummary = useMemo(() => {
+    if (!installedVersion) {
+      return {
+        label: "未识别安装版本",
+        description: "尚未检测到 OpenClaw 已安装版本。",
+      };
+    }
+
+    if (versionMismatch) {
+      return {
+        label: "运行中仍是旧版本",
+        description: `已安装 ${installedVersion}，但当前 Gateway 仍在运行 ${runningVersion || "未知版本"}。请重启 Gateway 让新版本生效。`,
+      };
+    }
+
+    if (gatewayRunning) {
+      return {
+        label: runningVersion ? "版本已生效" : "运行中待校验",
+        description: runningVersion
+          ? `当前 Gateway 已运行 ${runningVersion}。`
+          : "Gateway 已运行，但暂未识别运行中的版本号。",
+      };
+    }
+
+    if (gatewayStarting) {
+      return {
+        label: "启动中待校验",
+        description: `已安装 ${installedVersion}，等待 Gateway 启动后确认运行中版本。`,
+      };
+    }
+
+    return {
+      label: "待启动确认",
+      description: `已安装 ${installedVersion}，启动 Gateway 后即可确认新版本是否已生效。`,
+    };
+  }, [
+    gatewayRunning,
+    gatewayStarting,
+    installedVersion,
+    runningVersion,
+    versionMismatch,
+  ]);
+  const dashboardProfileVersionKey = useMemo(
+    () =>
+      normalizeComparableOpenClawVersion(runningVersion || installedVersion),
+    [installedVersion, runningVersion],
+  );
+  const openclawWorkflowReady = installed || softInstalled;
+  const canStartGateway =
+    openclawWorkflowReady && !gatewayRunning && !gatewayStarting;
+  const canStopGateway = openclawWorkflowReady && gatewayStatus !== "stopped";
+  const canRestartGateway = openclawWorkflowReady && gatewayRunning;
+  const canSync = openclawWorkflowReady && hasSelectedConfig;
+  const canStartFromConfigure =
+    canStartGateway && (hasSelectedConfig || !!lastSynced);
   const {
     dashboardLoading,
     dashboardUrl,
@@ -457,19 +840,22 @@ export function OpenClawPage({
     handleOpenDashboardWindow,
     handleOpenDashboardExternal,
     closeDashboardWindowSilently,
-  } = useOpenClawDashboardWindow({ gatewayStatus });
+  } = useOpenClawDashboardWindow({
+    gatewayStatus,
+    profileVersionKey: dashboardProfileVersionKey,
+  });
 
   const defaultSubpage = useMemo<OpenClawSubpage>(() => {
     if (operationState.running && operationState.kind) {
       return progressSubpageByAction[operationState.kind];
     }
 
-    if (!installed) {
+    if (!openclawWorkflowReady) {
       return "install";
     }
 
     return "runtime";
-  }, [installed, operationState.kind, operationState.running]);
+  }, [openclawWorkflowReady, operationState.kind, operationState.running]);
 
   const requestedOrFallbackSubpage =
     requestedSubpage ?? (onNavigate ? defaultSubpage : fallbackSubpage);
@@ -477,7 +863,7 @@ export function OpenClawPage({
     () =>
       resolveOpenClawSubpage(
         requestedOrFallbackSubpage,
-        installed,
+        openclawWorkflowReady,
         gatewayRunning,
         gatewayStarting,
         operationState,
@@ -485,7 +871,7 @@ export function OpenClawPage({
     [
       gatewayRunning,
       gatewayStarting,
-      installed,
+      openclawWorkflowReady,
       operationState,
       requestedOrFallbackSubpage,
     ],
@@ -540,6 +926,10 @@ export function OpenClawPage({
     },
     [onNavigate],
   );
+
+  useEffect(() => {
+    installLogsRef.current = installLogs;
+  }, [installLogs]);
 
   useEffect(() => {
     if (compatibleProviders.length === 0) {
@@ -637,26 +1027,38 @@ export function OpenClawPage({
 
     await refreshDashboardUrl({ silent: true });
 
+    let nextHealthInfo: OpenClawHealthInfo | null = null;
+    let nextChannels: OpenClawChannelInfo[] = [];
+
     if (status.status === "running") {
       const [healthResult, channelListResult] = await Promise.allSettled([
         openclawApi.checkHealth(),
         openclawApi.getChannels(),
       ]);
-      setHealthInfo(
-        healthResult.status === "fulfilled" ? healthResult.value : null,
-      );
-      setChannels(
-        channelListResult.status === "fulfilled" ? channelListResult.value : [],
-      );
+      nextHealthInfo =
+        healthResult.status === "fulfilled" ? healthResult.value : null;
+      nextChannels =
+        channelListResult.status === "fulfilled" &&
+        Array.isArray(channelListResult.value)
+          ? channelListResult.value
+          : [];
+      setHealthInfo(nextHealthInfo);
+      setChannels(nextChannels);
     } else {
       setHealthInfo(null);
       setChannels([]);
     }
+
+    return {
+      status,
+      healthInfo: nextHealthInfo,
+      channels: nextChannels,
+    };
   }, [gatewayPort, refreshDashboardUrl, setGatewayPort]);
 
   const refreshUpdateStatus = useCallback(
     async ({ showToast = false } = {}) => {
-      if (!installed) {
+      if (!openclawWorkflowReady) {
         setUpdateInfo(null);
         return null;
       }
@@ -682,12 +1084,67 @@ export function OpenClawPage({
 
       return result;
     },
-    [installed],
+    [openclawWorkflowReady],
   );
 
-  const refreshAll = useCallback(async () => {
+  const syncPreferredRuntimeSelection = useCallback(
+    async (
+      runtimeId: string | null,
+      options?: { allowAutoReset?: boolean },
+    ) => {
+      const allowAutoReset = options?.allowAutoReset ?? false;
+      if (!runtimeId && !allowAutoReset) {
+        return {
+          appliedRuntimeId: null,
+          message: "当前使用自动选择执行环境。",
+          recoveredToAuto: false,
+        };
+      }
+
+      const result = await openclawApi.setPreferredRuntime(runtimeId);
+      if (result.success) {
+        return {
+          appliedRuntimeId: runtimeId,
+          message: result.message,
+          recoveredToAuto: false,
+        };
+      }
+
+      if (runtimeId) {
+        setPreferredRuntimeId(null);
+        const autoResult = await openclawApi
+          .setPreferredRuntime(null)
+          .catch(() => null);
+        return {
+          appliedRuntimeId: null,
+          message: autoResult?.message || result.message,
+          recoveredToAuto: true,
+          recoveryReason: result.message,
+        };
+      }
+
+      throw new Error(result.message);
+    },
+    [setPreferredRuntimeId],
+  );
+
+  const refreshAll = useCallback(async (runtimeIdOverride?: string | null) => {
     try {
-      const environment = await openclawApi.getEnvironmentStatus();
+      const effectiveRuntimeId =
+        runtimeIdOverride === undefined ? preferredRuntimeId : runtimeIdOverride;
+      const runtimeSync =
+        await syncPreferredRuntimeSelection(effectiveRuntimeId);
+      if (runtimeSync.recoveredToAuto && runtimeSync.recoveryReason) {
+        toast.warning("已恢复为自动选择执行环境。", {
+          description: runtimeSync.recoveryReason,
+        });
+      }
+
+      const [environment, runtimes] = await Promise.all([
+        openclawApi.getEnvironmentStatus(),
+        openclawApi.listRuntimeCandidates(),
+      ]);
+      setRuntimeCandidates(runtimes);
       setEnvironmentStatus(environment);
       setInstalledStatus({
         installed: environment.openclaw.status === "ok",
@@ -705,22 +1162,38 @@ export function OpenClawPage({
         available: environment.git.status === "ok",
         path: environment.git.path,
       });
-      if (environment.openclaw.status === "ok") {
-        const updateResult = await openclawApi.checkUpdate().catch(() => null);
-        setUpdateInfo(updateResult);
-      } else {
-        setUpdateInfo(null);
-      }
-      await Promise.all([
+      const updateResult =
+        environment.openclaw.status === "ok"
+          ? await openclawApi.checkUpdate().catch(() => null)
+          : null;
+      setUpdateInfo(updateResult);
+      const [gatewayRuntime, dashboardWindowOpenState] = await Promise.all([
         refreshGatewayRuntime(),
         refreshDashboardWindowState(),
       ]);
+      return {
+        appliedRuntimeId: runtimeSync.appliedRuntimeId,
+        environment,
+        runtimes,
+        updateInfo: updateResult,
+        gatewayStatus: gatewayRuntime.status.status,
+        gatewayPort: gatewayRuntime.status.port,
+        healthInfo: gatewayRuntime.healthInfo,
+        channels: gatewayRuntime.channels,
+        dashboardWindowOpen: dashboardWindowOpenState,
+      } satisfies OpenClawRefreshSnapshot;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
+      return null;
     } finally {
       setStatusResolved(true);
     }
-  }, [refreshDashboardWindowState, refreshGatewayRuntime]);
+  }, [
+    preferredRuntimeId,
+    refreshDashboardWindowState,
+    refreshGatewayRuntime,
+    syncPreferredRuntimeSelection,
+  ]);
 
   useEffect(() => {
     if (!isActive) {
@@ -735,7 +1208,15 @@ export function OpenClawPage({
       return;
     }
 
-    const resolvedSubpage = !installed ? "install" : "runtime";
+    if (
+      operationState.kind &&
+      operationState.message &&
+      fallbackSubpage === progressSubpageByAction[operationState.kind]
+    ) {
+      return;
+    }
+
+    const resolvedSubpage = !openclawWorkflowReady ? "install" : "runtime";
 
     if (!onNavigate && fallbackSubpage !== resolvedSubpage) {
       setFallbackSubpage(resolvedSubpage);
@@ -744,8 +1225,10 @@ export function OpenClawPage({
     fallbackSubpage,
     gatewayRunning,
     gatewayStarting,
-    installed,
+    openclawWorkflowReady,
     onNavigate,
+    operationState.kind,
+    operationState.message,
     operationState.running,
     requestedSubpage,
     statusResolved,
@@ -844,6 +1327,109 @@ export function OpenClawPage({
     [providerModels, selectedModelId, selectedProvider, setLastSynced],
   );
 
+  const createOpenClawOperationHistoryEntry = useCallback(
+    (params: {
+      kind: OpenClawOperationKind;
+      target: OpenClawOperationState["target"];
+      title: string | null;
+      description: string | null;
+      message: string | null;
+      returnSubpage: OpenClawSubpage;
+      logs: OpenClawInstallProgressEvent[];
+      success: boolean;
+    }): OpenClawOperationHistoryEntry => {
+      const {
+        kind,
+        target,
+        title,
+        description,
+        message,
+        returnSubpage,
+        logs,
+        success,
+      } = params;
+      const rawLogsText = buildOpenClawRawLogsText(logs);
+      const repairPrompt = buildOpenClawRepairPrompt(kind, message, logs, {
+        os:
+          typeof navigator !== "undefined"
+            ? `${navigator.platform || "unknown"} / ${navigator.language || "unknown"}`
+            : "unknown",
+        userAgent:
+          typeof navigator !== "undefined"
+            ? navigator.userAgent || "unknown"
+            : "unknown",
+        runtime: currentRuntimeSummary,
+        installPath: installedStatus?.path || "未检测到安装路径",
+        nodeStatus: formatNodeStatus(nodeStatus),
+        gitStatus: formatBinaryStatus(gitStatus, "可用", "未检测到 Git"),
+        gatewayStatus,
+        gatewayPort,
+        healthStatus: healthInfo
+          ? `${healthInfo.status}${healthInfo.version ? ` · ${healthInfo.version}` : ""}`
+          : "尚未执行健康检查",
+        dashboardUrl: dashboardUrl || "尚未生成 Dashboard 地址",
+      });
+
+      const diagnosticBundleJson = JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          source: "openclaw-progress",
+          operation: kind,
+          running: false,
+          message,
+          system: {
+            os:
+              typeof navigator !== "undefined"
+                ? `${navigator.platform || "unknown"} / ${navigator.language || "unknown"}`
+                : "unknown",
+            userAgent:
+              typeof navigator !== "undefined"
+                ? navigator.userAgent || "unknown"
+                : "unknown",
+            runtime: currentRuntimeSummary,
+            installPath: installedStatus?.path || "未检测到安装路径",
+            nodeStatus: formatNodeStatus(nodeStatus),
+            gitStatus: formatBinaryStatus(gitStatus, "可用", "未检测到 Git"),
+            gatewayStatus,
+            gatewayPort,
+            healthStatus: healthInfo
+              ? `${healthInfo.status}${healthInfo.version ? ` · ${healthInfo.version}` : ""}`
+              : "尚未执行健康检查",
+            dashboardUrl: dashboardUrl || "尚未生成 Dashboard 地址",
+          },
+          logs,
+        },
+        null,
+        2,
+      );
+
+      return {
+        kind,
+        target,
+        title,
+        description,
+        message,
+        returnSubpage,
+        success,
+        updatedAt: new Date().toISOString(),
+        logs,
+        rawLogsText,
+        diagnosticBundleJson,
+        repairPrompt,
+      };
+    },
+    [
+      currentRuntimeSummary,
+      dashboardUrl,
+      gatewayPort,
+      gatewayStatus,
+      gitStatus,
+      healthInfo,
+      installedStatus?.path,
+      nodeStatus,
+    ],
+  );
+
   const runProgressOperation = useCallback(
     async (options: {
       kind: OpenClawOperationKind;
@@ -855,6 +1441,18 @@ export function OpenClawPage({
       returnSubpage: OpenClawSubpage;
       initialLogs?: OpenClawInstallProgressEvent[];
       onSuccess?: () => void;
+      successToast?:
+        | false
+        | ((context: {
+            result: { success: boolean; message: string };
+            snapshot: OpenClawRefreshSnapshot | null;
+            logs: OpenClawInstallProgressEvent[];
+          }) => void);
+      afterSuccessRefresh?: (context: {
+        result: { success: boolean; message: string };
+        snapshot: OpenClawRefreshSnapshot | null;
+        logs: OpenClawInstallProgressEvent[];
+      }) => Promise<void> | void;
     }) => {
       const {
         kind,
@@ -866,6 +1464,8 @@ export function OpenClawPage({
         returnSubpage,
         initialLogs = [],
         onSuccess,
+        successToast,
+        afterSuccessRefresh,
       } = options;
 
       setInstallLogs(initialLogs);
@@ -883,6 +1483,29 @@ export function OpenClawPage({
 
       try {
         const result = await action();
+        const latestLogs = await openclawApi
+          .getProgressLogs()
+          .catch(() => installLogsRef.current);
+        const historyLogs =
+          latestLogs.length > 0
+            ? latestLogs
+            : installLogsRef.current.length > 0
+              ? installLogsRef.current
+              : initialLogs;
+
+        setInstallLogs(historyLogs);
+        setRecentOperation(
+          createOpenClawOperationHistoryEntry({
+            kind,
+            target,
+            title,
+            description,
+            message: result.message,
+            returnSubpage,
+            logs: historyLogs,
+            success: result.success,
+          }),
+        );
         setOperationState({
           kind,
           target,
@@ -899,12 +1522,50 @@ export function OpenClawPage({
           return;
         }
 
-        toast.success(result.message);
         onSuccess?.();
-        await refreshAll();
+        const refreshSnapshot = await refreshAll();
+        if (successToast === false) {
+          // 由调用方自行处理成功提示
+        } else if (typeof successToast === "function") {
+          successToast({
+            result,
+            snapshot: refreshSnapshot,
+            logs: historyLogs,
+          });
+        } else {
+          toast.success(result.message);
+        }
+        await afterSuccessRefresh?.({
+          result,
+          snapshot: refreshSnapshot,
+          logs: historyLogs,
+        });
         navigateSubpage(successSubpage);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const latestLogs = await openclawApi
+          .getProgressLogs()
+          .catch(() => installLogsRef.current);
+        const historyLogs =
+          latestLogs.length > 0
+            ? latestLogs
+            : installLogsRef.current.length > 0
+              ? installLogsRef.current
+              : initialLogs;
+
+        setInstallLogs(historyLogs);
+        setRecentOperation(
+          createOpenClawOperationHistoryEntry({
+            kind,
+            target,
+            title,
+            description,
+            message,
+            returnSubpage,
+            logs: historyLogs,
+            success: false,
+          }),
+        );
         setOperationState({
           kind,
           target,
@@ -918,7 +1579,12 @@ export function OpenClawPage({
         await refreshAll();
       }
     },
-    [navigateSubpage, refreshAll],
+    [
+      createOpenClawOperationHistoryEntry,
+      navigateSubpage,
+      refreshAll,
+      setRecentOperation,
+    ],
   );
 
   const handleDownloadNode = useCallback(async () => {
@@ -951,7 +1617,7 @@ export function OpenClawPage({
       title: isWindowsPlatform ? "正在安装 OpenClaw" : "正在修复环境并安装 OpenClaw",
       description: isWindowsPlatform
         ? "当前环境已通过检测，正在继续安装 OpenClaw。"
-        : "ProxyCast 会先自动检查并修复 Node.js / Git，再继续安装 OpenClaw。",
+        : "Lime 会先自动检查并修复 Node.js / Git，再继续安装 OpenClaw。",
       action: () => openclawApi.install(),
       successSubpage: "runtime",
       returnSubpage: "install",
@@ -1047,7 +1713,7 @@ export function OpenClawPage({
       kind: "repair",
       target: "node",
       title: "正在安装 Node.js 环境",
-      description: "ProxyCast 会优先尝试应用内一键安装或修复 Node.js。",
+      description: "Lime 会优先尝试应用内一键安装或修复 Node.js。",
       action: () => openclawApi.installDependency("node"),
       successSubpage: "install",
       returnSubpage: "install",
@@ -1073,7 +1739,7 @@ export function OpenClawPage({
       kind: "repair",
       target: "git",
       title: "正在安装 Git 环境",
-      description: "ProxyCast 会优先尝试应用内一键安装或修复 Git。",
+      description: "Lime 会优先尝试应用内一键安装或修复 Git。",
       action: () => openclawApi.installDependency("git"),
       successSubpage: "install",
       returnSubpage: "install",
@@ -1197,14 +1863,89 @@ export function OpenClawPage({
     }
   }, [refreshUpdateStatus]);
 
+  const handleSelectPreferredRuntime = useCallback(
+    async (runtimeId: string | null) => {
+      setSwitchingRuntime(true);
+      try {
+        const result = await syncPreferredRuntimeSelection(runtimeId, {
+          allowAutoReset: runtimeId === null,
+        });
+        setPreferredRuntimeId(result.appliedRuntimeId);
+        await refreshAll(result.appliedRuntimeId);
+        toast.success(result.message);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error));
+      } finally {
+        setSwitchingRuntime(false);
+      }
+    },
+    [refreshAll, setPreferredRuntimeId, syncPreferredRuntimeSelection],
+  );
+
+  const ensureUpdateRuntimeReady = useCallback(async () => {
+    if (currentRuntimeHasOpenClawInstallation) {
+      return true;
+    }
+
+    if (!recommendedUpdateRuntimeCandidate) {
+      toast.warning("当前执行环境里还没有检测到 OpenClaw。", {
+        description:
+          "智能升级会继续尝试自动识别安装来源；如果仍失败，请先在执行环境卡片里切到已安装 OpenClaw 的 Node 运行时。",
+      });
+      return true;
+    }
+
+    setSwitchingRuntime(true);
+    try {
+      const result = await syncPreferredRuntimeSelection(
+        recommendedUpdateRuntimeCandidate.id,
+      );
+      if (result.appliedRuntimeId !== recommendedUpdateRuntimeCandidate.id) {
+        throw new Error(result.recoveryReason || result.message);
+      }
+
+      setPreferredRuntimeId(result.appliedRuntimeId);
+      toast.info("已自动切换到检测到 OpenClaw 的执行环境。", {
+        description: formatRuntimeCandidateOpenClawSummary(
+          recommendedUpdateRuntimeCandidate,
+        ),
+      });
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally {
+      setSwitchingRuntime(false);
+    }
+  }, [
+    currentRuntimeHasOpenClawInstallation,
+    recommendedUpdateRuntimeCandidate,
+    setPreferredRuntimeId,
+    syncPreferredRuntimeSelection,
+  ]);
+
+  const handleUseRecommendedUpdateRuntime = useCallback(async () => {
+    if (!recommendedUpdateRuntimeCandidate) {
+      return;
+    }
+
+    await handleSelectPreferredRuntime(recommendedUpdateRuntimeCandidate.id);
+  }, [handleSelectPreferredRuntime, recommendedUpdateRuntimeCandidate]);
+
   const handlePerformUpdate = useCallback(async () => {
+    const runtimePrepared = await ensureUpdateRuntimeReady();
+    if (!runtimePrepared) {
+      return;
+    }
+
+    const reopenDashboardAfterUpdate = dashboardWindowOpen;
     await closeDashboardWindowSilently();
     await runProgressOperation({
       kind: "update",
       target: "openclaw",
-      title: "正在升级 OpenClaw",
+      title: "正在智能升级 OpenClaw",
       description:
-        "将调用 openclaw update 执行本体升级，完成后会自动刷新版本与运行状态。",
+        "将优先调用 openclaw update；如果官方自更新无法识别安装来源，Lime 会自动尝试同运行时的全局安装升级兜底。",
       action: () => openclawApi.performUpdate(),
       successSubpage: "runtime",
       returnSubpage: "runtime",
@@ -1212,13 +1953,57 @@ export function OpenClawPage({
         {
           level: "info",
           message: updateInfo?.hasUpdate
-            ? `已检测到新版本 ${updateInfo.latestVersion || "待确认"}，开始升级...`
-            : "开始执行 OpenClaw 升级命令...",
+            ? `已检测到新版本 ${updateInfo.latestVersion || "待确认"}，开始智能升级...`
+            : "开始执行 OpenClaw 智能升级...",
         },
       ],
+      successToast: ({ result, snapshot }) => {
+        if (!snapshot) {
+          toast.success(result.message);
+          return;
+        }
+
+        const snapshotVersionState =
+          resolveSnapshotOpenClawVersionState(snapshot);
+
+        if (snapshotVersionState.versionMismatch) {
+          toast.warning("新版本已经安装，但当前仍在运行旧版 Gateway。", {
+            description: `已安装 ${snapshotVersionState.installedVersion || "新版本"}，当前运行中 ${snapshotVersionState.runningVersion || "未知版本"}。请点击“重启 Gateway”让桌面版切换到新版本。`,
+          });
+          return;
+        }
+
+        toast.success(
+          snapshotVersionState.installedVersion
+            ? `OpenClaw 已升级到 ${snapshotVersionState.installedVersion}。`
+            : result.message,
+          {
+            description:
+              snapshot.gatewayStatus === "running"
+                ? `当前运行中 ${snapshotVersionState.runningVersion || snapshotVersionState.installedVersion || "新版本"}。`
+                : "Gateway 未运行，启动后即可进入新版本桌面版。",
+          },
+        );
+      },
+      afterSuccessRefresh: async ({ snapshot }) => {
+        if (!snapshot) {
+          return;
+        }
+
+        if (
+          reopenDashboardAfterUpdate &&
+          snapshot.gatewayStatus === "running" &&
+          !resolveSnapshotOpenClawVersionState(snapshot).versionMismatch
+        ) {
+          await handleOpenDashboardWindow();
+        }
+      },
     });
   }, [
+    dashboardWindowOpen,
     closeDashboardWindowSilently,
+    ensureUpdateRuntimeReady,
+    handleOpenDashboardWindow,
     runProgressOperation,
     updateInfo?.hasUpdate,
     updateInfo?.latestVersion,
@@ -1243,22 +2028,47 @@ export function OpenClawPage({
 
   const handleCopyPath = useCallback(async () => {
     const path = installedStatus?.path;
-    if (!path) {
+    if (!path?.trim()) {
       toast.error("当前没有可复制的安装路径。");
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(path);
+      await copyTextToClipboard(path, {
+        fallbackErrorMessage: "复制安装路径失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制安装路径。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制安装路径。",
+      });
       toast.success("安装路径已复制。");
-    } catch {
-      toast.error("复制安装路径失败。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "复制安装路径失败。");
     }
   }, [installedStatus?.path]);
 
   const handleCloseProgress = useCallback(() => {
     navigateSubpage(operationState.returnSubpage);
   }, [navigateSubpage, operationState.returnSubpage]);
+
+  const handleOpenRecentOperationLogsPage = useCallback(() => {
+    if (!recentOperation) {
+      toast.error("当前没有可查看的历史日志。");
+      return;
+    }
+
+    setInstallLogs(recentOperation.logs);
+    setOperationState({
+      kind: recentOperation.kind,
+      target: recentOperation.target,
+      running: false,
+      title: recentOperation.title,
+      description: recentOperation.description,
+      message: recentOperation.message,
+      returnSubpage: "runtime",
+    });
+    navigateSubpage(progressSubpageByAction[recentOperation.kind]);
+  }, [navigateSubpage, recentOperation]);
 
   const openClawRepairPrompt = useMemo(
     () =>
@@ -1275,6 +2085,7 @@ export function OpenClawPage({
             typeof navigator !== "undefined"
               ? navigator.userAgent || "unknown"
               : "unknown",
+          runtime: currentRuntimeSummary,
           installPath: installedStatus?.path || "未检测到安装路径",
           nodeStatus: formatNodeStatus(nodeStatus),
           gitStatus: formatBinaryStatus(gitStatus, "可用", "未检测到 Git"),
@@ -1287,6 +2098,7 @@ export function OpenClawPage({
         },
       ),
     [
+      currentRuntimeSummary,
       dashboardUrl,
       gatewayPort,
       gatewayStatus,
@@ -1301,12 +2113,7 @@ export function OpenClawPage({
   );
 
   const openClawRawLogsText = useMemo(
-    () =>
-      installLogs.length > 0
-        ? installLogs
-            .map((log) => `[${log.level.toUpperCase()}] ${log.message}`)
-            .join("\n")
-        : "",
+    () => buildOpenClawRawLogsText(installLogs),
     [installLogs],
   );
 
@@ -1328,6 +2135,7 @@ export function OpenClawPage({
               typeof navigator !== "undefined"
                 ? navigator.userAgent || "unknown"
                 : "unknown",
+            runtime: currentRuntimeSummary,
             installPath: installedStatus?.path || "未检测到安装路径",
             nodeStatus: formatNodeStatus(nodeStatus),
             gitStatus: formatBinaryStatus(gitStatus, "可用", "未检测到 Git"),
@@ -1344,6 +2152,7 @@ export function OpenClawPage({
         2,
       ),
     [
+      currentRuntimeSummary,
       dashboardUrl,
       gatewayPort,
       gatewayStatus,
@@ -1360,10 +2169,18 @@ export function OpenClawPage({
 
   const handleCopyOpenClawRepairPrompt = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(openClawRepairPrompt);
+      await copyTextToClipboard(openClawRepairPrompt, {
+        fallbackErrorMessage: "复制 OpenClaw 修复提示词失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制修复提示词。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制修复提示词。",
+      });
       toast.success("OpenClaw 修复提示词已复制。");
-    } catch {
-      toast.error("复制修复提示词失败。");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "复制修复提示词失败。",
+      );
     }
   }, [openClawRepairPrompt]);
 
@@ -1374,26 +2191,79 @@ export function OpenClawPage({
     }
 
     try {
-      await navigator.clipboard.writeText(openClawRawLogsText);
+      await copyTextToClipboard(openClawRawLogsText, {
+        fallbackErrorMessage: "复制 OpenClaw 日志失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制日志。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制日志。",
+      });
       toast.success("OpenClaw 纯日志已复制。");
-    } catch {
-      toast.error("复制纯日志失败。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "复制纯日志失败。");
     }
   }, [openClawRawLogsText]);
 
   const handleCopyOpenClawDiagnosticBundle = useCallback(async () => {
-    if (!openClawRawLogsText.trim()) {
-      toast.error("当前没有可复制的诊断内容。");
+    try {
+      await copyTextToClipboard(openClawDiagnosticBundleJson, {
+        fallbackErrorMessage: "复制 OpenClaw JSON 诊断包失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制诊断包。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制诊断包。",
+      });
+      toast.success("OpenClaw JSON 诊断包已复制。");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "复制 JSON 诊断包失败。",
+      );
+    }
+  }, [openClawDiagnosticBundleJson]);
+
+  const handleCopyRecentOperationLogs = useCallback(async () => {
+    const rawLogsText = recentOperation?.rawLogsText?.trim();
+    if (!rawLogsText) {
+      toast.error("当前没有可复制的历史日志。");
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(openClawDiagnosticBundleJson);
-      toast.success("OpenClaw JSON 诊断包已复制。");
-    } catch {
-      toast.error("复制 JSON 诊断包失败。");
+      await copyTextToClipboard(rawLogsText, {
+        fallbackErrorMessage: "复制历史日志失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制历史日志。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制历史日志。",
+      });
+      toast.success("历史日志已复制。");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "复制历史日志失败。");
     }
-  }, [openClawDiagnosticBundleJson, openClawRawLogsText]);
+  }, [recentOperation?.rawLogsText]);
+
+  const handleCopyRecentOperationDiagnosticBundle = useCallback(async () => {
+    const diagnosticBundleJson = recentOperation?.diagnosticBundleJson?.trim();
+    if (!diagnosticBundleJson) {
+      toast.error("当前没有可复制的历史诊断包。");
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(diagnosticBundleJson, {
+        fallbackErrorMessage: "复制历史诊断包失败，请重试。",
+        permissionDeniedMessage:
+          "剪贴板权限被系统拒绝，请先点击 Lime 窗口后重试复制历史诊断包。",
+        inactiveWindowMessage:
+          "当前窗口未激活，先点击 Lime 窗口后再复制历史诊断包。",
+      });
+      toast.success("历史诊断包已复制。");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "复制历史诊断包失败。",
+      );
+    }
+  }, [recentOperation?.diagnosticBundleJson]);
 
   const handleAskAgentFixOpenClaw = useCallback(async () => {
     const prompt = openClawRepairPrompt.trim();
@@ -1445,12 +2315,15 @@ export function OpenClawPage({
           if (installed) {
             return { label: "已安装", tone: "done" };
           }
+          if (softInstalled) {
+            return { label: "可继续", tone: "active" };
+          }
           if (environmentStatus?.openclaw.status === "needs_reload") {
             return { label: "待刷新", tone: "active" };
           }
           return { label: "待安装", tone: "idle" };
         case "sync":
-          if (!installed) {
+          if (!openclawWorkflowReady) {
             return { label: "等待安装", tone: "idle" };
           }
           if (syncing) {
@@ -1466,7 +2339,7 @@ export function OpenClawPage({
             ? { label: "待选择", tone: "active" }
             : { label: "缺少 Provider", tone: "error" };
         case "dashboard":
-          if (!installed) {
+          if (!openclawWorkflowReady) {
             return { label: "等待安装", tone: "idle" };
           }
           if (operationState.running && operationState.kind === "update") {
@@ -1505,9 +2378,11 @@ export function OpenClawPage({
       gatewayStatus,
       hasSelectedConfig,
       installed,
+      openclawWorkflowReady,
       lastSynced,
       operationState.kind,
       operationState.running,
+      softInstalled,
       starting,
       syncing,
     ],
@@ -1520,10 +2395,10 @@ export function OpenClawPage({
 
     switch (currentSubpage) {
       case "install":
-        return (
-          environmentStatus?.summary ||
-          "先确认 Node.js、Git 与 OpenClaw 本体状态，再决定是否执行一键修复。"
-        );
+        return softInstalled
+          ? "当前运行中的 Gateway 或已识别到版本表明 OpenClaw 已可用，但命令解析仍未完全对齐。你可以继续下一步，后续再修正执行环境。"
+          : (environmentStatus?.summary ||
+              "先确认 Node.js、Git 与 OpenClaw 本体状态，再决定是否执行一键修复。");
       case "installing":
       case "uninstalling":
       case "updating":
@@ -1535,10 +2410,26 @@ export function OpenClawPage({
       case "configure":
         return "在一个工作台里完成 Provider 选择、模型同步与启动前准备，避免在设置与运行页之间来回跳转。";
       case "runtime":
+        if (versionMismatch) {
+          return `新版本已经安装到 ${installedVersion || "当前环境"}，但 Gateway 仍在运行 ${runningVersion || "旧版本"}。重启 Gateway 后，桌面面板和 Dashboard 才会切到新版本。`;
+        }
+        if (updateRuntimeRequiresSwitch && recommendedUpdateRuntimeCandidate) {
+          return `当前执行环境没有检测到 OpenClaw。智能升级时，Lime 会先切到 ${formatRuntimeCandidateOpenClawSummary(
+            recommendedUpdateRuntimeCandidate,
+          )}，再继续升级。`;
+        }
         return gatewayRunning
           ? "Gateway 已准备就绪，可以直接打开桌面面板，或进入 Dashboard 访问页进一步检查地址与 token。"
           : "这里集中处理启动、停止、重启与健康检查。启动前如未同步模型，请先回到配置页。";
       case "dashboard":
+        if (versionMismatch) {
+          return `已安装 ${installedVersion || "新版本"}，但当前 Dashboard 仍连接到运行中的 ${runningVersion || "旧版本"}。先重启 Gateway，再重新打开桌面面板。`;
+        }
+        if (updateRuntimeRequiresSwitch && recommendedUpdateRuntimeCandidate) {
+          return `已检测到更合适的执行环境 ${formatRuntimeCandidateOpenClawSummary(
+            recommendedUpdateRuntimeCandidate,
+          )}。智能升级时，Lime 会自动切换过去。`;
+        }
         return "通过桌面面板或系统浏览器访问 OpenClaw Dashboard，并在这里确认地址、token 与面板状态。";
       default:
         return "统一管理 OpenClaw 的安装、模型同步、Gateway 运行与 Dashboard 访问。";
@@ -1547,9 +2438,15 @@ export function OpenClawPage({
     currentSubpage,
     environmentStatus?.summary,
     gatewayRunning,
+    installedVersion,
     operationState.description,
     operationState.running,
+    recommendedUpdateRuntimeCandidate,
+    runningVersion,
+    softInstalled,
     statusResolved,
+    updateRuntimeRequiresSwitch,
+    versionMismatch,
   ]);
 
   const summaryCards = useMemo<
@@ -1567,8 +2464,18 @@ export function OpenClawPage({
       {
         key: "setup",
         title: "安装环境",
-        value: installed ? "已安装" : operationState.running ? "处理中" : "待安装",
-        description: environmentStatus?.openclaw.path || "等待检测安装路径",
+        value: installed
+          ? "已安装"
+          : softInstalled
+            ? "可继续"
+            : operationState.running
+              ? "处理中"
+              : "待安装",
+        description:
+          environmentStatus?.openclaw.path ||
+          currentRuntimeCandidate?.openclawPath ||
+          currentRuntimeCandidate?.openclawPackagePath ||
+          "等待检测安装路径",
         icon: Wrench,
         iconClassName: "border-slate-200 bg-slate-100 text-slate-700",
       },
@@ -1613,8 +2520,11 @@ export function OpenClawPage({
       installed,
       lastSynced,
       operationState.running,
+      currentRuntimeCandidate?.openclawPackagePath,
+      currentRuntimeCandidate?.openclawPath,
       selectedModelId,
       selectedProvider?.label,
+      softInstalled,
     ],
   );
 
@@ -1650,8 +2560,11 @@ export function OpenClawPage({
     pageContent = (
       <OpenClawInstallPage
         environmentStatus={environmentStatus}
+        runtimeCandidates={runtimeCandidates}
+        preferredRuntimeId={preferredRuntimeId}
         desktopPlatform={desktopPlatform}
-        busy={operationState.running}
+        busy={operationState.running || switchingRuntime}
+        switchingRuntime={switchingRuntime}
         installing={
           operationState.running &&
           operationState.kind === "install" &&
@@ -1676,6 +2589,9 @@ export function OpenClawPage({
         onOpenDocs={() => void openUrl(OPENCLAW_DOCS_URL)}
         onDownloadNode={() => void handleDownloadNode()}
         onDownloadGit={() => void handleDownloadGit()}
+        onSelectPreferredRuntime={(runtimeId) =>
+          void handleSelectPreferredRuntime(runtimeId)
+        }
       />
     );
   } else if (
@@ -1709,12 +2625,15 @@ export function OpenClawPage({
         onAskAgentFix={handleAskAgentFixOpenClaw}
       />
     );
-  } else if (!installed) {
+  } else if (!openclawWorkflowReady) {
     pageContent = (
       <OpenClawInstallPage
         environmentStatus={environmentStatus}
+        runtimeCandidates={runtimeCandidates}
+        preferredRuntimeId={preferredRuntimeId}
         desktopPlatform={desktopPlatform}
-        busy={operationState.running}
+        busy={operationState.running || switchingRuntime}
+        switchingRuntime={switchingRuntime}
         installing={
           operationState.running &&
           operationState.kind === "install" &&
@@ -1739,6 +2658,9 @@ export function OpenClawPage({
         onOpenDocs={() => void openUrl(OPENCLAW_DOCS_URL)}
         onDownloadNode={() => void handleDownloadNode()}
         onDownloadGit={() => void handleDownloadGit()}
+        onSelectPreferredRuntime={(runtimeId) =>
+          void handleSelectPreferredRuntime(runtimeId)
+        }
       />
     );
   } else if (currentSubpage === "configure") {
@@ -1788,6 +2710,13 @@ export function OpenClawPage({
         gatewayStatus={gatewayStatus}
         gatewayPort={gatewayPort}
         healthInfo={healthInfo}
+        updateInfo={updateInfo}
+        installedVersion={installedVersion}
+        runningVersion={runningVersion}
+        versionMismatch={versionMismatch}
+        updateRuntimeNotice={updateRuntimeNotice}
+        runtimeCandidates={runtimeCandidates}
+        preferredRuntimeId={preferredRuntimeId}
         channelCount={channels.length}
         startReady={hasSelectedConfig || !!lastSynced}
         canStart={canStartGateway}
@@ -1795,13 +2724,22 @@ export function OpenClawPage({
         canRestart={canRestartGateway}
         starting={starting}
         stopping={stopping}
-        updateInfo={updateInfo}
         restarting={operationState.running && operationState.kind === "restart"}
         checkingHealth={checkingHealth}
         checkingUpdate={checkingUpdate}
+        switchingRuntime={switchingRuntime}
         updating={updating}
         dashboardWindowOpen={dashboardWindowOpen}
         dashboardWindowBusy={dashboardWindowBusy}
+        recentOperationLabel={
+          recentOperation ? openClawOperationLabel(recentOperation.kind) : null
+        }
+        recentOperationMessage={recentOperation?.message || null}
+        recentOperationUpdatedAt={recentOperation?.updatedAt || null}
+        recentOperationSucceeded={
+          recentOperation ? recentOperation.success : null
+        }
+        recentLogCount={recentOperation?.logs.length || 0}
         onStart={() => void handleStart()}
         onStop={() => void handleStop()}
         onRestart={() => void handleRestart()}
@@ -1811,6 +2749,17 @@ export function OpenClawPage({
         onCheckHealth={() => void handleCheckHealth()}
         onCheckUpdate={() => void handleCheckUpdate()}
         onUpdate={() => void handlePerformUpdate()}
+        onUseRecommendedUpdateRuntime={() =>
+          void handleUseRecommendedUpdateRuntime()
+        }
+        onSelectPreferredRuntime={(runtimeId) =>
+          void handleSelectPreferredRuntime(runtimeId)
+        }
+        onOpenRecentLogs={() => void handleOpenRecentOperationLogsPage()}
+        onCopyRecentLogs={() => void handleCopyRecentOperationLogs()}
+        onCopyRecentDiagnosticBundle={() =>
+          void handleCopyRecentOperationDiagnosticBundle()
+        }
       />
     );
   } else if (currentSubpage === "dashboard") {
@@ -1829,9 +2778,13 @@ export function OpenClawPage({
           running={gatewayRunning}
           windowBusy={dashboardWindowBusy}
           windowOpen={dashboardWindowOpen}
+          hasUpdate={Boolean(updateInfo?.hasUpdate)}
+          latestVersion={updateInfo?.latestVersion}
+          updating={updating}
           onBack={() => navigateSubpage("runtime")}
           onOpenExternal={() => void handleOpenDashboardExternal()}
           onOpenWindow={() => void handleOpenDashboardWindow()}
+          onUpdate={() => void handlePerformUpdate()}
           onRefresh={() =>
             void Promise.all([
               refreshDashboardUrl({ silent: false, showLoading: true }),
@@ -1887,13 +2840,33 @@ export function OpenClawPage({
                       variant="outline"
                       className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
                     >
-                      {installed ? "环境已安装" : "环境待安装"}
+                      {installed
+                        ? "环境已安装"
+                        : softInstalled
+                          ? "环境可继续"
+                          : "环境待安装"}
                     </Badge>
                     <Badge
                       variant="outline"
                       className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
                     >
-                      OpenClaw {updateInfo?.currentVersion || environmentStatus?.openclaw.version || "未检测到版本"}
+                      已安装 {installedVersion || "未检测到版本"}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full bg-white/75 px-3 py-1",
+                        versionMismatch
+                          ? "border-amber-200 text-amber-700"
+                          : "border-slate-200 text-slate-600",
+                      )}
+                    >
+                      运行中{" "}
+                      {gatewayRunning
+                        ? runningVersion || "待校验"
+                        : gatewayStarting
+                          ? "启动中"
+                          : "未启动"}
                     </Badge>
                     <Badge
                       variant="outline"
@@ -1901,6 +2874,23 @@ export function OpenClawPage({
                     >
                       Gateway {gatewayRunning ? "运行中" : gatewayStatus}
                     </Badge>
+                    {versionMismatch ? (
+                      <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700 shadow-none hover:bg-amber-50">
+                        需重启 Gateway 才会切到新版本
+                      </Badge>
+                    ) : null}
+                    {updateRuntimeRequiresSwitch &&
+                    recommendedUpdateRuntimeCandidate ? (
+                      <Badge
+                        variant="outline"
+                        className="rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-sky-700"
+                      >
+                        升级将自动切到{" "}
+                        {formatRuntimeCandidateLabel(
+                          recommendedUpdateRuntimeCandidate,
+                        )}
+                      </Badge>
+                    ) : null}
                     {updateInfo?.hasUpdate ? (
                       <Badge
                         variant="outline"
@@ -1908,6 +2898,24 @@ export function OpenClawPage({
                       >
                         可升级至 {updateInfo.latestVersion || "新版本"}
                       </Badge>
+                    ) : null}
+                    {updateInfo?.hasUpdate ? (
+                      <button
+                        type="button"
+                        onClick={() => void handlePerformUpdate()}
+                        disabled={operationState.running || switchingRuntime}
+                        className={cn(
+                          openClawPrimaryButtonClassName,
+                          "h-8 rounded-full px-3 text-xs shadow-sm",
+                        )}
+                      >
+                        {updating ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ArrowUpCircle className="h-3.5 w-3.5" />
+                        )}
+                        智能升级
+                      </button>
                     ) : null}
                   </div>
                 </div>
@@ -1944,6 +2952,43 @@ export function OpenClawPage({
                     <span className="rounded-full bg-slate-100 px-2.5 py-1">
                       端口 {gatewayPort}
                     </span>
+                  </div>
+
+                  <div className="mt-4 rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold tracking-[0.12em] text-slate-500">
+                          VERSION STATUS
+                        </p>
+                        <p
+                          className={cn(
+                            "mt-1 text-sm font-semibold",
+                            versionMismatch
+                              ? "text-amber-700"
+                              : "text-slate-800",
+                          )}
+                        >
+                          {versionStatusSummary.label}
+                        </p>
+                      </div>
+                      {versionMismatch && canRestartGateway ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleRestart()}
+                          disabled={operationState.running}
+                          className={cn(
+                            openClawSecondaryButtonClassName,
+                            "px-3 py-2 text-xs",
+                          )}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          立即重启生效
+                        </button>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      {versionStatusSummary.description}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2036,6 +3081,24 @@ export function OpenClawPage({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {updateInfo?.hasUpdate ? (
+                    <button
+                      type="button"
+                      onClick={() => void handlePerformUpdate()}
+                      disabled={operationState.running || switchingRuntime}
+                      className={cn(
+                        openClawPrimaryButtonClassName,
+                        "px-3 py-2 text-xs",
+                      )}
+                    >
+                      {updating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ArrowUpCircle className="h-3.5 w-3.5" />
+                      )}
+                      智能升级到 {updateInfo.latestVersion || "最新版本"}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void refreshAll()}

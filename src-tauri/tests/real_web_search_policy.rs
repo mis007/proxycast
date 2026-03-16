@@ -1,15 +1,16 @@
 use futures::StreamExt;
-use proxycast_agent::{
+use lime_agent::{
     convert_agent_event, merge_system_prompt_with_request_tool_policy, resolve_request_tool_policy,
     AsterAgentState, SessionConfigBuilder, TauriAgentEvent, WebSearchExecutionTracker,
 };
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::database::init_database;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::database::init_database;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
 use uuid::Uuid;
 
 fn should_run_real_test() -> bool {
-    std::env::var("PROXYCAST_REAL_API_TEST").ok().as_deref() == Some("1")
+    lime_core::env_compat::var(&["LIME_REAL_API_TEST", "PROXYCAST_REAL_API_TEST"]).as_deref()
+        == Some("1")
 }
 
 fn resolve_model_name(
@@ -33,17 +34,19 @@ fn resolve_model_name(
     }
 
     Err(
-        "未找到可用模型：请设置 PROXYCAST_REAL_MODEL，或在 Provider custom_models 中配置模型。"
+        "未找到可用模型：请设置 LIME_REAL_MODEL，或在 Provider custom_models 中配置模型（兼容旧的 PROXYCAST_REAL_MODEL）。"
             .to_string(),
     )
 }
 
 fn resolve_codex_provider_and_model(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
 ) -> Result<(String, String), String> {
-    let explicit_model = std::env::var("PROXYCAST_REAL_MODEL").ok();
+    let explicit_model = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"]);
 
-    if let Ok(explicit) = std::env::var("PROXYCAST_REAL_PROVIDER_ID") {
+    if let Some(explicit) =
+        lime_core::env_compat::var(&["LIME_REAL_PROVIDER_ID", "PROXYCAST_REAL_PROVIDER_ID"])
+    {
         let trimmed = explicit.trim();
         if !trimmed.is_empty() {
             let service = ApiKeyProviderService::new();
@@ -86,7 +89,7 @@ struct RealRunSummary {
 
 async fn run_real_case(
     state: &AsterAgentState,
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     provider_id: &str,
     model_name: &str,
     web_search: bool,
@@ -167,7 +170,7 @@ async fn run_real_case(
 }
 
 #[tokio::test]
-#[ignore = "真实联网测试：设置 PROXYCAST_REAL_API_TEST=1 后执行"]
+#[ignore = "真实联网测试：设置 LIME_REAL_API_TEST=1 后执行"]
 async fn test_real_gpt53_codex_web_search_scenarios() {
     if !should_run_real_test() {
         return;
@@ -176,13 +179,14 @@ async fn test_real_gpt53_codex_web_search_scenarios() {
     let db = init_database().expect("初始化数据库失败");
     let (provider_id, resolved_model) =
         resolve_codex_provider_and_model(&db).expect("解析 Codex Provider/模型失败");
-    let model_name = std::env::var("PROXYCAST_REAL_MODEL").unwrap_or_else(|_| {
-        if resolved_model.trim().is_empty() {
-            "gpt-5.3-codex".to_string()
-        } else {
-            resolved_model
-        }
-    });
+    let model_name = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"])
+        .unwrap_or_else(|| {
+            if resolved_model.trim().is_empty() {
+                "gpt-5.3-codex".to_string()
+            } else {
+                resolved_model
+            }
+        });
 
     assert_eq!(
         model_name.trim(),

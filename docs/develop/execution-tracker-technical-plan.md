@@ -1,8 +1,8 @@
-# ProxyCast 统一执行追踪（Execution Tracker）技术规划
+# Lime 统一执行追踪（Execution Tracker）技术规划
 
 ## 1. 背景与问题定义
 
-当前 ProxyCast 的执行入口分散在多个模块：
+当前 Lime 的执行入口分散在多个模块：
 
 - `aster_agent_cmd.rs`（通用 Agent 对话）
 - `skill_exec_cmd.rs`（Skill 执行）

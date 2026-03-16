@@ -112,7 +112,7 @@ src-tauri/src/converter/
 ```rust
 // Antigravity 请求格式 (参考 CLIProxyAPI)
 {
-    "project": "proxycast",
+    "project": "lime",
     "request": {
         "contents": [...],
         "systemInstruction": {...},

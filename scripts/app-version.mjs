@@ -61,7 +61,7 @@ if (entryFilePath && currentFilePath === entryFilePath) {
   const repoRoot = path.resolve(path.dirname(currentFilePath), "..");
   const version = readWorkspaceAppVersion(repoRoot);
   if (!version) {
-    console.error("[proxycast] 无法从 src-tauri/Cargo.toml 读取 workspace 版本");
+    console.error("[lime] 无法从 src-tauri/Cargo.toml 读取 workspace 版本");
     process.exit(1);
   }
   process.stdout.write(version);

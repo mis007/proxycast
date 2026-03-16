@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::models::provider_pool_model::PoolProviderType;
+use lime_core::models::provider_pool_model::PoolProviderType;
 
 /// 协议类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

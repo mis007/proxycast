@@ -3,10 +3,10 @@
 import WebSocket from 'ws';
 
 const serverUrl = 'ws://127.0.0.1:8999';
-const bridgeKey = 'Proxycast-key11';
+const bridgeKey = 'Lime-key11';
 const profileKey = 'search_google';
 
-const url = `${serverUrl}/proxycast-chrome-observer/${encodeURIComponent(bridgeKey)}?profileKey=${encodeURIComponent(profileKey)}`;
+const url = `${serverUrl}/lime-chrome-observer/${encodeURIComponent(bridgeKey)}?profileKey=${encodeURIComponent(profileKey)}`;
 
 console.log(`[测试] 连接 URL: ${url}`);
 

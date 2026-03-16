@@ -232,7 +232,7 @@ impl ConfigManager {
     pub fn default_config_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("proxycast")
+            .join("lime")
             .join("config.yaml")
     }
 }
@@ -646,7 +646,7 @@ impl YamlService {
 fn json_config_path() -> std::path::PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("config.json")
 }
 

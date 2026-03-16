@@ -237,7 +237,7 @@ fn handle_open_log_dir<R: Runtime>(app: &AppHandle<R>) {
 
     // 获取日志目录路径
     let _ = app;
-    let log_dir = match proxycast_core::app_paths::resolve_logs_dir() {
+    let log_dir = match lime_core::app_paths::resolve_logs_dir() {
         Ok(dir) => dir,
         Err(error) => {
             error!("[托盘] 无法确定日志目录路径: {}", error);

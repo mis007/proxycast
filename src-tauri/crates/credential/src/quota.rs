@@ -4,8 +4,8 @@
 
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
-use proxycast_core::config::QuotaExceededConfig;
-use proxycast_infra::resilience::{QUOTA_EXCEEDED_KEYWORDS, QUOTA_EXCEEDED_STATUS_CODES};
+use lime_core::config::QuotaExceededConfig;
+use lime_infra::resilience::{QUOTA_EXCEEDED_KEYWORDS, QUOTA_EXCEEDED_STATUS_CODES};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

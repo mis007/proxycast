@@ -1,16 +1,16 @@
 //! Agent 会话存储服务
 //!
 //! 提供会话创建、列表查询、详情查询能力。
-//! 数据来源为 ProxyCast 数据库（AgentDao）。
+//! 数据来源为 Lime 数据库（AgentDao）。
 
 use chrono::Utc;
-use proxycast_core::agent::types::{AgentMessage, AgentSession, ContentPart, MessageContent};
-use proxycast_core::database::dao::agent::AgentDao;
-use proxycast_core::database::dao::agent_timeline::{
+use lime_core::agent::types::{AgentMessage, AgentSession, ContentPart, MessageContent};
+use lime_core::database::dao::agent::AgentDao;
+use lime_core::database::dao::agent_timeline::{
     AgentThreadItem, AgentThreadTurn, AgentTimelineDao,
 };
-use proxycast_core::database::DbConnection;
-use proxycast_core::workspace::WorkspaceManager;
+use lime_core::database::DbConnection;
+use lime_core::workspace::WorkspaceManager;
 use uuid::Uuid;
 
 use crate::event_converter::{TauriMessage, TauriMessageContent};
@@ -378,7 +378,7 @@ fn convert_agent_message(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::agent::types::{FunctionCall, ImageUrl, ToolCall};
+    use lime_core::agent::types::{FunctionCall, ImageUrl, ToolCall};
     use std::ffi::OsString;
     use std::sync::{Mutex, OnceLock};
 
@@ -550,19 +550,19 @@ mod tests {
         let _lock = env_lock().lock().expect("lock env");
         let _env = EnvGuard::set(&[
             (
-                crate::tool_io_offload::PROXYCAST_TOOL_TOKEN_LIMIT_BEFORE_EVICT_ENV,
+                crate::tool_io_offload::TOOL_TOKEN_LIMIT_BEFORE_EVICT_ENV_KEYS[0],
                 OsString::from("50"),
             ),
             (
-                crate::tool_io_offload::PROXYCAST_CONTEXT_MAX_INPUT_TOKENS_ENV,
+                crate::tool_io_offload::CONTEXT_MAX_INPUT_TOKENS_ENV_KEYS[0],
                 OsString::from("600"),
             ),
             (
-                crate::tool_io_offload::PROXYCAST_CONTEXT_WINDOW_TRIGGER_RATIO_ENV,
+                crate::tool_io_offload::CONTEXT_WINDOW_TRIGGER_RATIO_ENV_KEYS[0],
                 OsString::from("0.5"),
             ),
             (
-                crate::tool_io_offload::PROXYCAST_CONTEXT_KEEP_RECENT_MESSAGES_ENV,
+                crate::tool_io_offload::CONTEXT_KEEP_RECENT_MESSAGES_ENV_KEYS[0],
                 OsString::from("1"),
             ),
         ]);
@@ -619,6 +619,6 @@ mod tests {
         let record = request
             .as_object()
             .expect("offloaded request should be object");
-        assert!(record.contains_key(crate::tool_io_offload::PROXYCAST_TOOL_ARGUMENTS_OFFLOAD_KEY));
+        assert!(record.contains_key(crate::tool_io_offload::LIME_TOOL_ARGUMENTS_OFFLOAD_KEY));
     }
 }

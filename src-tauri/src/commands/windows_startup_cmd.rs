@@ -35,7 +35,7 @@ pub struct WindowsStartupCheck {
 pub struct WindowsStartupDiagnostics {
     pub platform: String,
     pub app_data_dir: Option<String>,
-    pub legacy_proxycast_dir: Option<String>,
+    pub legacy_lime_dir: Option<String>,
     pub db_path: Option<String>,
     pub webview2_version: Option<String>,
     pub current_exe: Option<String>,
@@ -96,7 +96,7 @@ pub fn maybe_show_windows_startup_notice(app: &AppHandle) {
 
     app.dialog()
         .message(message)
-        .title("ProxyCast Windows 启动自检")
+        .title("Lime Windows 启动自检")
         .kind(MessageDialogKind::Error)
         .buttons(MessageDialogButtons::OkCustom("我知道了".to_string()))
         .show(|_| {});
@@ -109,7 +109,7 @@ pub fn collect_windows_startup_diagnostics(app: &AppHandle) -> WindowsStartupDia
         return WindowsStartupDiagnostics {
             platform: std::env::consts::OS.to_string(),
             app_data_dir: None,
-            legacy_proxycast_dir: None,
+            legacy_lime_dir: None,
             db_path: None,
             webview2_version: None,
             current_exe: None,
@@ -133,9 +133,9 @@ pub fn collect_windows_startup_diagnostics(app: &AppHandle) -> WindowsStartupDia
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
-        let app_data_dir: Option<PathBuf> = proxycast_core::app_paths::preferred_data_dir().ok();
+        let app_data_dir: Option<PathBuf> = lime_core::app_paths::preferred_data_dir().ok();
         let home_dir = dirs::home_dir();
-        let legacy_proxycast_dir = home_dir.clone().map(|home| home.join(".proxycast"));
+        let legacy_lime_dir = home_dir.clone().map(|home| home.join(".lime"));
         let db_path = crate::database::get_db_path().ok();
         let webview2_version = detect_webview2_runtime_version();
         let current_exe = std::env::current_exe().ok();
@@ -174,29 +174,29 @@ pub fn collect_windows_startup_diagnostics(app: &AppHandle) -> WindowsStartupDia
             }
         }
 
-        match &legacy_proxycast_dir {
+        match &legacy_lime_dir {
             Some(path) if path.exists() => match ensure_existing_dir_writable(path) {
                 Ok(()) => checks.push(ok_check(
-                    "legacy_proxycast_dir",
+                    "legacy_lime_dir",
                     format!("检测到旧版数据目录且可访问: {}", path.display()),
                 )),
                 Err(error) => {
                     warnings.push(format!("旧版数据目录不可访问: {}", path.display()));
                     checks.push(warn_check(
-                        "legacy_proxycast_dir",
+                        "legacy_lime_dir",
                         format!("旧版数据目录不可访问: {}", path.display()),
                         Some(error),
                     ));
                 }
             },
             Some(path) => checks.push(ok_check(
-                "legacy_proxycast_dir",
+                "legacy_lime_dir",
                 format!("未检测到旧版数据目录: {}", path.display()),
             )),
             None => {
                 warnings.push("无法解析用户 Home 目录".to_string());
                 checks.push(warn_check(
-                    "legacy_proxycast_dir",
+                    "legacy_lime_dir",
                     "无法解析用户 Home 目录".to_string(),
                     None,
                 ));
@@ -375,7 +375,7 @@ pub fn collect_windows_startup_diagnostics(app: &AppHandle) -> WindowsStartupDia
         WindowsStartupDiagnostics {
             platform: "windows".to_string(),
             app_data_dir: app_data_dir.map(path_to_string),
-            legacy_proxycast_dir: legacy_proxycast_dir.map(path_to_string),
+            legacy_lime_dir: legacy_lime_dir.map(path_to_string),
             db_path: db_path.map(path_to_string),
             webview2_version,
             current_exe: current_exe.map(path_to_string),
@@ -433,10 +433,10 @@ fn path_to_string(path: PathBuf) -> String {
 fn ensure_dir_writable(path: &Path) -> Result<(), String> {
     std::fs::create_dir_all(path).map_err(|e| format!("创建目录失败 {}: {e}", path.display()))?;
 
-    let probe = path.join("proxycast-write-test.tmp");
+    let probe = path.join("lime-write-test.tmp");
     let mut file = std::fs::File::create(&probe)
         .map_err(|e| format!("创建测试文件失败 {}: {e}", probe.display()))?;
-    file.write_all(b"proxycast")
+    file.write_all(b"lime")
         .map_err(|e| format!("写入测试文件失败 {}: {e}", probe.display()))?;
     file.sync_all()
         .map_err(|e| format!("刷新测试文件失败 {}: {e}", probe.display()))?;
@@ -452,10 +452,10 @@ fn ensure_existing_dir_writable(path: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let probe = path.join("proxycast-write-test.tmp");
+    let probe = path.join("lime-write-test.tmp");
     let mut file = std::fs::File::create(&probe)
         .map_err(|e| format!("创建测试文件失败 {}: {e}", probe.display()))?;
-    file.write_all(b"proxycast")
+    file.write_all(b"lime")
         .map_err(|e| format!("写入测试文件失败 {}: {e}", probe.display()))?;
     file.sync_all()
         .map_err(|e| format!("刷新测试文件失败 {}: {e}", probe.display()))?;

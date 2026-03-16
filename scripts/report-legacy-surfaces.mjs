@@ -232,9 +232,9 @@ const rustTextSurfaceMonitors = [
     description: "Rust 外部模块直接引用 pending/legacy general 子模块",
     patterns: [
       "crate::database::legacy_general_chat::",
-      "proxycast_core::database::legacy_general_chat::",
+      "lime_core::database::legacy_general_chat::",
       "crate::database::pending_general_chat::",
-      "proxycast_core::database::pending_general_chat::",
+      "lime_core::database::pending_general_chat::",
     ],
     allowedPaths: [],
   },
@@ -267,8 +267,8 @@ const rustTextSurfaceMonitors = [
   {
     id: "rust-cross-crate-general-chat-compat",
     classification: "deprecated",
-    description: "跨 crate 引回 proxycast_services::general_chat 兼容壳",
-    patterns: ["proxycast_services::general_chat::"],
+    description: "跨 crate 引回 lime_services::general_chat 兼容壳",
+    patterns: ["lime_services::general_chat::"],
     allowedPaths: [],
   },
   {
@@ -297,7 +297,7 @@ const rustTextSurfaceMonitors = [
     description: "request_tool_policy 旧服务壳回流",
     patterns: [
       "crate::services::request_tool_policy_prompt_service::",
-      "proxycast_lib::services::request_tool_policy_prompt_service::",
+      "lime_lib::services::request_tool_policy_prompt_service::",
       "services::request_tool_policy_prompt_service::",
     ],
     allowedPaths: [],
@@ -311,7 +311,7 @@ const rustTextSurfaceMonitors = [
       "services::heartbeat_service::",
       "HeartbeatServiceState",
       "heartbeat_service_adapter",
-      "proxycast_core::database::dao::heartbeat",
+      "lime_core::database::dao::heartbeat",
       "heartbeat_tool",
       "RunSource::Heartbeat",
       "source = 'heartbeat'",
@@ -342,7 +342,7 @@ const rustTextSurfaceMonitors = [
       "\"migrated_api_keys_to_pool\"",
       "\"migrated_provider_ids_v1\"",
       "\"cleaned_legacy_api_key_credentials\"",
-      "\"migrated_mcp_proxycast_enabled\"",
+      "\"migrated_mcp_lime_enabled\"",
       "\"migrated_mcp_created_at_to_integer\"",
       "\"model_registry_refresh_needed\"",
       "\"model_registry_version\"",
@@ -365,7 +365,7 @@ const rustTextSurfaceMonitors = [
       "migration::check_model_registry_version(",
       "migration::migrate_api_keys_to_pool(",
       "migration::cleanup_legacy_api_key_credentials(",
-      "migration::migrate_mcp_proxycast_enabled(",
+      "migration::migrate_mcp_lime_enabled(",
       "migration::migrate_mcp_created_at_to_integer(",
       "migration::check_general_chat_migration_status(",
       "migration::migrate_general_chat_to_unified(",
@@ -383,7 +383,7 @@ const rustTextSurfaceMonitors = [
       "match migration::migrate_provider_ids(",
       "match migration::migrate_api_keys_to_pool(",
       "match migration::cleanup_legacy_api_key_credentials(",
-      "match migration::migrate_mcp_proxycast_enabled(",
+      "match migration::migrate_mcp_lime_enabled(",
       "match migration::migrate_mcp_created_at_to_integer(",
       "match migration::migrate_general_chat_to_unified(",
       "match migration_v2::migrate_unified_content_system(",
@@ -419,7 +419,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-projects-path-leak",
     classification: "deprecated",
     description: "数据库迁移硬编码 legacy projects 路径",
-    patterns: ["\".proxycast/projects\"", "join(\".proxycast\").join(\"projects\")"],
+    patterns: ["\".lime/projects\"", "join(\".lime\").join(\"projects\")"],
     includePathPrefixes: ["src-tauri/crates/core/src/database"],
     allowedPaths: [],
   },
@@ -427,7 +427,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-session-files-path-leak",
     classification: "deprecated",
     description: "session files 硬编码 legacy sessions 路径",
-    patterns: ["~/.proxycast/sessions", "join(\".proxycast\").join(\"sessions\")"],
+    patterns: ["~/.lime/sessions", "join(\".lime\").join(\"sessions\")"],
     includePathPrefixes: ["src-tauri/crates/core/src/session_files"],
     allowedPaths: [],
   },
@@ -435,7 +435,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-legacy-config-path-leak",
     classification: "deprecated",
     description: "数据库迁移硬编码 legacy config 路径",
-    patterns: ["~/.proxycast/config.json", "join(\".proxycast\").join(\"config.json\")"],
+    patterns: ["~/.lime/config.json", "join(\".lime\").join(\"config.json\")"],
     includePathPrefixes: ["src-tauri/crates/core/src/database"],
     allowedPaths: [],
   },
@@ -443,7 +443,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-workspace-projects-path-leak",
     classification: "deprecated",
     description: "上层命令或桥接层硬编码 workspace projects 路径",
-    patterns: ["~/.proxycast/projects", "join(\".proxycast\").join(\"projects\")"],
+    patterns: ["~/.lime/projects", "join(\".lime\").join(\"projects\")"],
     includePathPrefixes: ["src-tauri/src"],
     allowedPaths: [],
   },
@@ -451,7 +451,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-logger-path-leak",
     classification: "deprecated",
     description: "logger fallback 硬编码 legacy logs 路径",
-    patterns: ["~/.proxycast/logs", "join(\".proxycast\").join(\"logs\")"],
+    patterns: ["~/.lime/logs", "join(\".lime\").join(\"logs\")"],
     includePathPrefixes: ["src-tauri/crates/core/src/logger.rs"],
     allowedPaths: [],
   },
@@ -459,7 +459,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-skills-path-leak",
     classification: "deprecated",
     description: "skills 相关模块硬编码 legacy skills 路径",
-    patterns: ["~/.proxycast/skills", "join(\".proxycast\").join(\"skills\")"],
+    patterns: ["~/.lime/skills", "join(\".lime\").join(\"skills\")"],
     includePathPrefixes: ["src-tauri/src"],
     allowedPaths: [],
   },
@@ -468,10 +468,10 @@ const rustTextSurfaceMonitors = [
     classification: "deprecated",
     description: "memory 相关模块硬编码 legacy memory 或 AGENTS 路径",
     patterns: [
-      "~/.proxycast/AGENTS.md",
-      "join(\".proxycast\").join(\"AGENTS.md\")",
-      "join(\".proxycast\").join(\"memory\")",
-      ".proxycast/memory",
+      "~/.lime/AGENTS.md",
+      "join(\".lime\").join(\"AGENTS.md\")",
+      "join(\".lime\").join(\"memory\")",
+      ".lime/memory",
     ],
     includePathPrefixes: ["src-tauri/src"],
     allowedPaths: [],
@@ -1076,7 +1076,7 @@ const violations = [
   ),
 ];
 
-console.log("[proxycast] legacy surface report");
+console.log("[lime] legacy surface report");
 console.log("");
 console.log("## 入口引用");
 for (const result of importResults) {
@@ -1122,7 +1122,7 @@ for (const violation of violations) {
 if (violations.length > 0) {
   console.error("");
   console.error(
-    "[proxycast] legacy surface report 检测到边界违规，请先治理再继续扩展。",
+    "[lime] legacy surface report 检测到边界违规，请先治理再继续扩展。",
   );
   process.exit(1);
 }

@@ -4,7 +4,7 @@
 
 use crate::app::bootstrap::AppStates;
 use anyhow::Result;
-use proxycast_services::content_creator::{CreationMode, StepResult, ThemeType, WorkflowState};
+use lime_services::content_creator::{CreationMode, StepResult, ThemeType, WorkflowState};
 use tauri::State;
 use tracing::{error, info};
 
@@ -164,8 +164,7 @@ pub async fn content_workflow_retry(
 
     let current_index = workflow.current_step_index;
     if current_index < workflow.steps.len() {
-        workflow.steps[current_index].status =
-            proxycast_services::content_creator::StepStatus::Pending;
+        workflow.steps[current_index].status = lime_services::content_creator::StepStatus::Pending;
         workflow.steps[current_index].result = None;
         workflow.updated_at = chrono::Utc::now().timestamp_millis();
 

@@ -5,8 +5,8 @@
 use super::{
     WsApiRequest, WsApiResponse, WsEndpoint, WsError, WsMessage, WsStreamChunk, WsStreamEnd,
 };
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
-use proxycast_core::models::openai::ChatCompletionRequest;
+use lime_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::models::openai::ChatCompletionRequest;
 use serde_json::Value;
 
 /// 消息处理器

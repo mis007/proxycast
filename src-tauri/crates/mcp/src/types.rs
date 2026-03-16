@@ -70,7 +70,7 @@ pub struct McpServerInfo {
     pub config: McpServerConfig,
     pub is_running: bool,
     pub server_info: Option<McpServerCapabilities>,
-    pub enabled_proxycast: bool,
+    pub enabled_lime: bool,
     pub enabled_claude: bool,
     pub enabled_codex: bool,
     pub enabled_gemini: bool,

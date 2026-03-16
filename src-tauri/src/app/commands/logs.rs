@@ -482,7 +482,7 @@ struct SupportBundleManifest {
     #[serde(skip_serializing_if = "Option::is_none")]
     config_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    legacy_proxycast_dir: Option<String>,
+    legacy_lime_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     database_path: Option<String>,
     path_checks: Vec<SupportBundlePathMetadata>,
@@ -500,7 +500,7 @@ struct SupportBundleContext {
     generated_at: String,
     app_data_dir: Option<PathBuf>,
     config_path: Option<PathBuf>,
-    legacy_proxycast_dir: Option<PathBuf>,
+    legacy_lime_dir: Option<PathBuf>,
     database_path: Option<PathBuf>,
     log_storage_diagnostics: LogStorageDiagnostics,
     persisted_log_tail: Vec<logger::LogEntry>,
@@ -522,16 +522,14 @@ pub async fn export_support_bundle(
         get_log_storage_diagnostics_from_path(log_file_path.clone(), in_memory_log_count);
     let persisted_log_tail = read_persisted_logs_tail_from_path(log_file_path, 200)?;
 
-    let app_data_dir = proxycast_core::app_paths::preferred_data_dir()
+    let app_data_dir = lime_core::app_paths::preferred_data_dir()
         .ok()
-        .or_else(guess_proxycast_app_data_dir);
-    let config_path = guess_proxycast_config_path();
-    let legacy_proxycast_dir = dirs::home_dir().map(|home| home.join(".proxycast"));
-    let database_path = crate::database::get_db_path().ok().or_else(|| {
-        legacy_proxycast_dir
-            .as_ref()
-            .map(|dir| dir.join("proxycast.db"))
-    });
+        .or_else(guess_lime_app_data_dir);
+    let config_path = guess_lime_config_path();
+    let legacy_lime_dir = dirs::home_dir().map(|home| home.join(".lime"));
+    let database_path = crate::database::get_db_path()
+        .ok()
+        .or_else(|| legacy_lime_dir.as_ref().map(|dir| dir.join("lime.db")));
     let output_directory = default_support_bundle_output_dir();
 
     let result = export_support_bundle_to(
@@ -540,7 +538,7 @@ pub async fn export_support_bundle(
             generated_at: Utc::now().to_rfc3339(),
             app_data_dir,
             config_path,
-            legacy_proxycast_dir,
+            legacy_lime_dir,
             database_path,
             log_storage_diagnostics,
             persisted_log_tail,
@@ -561,12 +559,12 @@ pub async fn export_support_bundle(
     Ok(result)
 }
 
-fn guess_proxycast_app_data_dir() -> Option<PathBuf> {
-    proxycast_core::app_paths::preferred_data_dir().ok()
+fn guess_lime_app_data_dir() -> Option<PathBuf> {
+    lime_core::app_paths::preferred_data_dir().ok()
 }
 
-fn guess_proxycast_config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("proxycast").join("config.yaml"))
+fn guess_lime_config_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|dir| dir.join("lime").join("config.yaml"))
 }
 
 fn default_support_bundle_output_dir() -> PathBuf {
@@ -729,7 +727,7 @@ fn write_support_bundle_readme(path: &Path, omitted_sections: &[String]) -> Resu
         .join("\n");
 
     let content = format!(
-        "ProxyCast 支持包\n\n已包含：\n- meta/manifest.json\n- meta/log-storage-diagnostics.json\n- meta/persisted-log-tail.json\n- meta/appdata-listing.json（如目录存在）\n- meta/legacy-listing.json（如目录存在）\n- logs/（如目录存在）\n- request_logs/（如目录存在）\n\n默认未包含：\n{omitted}\n"
+        "Lime 支持包\n\n已包含：\n- meta/manifest.json\n- meta/log-storage-diagnostics.json\n- meta/persisted-log-tail.json\n- meta/appdata-listing.json（如目录存在）\n- meta/legacy-listing.json（如目录存在）\n- logs/（如目录存在）\n- request_logs/（如目录存在）\n\n默认未包含：\n{omitted}\n"
     );
 
     fs::write(path, content)
@@ -808,7 +806,7 @@ fn export_support_bundle_to(
     let timestamp = chrono::DateTime::parse_from_rfc3339(&context.generated_at)
         .map(|value| value.format("%Y%m%d-%H%M%S").to_string())
         .unwrap_or_else(|_| Utc::now().format("%Y%m%d-%H%M%S").to_string());
-    let bundle_name = format!("ProxyCast-Support-{timestamp}");
+    let bundle_name = format!("Lime-Support-{timestamp}");
     let temp_dir = tempfile::tempdir().map_err(|error| format!("创建临时目录失败: {error}"))?;
     let bundle_dir = temp_dir.path().join(&bundle_name);
     let meta_dir = bundle_dir.join("meta");
@@ -818,7 +816,7 @@ fn export_support_bundle_to(
         .map_err(|error| format!("创建支持包元数据目录失败 {}: {error}", meta_dir.display()))?;
 
     let legacy_request_logs_dir = context
-        .legacy_proxycast_dir
+        .legacy_lime_dir
         .as_ref()
         .map(|dir| dir.join("request_logs"));
     let effective_logs_dir = context
@@ -826,12 +824,7 @@ fn export_support_bundle_to(
         .log_directory
         .as_ref()
         .map(PathBuf::from)
-        .or_else(|| {
-            context
-                .legacy_proxycast_dir
-                .as_ref()
-                .map(|dir| dir.join("logs"))
-        });
+        .or_else(|| context.legacy_lime_dir.as_ref().map(|dir| dir.join("logs")));
 
     if let Some(log_dir) = effective_logs_dir.as_deref() {
         if log_dir.exists() {
@@ -873,8 +866,8 @@ fn export_support_bundle_to(
             .config_path
             .as_ref()
             .map(|path| path.to_string_lossy().to_string()),
-        legacy_proxycast_dir: context
-            .legacy_proxycast_dir
+        legacy_lime_dir: context
+            .legacy_lime_dir
             .as_ref()
             .map(|path| path.to_string_lossy().to_string()),
         database_path: context
@@ -884,7 +877,7 @@ fn export_support_bundle_to(
         path_checks: vec![
             collect_support_path_metadata(context.app_data_dir.as_deref()),
             collect_support_path_metadata(context.config_path.as_deref()),
-            collect_support_path_metadata(context.legacy_proxycast_dir.as_deref()),
+            collect_support_path_metadata(context.legacy_lime_dir.as_deref()),
             collect_support_path_metadata(context.database_path.as_deref()),
             collect_support_path_metadata(effective_logs_dir.as_deref()),
             collect_support_path_metadata(legacy_request_logs_dir.as_deref()),
@@ -910,7 +903,7 @@ fn export_support_bundle_to(
         let entries = collect_directory_tree_entries(app_data_dir);
         write_support_json(&meta_dir.join("appdata-listing.json"), &entries)?;
     }
-    if let Some(legacy_dir) = context.legacy_proxycast_dir.as_deref() {
+    if let Some(legacy_dir) = context.legacy_lime_dir.as_deref() {
         let entries = collect_directory_tree_entries(legacy_dir);
         write_support_json(&meta_dir.join("legacy-listing.json"), &entries)?;
     }
@@ -949,9 +942,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("系统时间异常")
             .as_nanos();
-        let log_dir = std::env::temp_dir().join(format!("proxycast-log-tail-test-{nanos}"));
+        let log_dir = std::env::temp_dir().join(format!("lime-log-tail-test-{nanos}"));
         fs::create_dir_all(&log_dir).expect("创建测试日志目录失败");
-        log_dir.join("proxycast.log")
+        log_dir.join("lime.log")
     }
 
     fn cleanup_log_fixture(path: &Path) {
@@ -1104,13 +1097,13 @@ mod tests {
     fn export_support_bundle_to_should_create_zip_with_manifest_and_logs() {
         let temp_dir = tempfile::tempdir().expect("创建临时目录失败");
         let output_dir = temp_dir.path().join("output");
-        let app_data_dir = temp_dir.path().join("appdata").join("proxycast");
-        let legacy_dir = temp_dir.path().join("home").join(".proxycast");
+        let app_data_dir = temp_dir.path().join("appdata").join("lime");
+        let legacy_dir = temp_dir.path().join("home").join(".lime");
         let logs_dir = legacy_dir.join("logs");
         let request_logs_dir = legacy_dir.join("request_logs");
         let config_path = app_data_dir.join("config.yaml");
-        let database_path = legacy_dir.join("proxycast.db");
-        let current_log_path = logs_dir.join("proxycast.log");
+        let database_path = legacy_dir.join("lime.db");
+        let current_log_path = logs_dir.join("lime.log");
         let raw_response_path = logs_dir.join("raw_response_demo.txt");
         let request_log_path = request_logs_dir.join("requests.log");
 
@@ -1148,7 +1141,7 @@ mod tests {
                 generated_at: "2026-03-09T10:00:00Z".to_string(),
                 app_data_dir: Some(app_data_dir),
                 config_path: Some(config_path),
-                legacy_proxycast_dir: Some(legacy_dir),
+                legacy_lime_dir: Some(legacy_dir),
                 database_path: Some(database_path),
                 log_storage_diagnostics: diagnostics,
                 persisted_log_tail: tail,
@@ -1173,9 +1166,7 @@ mod tests {
         assert!(names
             .iter()
             .any(|name| name.ends_with("meta/persisted-log-tail.json")));
-        assert!(names
-            .iter()
-            .any(|name| name.ends_with("logs/proxycast.log")));
+        assert!(names.iter().any(|name| name.ends_with("logs/lime.log")));
         assert!(names
             .iter()
             .any(|name| name.ends_with("logs/raw_response_demo.txt")));

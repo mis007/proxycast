@@ -42,7 +42,7 @@ async function executeExistingSessionAction(params: {
 }) {
   const result = await browserRuntimeApi.browserExecuteAction({
     profile_key: params.profileKey,
-    backend: "proxycast_extension_bridge",
+    backend: "lime_extension_bridge",
     action: params.action,
     args: params.args,
     timeout_ms: 30_000,
@@ -70,7 +70,7 @@ export function findExistingSessionObserver(
 
 export function buildMissingExistingSessionObserverError(profileKey: string) {
   return new Error(
-    `没有检测到 profile_key=${profileKey} 的当前 Chrome 连接。请先在当前 Chrome 安装并连接 Proxycast Browser Bridge 扩展。`,
+    `没有检测到 profile_key=${profileKey} 的当前 Chrome 连接。请先在当前 Chrome 安装并连接 Lime Browser Bridge 扩展。`,
   );
 }
 

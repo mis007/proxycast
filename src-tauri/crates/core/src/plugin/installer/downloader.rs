@@ -41,7 +41,7 @@ impl PluginDownloader {
         let response = self
             .client
             .get(url)
-            .header("User-Agent", "ProxyCast-Plugin-Installer")
+            .header("User-Agent", "Lime-Plugin-Installer")
             .send()
             .await
             .map_err(|e| InstallError::NetworkError(e.to_string()))?;

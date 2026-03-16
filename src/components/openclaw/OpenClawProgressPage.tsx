@@ -1,4 +1,5 @@
 import { Bot, Copy, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { OpenClawInstallProgressEvent } from "@/lib/api/openclaw";
 import { cn } from "@/lib/utils";
 import type { OpenClawOperationKind } from "./types";
@@ -88,7 +89,9 @@ export function OpenClawProgressPage({
           <div>
             <h2 className="text-base font-semibold text-slate-900">操作日志</h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              {running ? "命令执行中，请稍候。" : message || "操作已结束。"}
+              {running
+                ? "命令执行中，可随时复制当前日志，或直接选中文本。"
+                : message || "操作已结束，可直接复制或手动选中日志。"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -99,7 +102,7 @@ export function OpenClawProgressPage({
               className={cn(openClawSecondaryButtonClassName, "px-3 py-2 text-sm")}
             >
               <Copy className="h-4 w-4" />
-              复制纯日志
+              复制全部日志
             </button>
             <button
               type="button"
@@ -144,50 +147,71 @@ export function OpenClawProgressPage({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="max-h-[420px] min-h-[300px] overflow-auto rounded-[22px] bg-slate-950 p-4 text-sm text-slate-100">
-            {logs.length === 0 ? (
-              <div className="text-slate-400">
-                {running ? "正在等待日志输出..." : "暂无日志输出"}
-              </div>
-            ) : (
-              <div className="space-y-2 leading-7">
-                {logs.map((log, index) => (
-                  <div key={`${log.message}-${index}`}>
-                    <span
-                      className={
-                        log.level === "error"
-                          ? "text-red-300"
-                          : log.level === "warn"
-                            ? "text-amber-300"
-                            : "text-slate-200"
-                      }
+        <Tabs defaultValue="logs" className="mt-4">
+          <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
+            <TabsTrigger value="logs" className="rounded-xl py-2">
+              完整日志
+            </TabsTrigger>
+            <TabsTrigger value="summary" className="rounded-xl py-2">
+              结果摘要
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="logs" className="mt-4">
+            <div className="max-h-[420px] min-h-[300px] overflow-auto rounded-[22px] bg-slate-950 p-4 text-sm text-slate-100">
+              {logs.length === 0 ? (
+                <div className="text-slate-400">
+                  {running ? "正在等待日志输出..." : "暂无日志输出"}
+                </div>
+              ) : (
+                <div className="cursor-text select-text space-y-2 font-mono text-[13px] leading-6">
+                  {logs.map((log, index) => (
+                    <div
+                      key={`${log.message}-${index}`}
+                      className="whitespace-pre-wrap break-words"
                     >
-                      [{log.level.toUpperCase()}]
-                    </span>{" "}
-                    <span>{log.message}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      <span
+                        className={
+                          log.level === "error"
+                            ? "text-red-300"
+                            : log.level === "warn"
+                              ? "text-amber-300"
+                              : "text-slate-200"
+                        }
+                      >
+                        [{log.level.toUpperCase()}]
+                      </span>{" "}
+                      <span>{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-          <div className="space-y-4">
-            <div className={openClawSubPanelClassName}>
-              <div className="text-xs font-medium text-slate-500">当前阶段</div>
-              <div className="mt-2 text-sm font-medium text-slate-900">
-                {title || titleMap[kind]}
+          <TabsContent value="summary" className="mt-4">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className={openClawSubPanelClassName}>
+                <div className="text-xs font-medium text-slate-500">当前阶段</div>
+                <div className="mt-2 text-sm font-medium text-slate-900">
+                  {title || titleMap[kind]}
+                </div>
+                <div className="mt-3 text-sm leading-6 text-slate-600">
+                  {running
+                    ? "任务仍在执行，日志会持续追加到“完整日志”标签。"
+                    : message || "当前操作已结束。"}
+                </div>
+              </div>
+
+              <div className={openClawSubPanelClassName}>
+                <div className="text-xs font-medium text-slate-500">诊断动作</div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  如果操作失败，可以切到“完整日志”直接复制，或复制 JSON 诊断包、修复提示词继续排障。
+                </div>
               </div>
             </div>
-
-            <div className={openClawSubPanelClassName}>
-              <div className="text-xs font-medium text-slate-500">诊断动作</div>
-              <div className="mt-2 text-sm leading-6 text-slate-600">
-                如果操作失败，可以复制日志、复制 JSON 诊断包，或直接把修复提示词交给 AI。
-              </div>
-            </div>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </section>
     </div>
   );

@@ -52,7 +52,7 @@ pub struct McpServer {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(default)]
-    pub enabled_proxycast: bool,
+    pub enabled_lime: bool,
     #[serde(default)]
     pub enabled_claude: bool,
     #[serde(default)]
@@ -71,7 +71,7 @@ impl McpServer {
             name,
             server_config,
             description: None,
-            enabled_proxycast: false,
+            enabled_lime: false,
             enabled_claude: false,
             enabled_codex: false,
             enabled_gemini: false,

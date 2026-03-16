@@ -2,8 +2,8 @@
 //!
 //! 实现 ConfigEventEmit trait，通过 Tauri AppHandle 发送事件
 
-use proxycast_config::ConfigChangeEvent;
-use proxycast_config::ConfigEventEmit;
+use lime_config::ConfigChangeEvent;
+use lime_config::ConfigEventEmit;
 use tauri::{AppHandle, Emitter};
 
 /// Tauri 配置事件发射器

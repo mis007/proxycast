@@ -9,7 +9,7 @@
 use crate::app::AppState;
 use crate::config;
 use crate::services::update_window;
-use proxycast_services::update_check_service::{
+use lime_services::update_check_service::{
     UpdateCheckService, UpdateCheckServiceState, UpdateInfo,
 };
 use serde::{Deserialize, Serialize};
@@ -257,7 +257,7 @@ pub fn test_update_window(app_handle: AppHandle) -> Result<(), String> {
         latest_version: Some("0.99.0".to_string()),
         has_update: true,
         download_url: Some(
-            "https://github.com/aiclientproxy/proxycast/releases/tag/v0.99.0".to_string(),
+            "https://github.com/aiclientproxy/lime/releases/tag/v0.99.0".to_string(),
         ),
         release_notes_url: None,
         checked_at: std::time::SystemTime::now()

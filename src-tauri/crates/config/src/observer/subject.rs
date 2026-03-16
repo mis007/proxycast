@@ -5,8 +5,8 @@
 use super::emitter::ConfigEventEmit;
 use super::events::{ConfigChangeEvent, ConfigChangeSource, FullReloadEvent};
 use super::traits::ConfigObserver;
+use lime_core::config::Config;
 use parking_lot::RwLock;
-use proxycast_core::config::Config;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};

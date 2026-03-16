@@ -35,7 +35,7 @@ impl KiroFingerprintStore {
     pub fn get_storage_path() -> Result<PathBuf, String> {
         let app_data_dir = dirs::data_dir()
             .ok_or_else(|| "无法获取应用数据目录".to_string())?
-            .join("proxycast");
+            .join("lime");
 
         // 确保目录存在
         if !app_data_dir.exists() {

@@ -26,7 +26,7 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::DynEmitter;
+use lime_core::DynEmitter;
 use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -480,7 +480,7 @@ impl McpClientManager {
 
         // 4. 初始化 MCP 客户端
         let client_handler =
-            crate::client::ProxyCastMcpClient::new(name.to_string(), self.emitter.clone());
+            crate::client::LimeMcpClient::new(name.to_string(), self.emitter.clone());
 
         // 连接超时：至少 60 秒，避免 npx 首次下载时超时
         let timeout_secs = std::cmp::max(config.timeout, 60);
@@ -894,8 +894,8 @@ impl McpClientManager {
         }
 
         let extension = input_schema
-            .get("x-proxycast")
-            .or_else(|| input_schema.get("x_proxycast"))
+            .get("x-lime")
+            .or_else(|| input_schema.get("x_lime"))
             .unwrap_or(input_schema);
 
         ToolMetadataExtraction {
@@ -1967,7 +1967,7 @@ mod tests {
         let schema = serde_json::json!({
             "type": "object",
             "properties": {},
-            "x-proxycast": {
+            "x-lime": {
                 "deferred_loading": true,
                 "always_visible": false,
                 "allowed_callers": ["assistant", "code_execution"],

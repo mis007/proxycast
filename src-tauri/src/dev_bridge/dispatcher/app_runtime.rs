@@ -10,20 +10,20 @@ pub(super) async fn try_handle(
 ) -> Result<Option<JsonValue>, DynError> {
     let result = match cmd {
         "get_config" => {
-            let config_path = proxycast_core::config::ConfigManager::default_config_path();
-            let manager = proxycast_core::config::ConfigManager::load(&config_path)?;
+            let config_path = lime_core::config::ConfigManager::default_config_path();
+            let manager = lime_core::config::ConfigManager::load(&config_path)?;
             serde_json::to_value(manager.config())?
         }
         "save_config" => {
-            let config: proxycast_core::config::Config =
+            let config: lime_core::config::Config =
                 serde_json::from_value(args.cloned().unwrap_or_default())?;
-            proxycast_core::config::save_config(&config)?;
+            lime_core::config::save_config(&config)?;
             crate::services::environment_service::apply_configured_environment(&config).await;
             serde_json::json!({ "success": true })
         }
         "get_environment_preview" => {
-            let config_path = proxycast_core::config::ConfigManager::default_config_path();
-            let manager = proxycast_core::config::ConfigManager::load(&config_path)?;
+            let config_path = lime_core::config::ConfigManager::default_config_path();
+            let manager = lime_core::config::ConfigManager::load(&config_path)?;
             let preview =
                 crate::services::environment_service::build_environment_preview(manager.config())
                     .await;
@@ -55,7 +55,7 @@ pub(super) async fn try_handle(
             };
 
             let telemetry_summary = state.shared_stats.read().summary(None);
-            let diagnostics = proxycast_server::build_server_diagnostics(
+            let diagnostics = lime_server::build_server_diagnostics(
                 status.running,
                 status.host,
                 status.port,

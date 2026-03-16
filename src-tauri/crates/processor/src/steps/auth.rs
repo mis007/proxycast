@@ -4,7 +4,7 @@
 
 use super::traits::{PipelineStep, StepError};
 use async_trait::async_trait;
-use proxycast_core::processor::RequestContext;
+use lime_core::processor::RequestContext;
 use subtle::ConstantTimeEq;
 
 /// 认证步骤 - 验证请求中的 API Key

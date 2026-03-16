@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-infra"
+name = "lime-infra"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -7,7 +7,7 @@ repository.workspace = true
 
 [dependencies]
 # 项目内 crate
-proxycast-core.workspace = true
+lime-core.workspace = true
 
 # 序列化
 serde.workspace = true

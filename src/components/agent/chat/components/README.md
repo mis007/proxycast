@@ -11,7 +11,6 @@ Agent 聊天界面的 UI 组件集合。
 | `ChatSidebar.tsx` | 聊天侧边栏（会话列表） |
 | `CanvasWorkbenchLayout.tsx` | 画布内工作台布局，宽屏侧栏/窄屏底部工作台均支持产物、全部文件、变更、预览与下载动作 |
 | `EmptyState.tsx` | 空状态占位组件 |
-| `InputArea.tsx` | 消息输入区域 |
 | `MarkdownRenderer.tsx` | Markdown 渲染组件 |
 | `MessageList.tsx` | 消息列表组件 |
 | `StreamingRenderer.tsx` | 流式消息渲染（支持思考内容、工具调用） |

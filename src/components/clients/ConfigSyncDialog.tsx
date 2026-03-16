@@ -99,7 +99,7 @@ export function ConfigSyncDialog({
 
             <div className="space-y-2 text-sm">
               <div>
-                <span className="font-medium">ProxyCast 当前配置:</span>{" "}
+                <span className="font-medium">Lime 当前配置:</span>{" "}
                 {syncResult.current_provider}
               </div>
               <div>
@@ -122,7 +122,7 @@ export function ConfigSyncDialog({
                 {syncResult.conflicts.map((conflict, index) => (
                   <div key={index} className="text-sm space-y-1">
                     <div>字段: {conflict.field}</div>
-                    <div>ProxyCast: {conflict.local_value}</div>
+                    <div>Lime: {conflict.local_value}</div>
                     <div>外部软件: {conflict.external_value}</div>
                   </div>
                 ))}
@@ -135,14 +135,14 @@ export function ConfigSyncDialog({
               <p className="text-sm text-blue-700 dark:text-blue-400">
                 {syncResult.status === "OutOfSync" && (
                   <>
-                    检测到外部软件的配置与 ProxyCast
-                    不同。您可以选择同步外部配置到 ProxyCast。
+                    检测到外部软件的配置与 Lime
+                    不同。您可以选择同步外部配置到 Lime。
                   </>
                 )}
                 {syncResult.status === "Conflict" && (
                   <>
                     检测到配置冲突。建议选择使用外部软件的配置，或者手动在
-                    ProxyCast 中重新设置。
+                    Lime 中重新设置。
                   </>
                 )}
               </p>

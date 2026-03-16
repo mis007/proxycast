@@ -125,7 +125,7 @@ export interface ApiKeyProviderDiagnosticSummary {
 export interface McpServerEntrySummary {
   name: string;
   is_running: boolean;
-  enabled_proxycast: boolean;
+  enabled_lime: boolean;
   enabled_claude: boolean;
   enabled_codex: boolean;
   enabled_gemini: boolean;
@@ -134,7 +134,7 @@ export interface McpServerEntrySummary {
 export interface McpDiagnosticSummary {
   total_servers: number;
   running_servers: number;
-  enabled_proxycast: number;
+  enabled_lime: number;
   enabled_claude: number;
   enabled_codex: number;
   enabled_gemini: number;
@@ -183,6 +183,12 @@ export interface CrashDiagnosticExportOptions {
 
 export interface OpenDownloadDirectoryResult {
   openedPath: string;
+}
+
+export interface ClipboardCopyMessages {
+  fallbackErrorMessage?: string;
+  permissionDeniedMessage?: string;
+  inactiveWindowMessage?: string;
 }
 
 export const CLEAR_CRASH_DIAGNOSTIC_HISTORY_CONFIRM_TEXT = [
@@ -344,7 +350,7 @@ function buildMcpSummary(servers: McpServerInfo[]): McpDiagnosticSummary {
   const serverSummaries = servers.map((server) => ({
     name: server.name,
     is_running: server.is_running,
-    enabled_proxycast: server.enabled_proxycast,
+    enabled_lime: server.enabled_lime,
     enabled_claude: server.enabled_claude,
     enabled_codex: server.enabled_codex,
     enabled_gemini: server.enabled_gemini,
@@ -353,7 +359,7 @@ function buildMcpSummary(servers: McpServerInfo[]): McpDiagnosticSummary {
   return {
     total_servers: serverSummaries.length,
     running_servers: serverSummaries.filter((item) => item.is_running).length,
-    enabled_proxycast: serverSummaries.filter((item) => item.enabled_proxycast)
+    enabled_lime: serverSummaries.filter((item) => item.enabled_lime)
       .length,
     enabled_claude: serverSummaries.filter((item) => item.enabled_claude)
       .length,
@@ -701,17 +707,32 @@ export async function copyCrashDiagnosticToClipboard(
   payload: CrashDiagnosticPayload,
 ): Promise<void> {
   const text = buildCrashDiagnosticClipboardText(payload);
-  await copyTextToClipboard(text);
+  await copyTextToClipboard(text, {
+    fallbackErrorMessage: "复制诊断信息失败，请重试或使用“导出诊断 JSON”",
+    permissionDeniedMessage:
+      "剪贴板权限被系统拒绝，请允许权限后重试，或使用“导出诊断 JSON”",
+    inactiveWindowMessage:
+      "当前窗口未激活，先点击应用窗口后重试，或使用“导出诊断 JSON”",
+  });
 }
 
 export async function copyCrashDiagnosticJsonToClipboard(
   payload: CrashDiagnosticPayload,
 ): Promise<void> {
   const text = JSON.stringify(payload, null, 2);
-  await copyTextToClipboard(text);
+  await copyTextToClipboard(text, {
+    fallbackErrorMessage: "复制诊断信息失败，请重试或使用“导出诊断 JSON”",
+    permissionDeniedMessage:
+      "剪贴板权限被系统拒绝，请允许权限后重试，或使用“导出诊断 JSON”",
+    inactiveWindowMessage:
+      "当前窗口未激活，先点击应用窗口后重试，或使用“导出诊断 JSON”",
+  });
 }
 
-async function copyTextToClipboard(text: string): Promise<void> {
+export async function copyTextToClipboard(
+  text: string,
+  messages: ClipboardCopyMessages = {},
+): Promise<void> {
   let lastError: unknown;
 
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -735,10 +756,10 @@ async function copyTextToClipboard(text: string): Promise<void> {
   }
 
   if (lastError) {
-    throw new Error(formatClipboardCopyError(lastError));
+    throw new Error(formatClipboardCopyError(lastError, messages));
   }
 
-  throw new Error("复制诊断信息失败，请重试或使用“导出诊断 JSON”");
+  throw new Error(messages.fallbackErrorMessage || "复制内容失败，请重试");
 }
 
 export function buildCrashDiagnosticClipboardText(
@@ -746,7 +767,7 @@ export function buildCrashDiagnosticClipboardText(
 ): string {
   const json = JSON.stringify(payload, null, 2);
   const summary = buildDiagnosticSummary(payload);
-  return `# ProxyCast 故障诊断请求（可直接给 AI）
+  return `# Lime 故障诊断请求（可直接给 AI）
 
 请你扮演资深全栈工程师，基于下方诊断数据定位问题并给出可落地修复方案。
 
@@ -907,19 +928,27 @@ function copyTextWithExecCommand(text: string): boolean {
   }
 }
 
-function formatClipboardCopyError(error: unknown): string {
+function formatClipboardCopyError(
+  error: unknown,
+  messages: ClipboardCopyMessages,
+): string {
   if (isClipboardPermissionDeniedError(error)) {
-    return "剪贴板权限被系统拒绝，请允许权限后重试，或使用“导出诊断 JSON”";
+    return (
+      messages.permissionDeniedMessage ||
+      "剪贴板权限被系统拒绝，请允许权限后重试"
+    );
   }
 
   const rawMessage = error instanceof Error ? error.message : String(error);
   const normalizedMessage = rawMessage.toLowerCase();
 
   if (normalizedMessage.includes("document is not focused")) {
-    return "当前窗口未激活，先点击应用窗口后重试，或使用“导出诊断 JSON”";
+    return (
+      messages.inactiveWindowMessage || "当前窗口未激活，先点击应用窗口后重试"
+    );
   }
 
-  return "复制诊断信息失败，请重试或使用“导出诊断 JSON”";
+  return messages.fallbackErrorMessage || "复制内容失败，请重试";
 }
 
 export function isClipboardPermissionDeniedError(error: unknown): boolean {
@@ -970,8 +999,8 @@ export function getClipboardPermissionGuide(
       platform: detectedPlatform,
       title: "macOS 剪贴板权限指引",
       steps: [
-        "先点击 ProxyCast 窗口任意区域，再重试复制。",
-        "打开“系统设置 → 隐私与安全性 → 辅助功能”，确认 ProxyCast 已启用。",
+        "先点击 Lime 窗口任意区域，再重试复制。",
+        "打开“系统设置 → 隐私与安全性 → 辅助功能”，确认 Lime 已启用。",
         "若仍失败，请使用“导出诊断 JSON”并发送给开发者。",
       ],
       settingsUrl:
@@ -984,7 +1013,7 @@ export function getClipboardPermissionGuide(
       platform: detectedPlatform,
       title: "Windows 剪贴板权限指引",
       steps: [
-        "先点击 ProxyCast 窗口任意区域，再重试复制。",
+        "先点击 Lime 窗口任意区域，再重试复制。",
         "打开“设置 → 隐私和安全性 → 剪贴板”，确认系统剪贴板功能可用。",
         "若企业策略限制剪贴板访问，请改用“导出诊断 JSON”。",
       ],
@@ -997,7 +1026,7 @@ export function getClipboardPermissionGuide(
       platform: detectedPlatform,
       title: "Linux 剪贴板权限指引",
       steps: [
-        "先点击 ProxyCast 窗口任意区域，再重试复制。",
+        "先点击 Lime 窗口任意区域，再重试复制。",
         "请在桌面环境隐私设置中确认应用未被限制访问剪贴板。",
         "Wayland 环境若仍失败，建议使用“导出诊断 JSON”。",
       ],
@@ -1008,7 +1037,7 @@ export function getClipboardPermissionGuide(
     platform: detectedPlatform,
     title: "剪贴板权限指引",
     steps: [
-      "先点击 ProxyCast 窗口任意区域，再重试复制。",
+      "先点击 Lime 窗口任意区域，再重试复制。",
       "请在系统隐私设置中确认未禁止应用访问剪贴板。",
       "若仍失败，请使用“导出诊断 JSON”。",
     ],
@@ -1050,7 +1079,7 @@ export function buildCrashDiagnosticFileName(
     sanitizeDiagnosticSceneTag(`v-${payload.app_version || "unknown"}`) ||
     "v-unknown";
   const timestamp = formatDiagnosticTimestamp(options.timestamp ?? Date.now());
-  return `proxycast-crash-${sceneTag}-${appVersionTag}-${timestamp}.json`;
+  return `lime-crash-${sceneTag}-${appVersionTag}-${timestamp}.json`;
 }
 
 export async function openCrashDiagnosticDownloadDirectory(): Promise<OpenDownloadDirectoryResult> {

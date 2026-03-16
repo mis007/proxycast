@@ -34,8 +34,8 @@ import MinimaxIcon from "./minimax.svg?react";
 import DoubaoIcon from "./doubao.svg?react";
 import AzureIcon from "./azure.svg?react";
 import antigravityIconUrl from "./antigravity.svg?url";
-import ProxycastIcon from "./proxycast.svg?react";
-import ProxycastHubIcon from "./proxycast-hub.svg?react";
+import LimeIcon from "./lime.svg?react";
+import LimeHubIcon from "./lime-hub.svg?react";
 
 // 新增图标 - 主流 AI
 import PerplexityIcon from "./perplexity.svg?react";
@@ -150,8 +150,8 @@ const iconComponents: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   doubao: DoubaoIcon,
   azure: AzureIcon,
   antigravity: AntigravityIcon,
-  proxycast: ProxycastIcon,
-  "proxycast-hub": ProxycastHubIcon,
+  lime: LimeIcon,
+  "lime-hub": LimeHubIcon,
 
   // 主流 AI
   perplexity: PerplexityIcon,

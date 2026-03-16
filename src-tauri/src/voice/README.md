@@ -42,11 +42,11 @@
 
 ```
 voice/
-├── asr_service.rs ──→ proxycast-services (voice_asr_service)
-├── recording_service.rs ──→ proxycast-services (voice_recording_service)
-├── config.rs ──→ proxycast-services (voice_config_service)
-├── output_service.rs ──→ proxycast-services (voice_output_service)
-├── processor.rs ──→ proxycast-services (voice_processor_service)
+├── asr_service.rs ──→ lime-services (voice_asr_service)
+├── recording_service.rs ──→ lime-services (voice_recording_service)
+├── config.rs ──→ lime-services (voice_config_service)
+├── output_service.rs ──→ lime-services (voice_output_service)
+├── processor.rs ──→ lime-services (voice_processor_service)
 └── commands.rs ──→ 上述所有服务
 ```
 
@@ -71,7 +71,7 @@ voice/
 
 ## Whisper 模型文件
 
-模型文件存储路径：`~/Library/Application Support/proxycast/models/whisper/`
+模型文件存储路径：`~/Library/Application Support/lime/models/whisper/`
 
 下载地址：https://huggingface.co/ggerganov/whisper.cpp/tree/main
 

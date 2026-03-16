@@ -9,8 +9,8 @@ use axum::{
     Json,
 };
 use futures::stream;
-use proxycast_core::errors::{GatewayError, GatewayErrorCode, GatewayErrorResponse};
-use proxycast_core::models::openai::{ContentPart, FunctionCall, MessageContent, ToolCall};
+use lime_core::errors::{GatewayError, GatewayErrorCode, GatewayErrorResponse};
+use lime_core::models::openai::{ContentPart, FunctionCall, MessageContent, ToolCall};
 use std::collections::HashMap;
 
 /// 从错误信息中解析 HTTP 状态码

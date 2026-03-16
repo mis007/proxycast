@@ -133,7 +133,7 @@ mod tests {
     use super::super::traits::StepError;
     use super::*;
     use async_trait::async_trait;
-    use proxycast_core::processor::RequestContext;
+    use lime_core::processor::RequestContext;
 
     struct DummyStep {
         name: String,

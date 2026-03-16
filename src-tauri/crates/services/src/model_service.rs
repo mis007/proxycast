@@ -2,9 +2,9 @@
 //!
 //! 提供统一的模型获取、缓存和查询接口，支持从不同 Provider 获取模型列表。
 
-use proxycast_core::database::dao::provider_pool::ProviderPoolDao;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::provider_pool_model::{
+use lime_core::database::dao::provider_pool::ProviderPoolDao;
+use lime_core::database::DbConnection;
+use lime_core::models::provider_pool_model::{
     CredentialData, PoolProviderType, ProviderCredential,
 };
 use reqwest::Client;

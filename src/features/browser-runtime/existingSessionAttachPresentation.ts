@@ -30,7 +30,7 @@ export function buildExistingSessionAttachPresentation(params: {
       label: "检查桥接中",
       toneClass:
         "border-sky-300/70 bg-sky-50 text-sky-800 dark:border-sky-800/70 dark:bg-sky-950/30 dark:text-sky-200",
-      description: "正在确认当前 Chrome 是否已经连接 Proxycast Browser Bridge。",
+      description: "正在确认当前 Chrome 是否已经连接 Lime Browser Bridge。",
     };
   } else if (!observerConnected) {
     statusInfo = {
@@ -38,7 +38,7 @@ export function buildExistingSessionAttachPresentation(params: {
       toneClass:
         "border-orange-300/70 bg-orange-50 text-orange-800 dark:border-orange-800/70 dark:bg-orange-950/30 dark:text-orange-200",
       description:
-        "当前资料为附着当前 Chrome 模式。请先在你正在使用的 Chrome 中连接 Proxycast Browser Bridge 扩展。",
+        "当前资料为附着当前 Chrome 模式。请先在你正在使用的 Chrome 中连接 Lime Browser Bridge 扩展。",
     };
   } else if (pageLoading) {
     statusInfo = {
@@ -62,7 +62,7 @@ export function buildExistingSessionAttachPresentation(params: {
     placeholder = "正在检查当前 Chrome 的桥接连接...";
   } else if (!observerConnected) {
     placeholder =
-      "当前资料配置为附着当前 Chrome。请先在当前浏览器安装并连接 Proxycast Browser Bridge 扩展。";
+      "当前资料配置为附着当前 Chrome。请先在当前浏览器安装并连接 Lime Browser Bridge 扩展。";
   } else if (pageLoading) {
     placeholder = "正在读取当前 Chrome 的页面摘要...";
   }
@@ -83,9 +83,9 @@ export function buildExistingSessionAttachPresentation(params: {
     tabsActionLabel: tabsLoading ? "读取中..." : "读取标签页",
     embeddedControlHint: observerConnected
       ? "附着模式已连接：可读取页面摘要，并在高级调试里切换当前 Chrome 标签页。"
-      : "当前资料为附着模式，请先连接 Proxycast Browser Bridge 扩展。",
+      : "当前资料为附着模式，请先连接 Lime Browser Bridge 扩展。",
     liveViewHint: observerConnected
       ? "附着模式当前不采集实时画面，可在高级调试里读取页面摘要并切换标签页。"
-      : "当前资料为附着模式，请先连接 Proxycast Browser Bridge 扩展。",
+      : "当前资料为附着模式，请先连接 Lime Browser Bridge 扩展。",
   };
 }

@@ -5,12 +5,12 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use proxycast_core::app_paths;
-use proxycast_core::models::{
+use lime_core::app_paths;
+use lime_core::models::{
     parse_skill_manifest_from_content, split_skill_frontmatter, ParsedSkillManifest,
     SkillStandardCompliance,
 };
-use proxycast_services::skill_service::SkillService;
+use lime_services::skill_service::SkillService;
 use serde::{Deserialize, Serialize};
 
 /// Skill 自动触发条件配置
@@ -123,39 +123,39 @@ pub fn parse_skill_frontmatter(content: &str) -> (SkillFrontmatter, String) {
 fn build_skill_frontmatter_from_manifest(parsed: &ParsedSkillManifest) -> SkillFrontmatter {
     let metadata = parsed.metadata.metadata.clone();
     let version = metadata
-        .get("proxycast_version")
+        .get("lime_version")
         .cloned()
         .or_else(|| parsed.raw_string("version"));
     let argument_hint = metadata
-        .get("proxycast_argument_hint")
+        .get("lime_argument_hint")
         .cloned()
         .or_else(|| parsed.raw_string("argument-hint"))
         .or_else(|| parsed.raw_string("argument_hint"));
     let when_to_use = metadata
-        .get("proxycast_when_to_use")
+        .get("lime_when_to_use")
         .cloned()
         .or_else(|| parsed.raw_string("when-to-use"))
         .or_else(|| parsed.raw_string("when_to_use"));
     let model = metadata
-        .get("proxycast_model_preference")
+        .get("lime_model_preference")
         .cloned()
         .or_else(|| parsed.raw_string("model"));
     let provider = metadata
-        .get("proxycast_provider_preference")
+        .get("lime_provider_preference")
         .cloned()
         .or_else(|| parsed.raw_string("provider"));
     let workflow_ref = metadata
-        .get("proxycast_workflow_ref")
+        .get("lime_workflow_ref")
         .cloned()
         .filter(|value| !value.trim().is_empty());
     let execution_mode = metadata
-        .get("proxycast_execution_mode")
+        .get("lime_execution_mode")
         .cloned()
         .or_else(|| parsed.raw_string("execution-mode"))
         .or_else(|| workflow_ref.as_ref().map(|_| "workflow".to_string()));
 
     let disable_model_invocation = metadata
-        .get("proxycast_disable_model_invocation")
+        .get("lime_disable_model_invocation")
         .cloned()
         .or_else(|| {
             parsed
@@ -355,7 +355,7 @@ pub fn load_skill_from_file(
     })
 }
 
-pub fn get_proxycast_skills_dir() -> Option<PathBuf> {
+pub fn get_lime_skills_dir() -> Option<PathBuf> {
     app_paths::resolve_skills_dir().ok()
 }
 
@@ -364,12 +364,12 @@ pub fn get_project_skills_dir() -> Option<PathBuf> {
 }
 
 pub fn get_skill_roots() -> Vec<PathBuf> {
-    app_paths::resolve_proxycast_skill_roots().unwrap_or_else(|_| {
+    app_paths::resolve_lime_skill_roots().unwrap_or_else(|_| {
         let mut roots = Vec::new();
         if let Some(project_dir) = get_project_skills_dir() {
             roots.push(project_dir);
         }
-        if let Some(user_dir) = get_proxycast_skills_dir() {
+        if let Some(user_dir) = get_lime_skills_dir() {
             roots.push(user_dir);
         }
         roots
@@ -448,7 +448,7 @@ mod tests {
 name: workflow-skill
 description: Workflow skill
 metadata:
-  proxycast_workflow_ref: references/missing.json
+  lime_workflow_ref: references/missing.json
 ---
 
 # Workflow Skill
@@ -463,7 +463,7 @@ metadata:
             .standard_compliance
             .validation_errors
             .iter()
-            .any(|error| error.contains("metadata.proxycast_workflow_ref")));
+            .any(|error| error.contains("metadata.lime_workflow_ref")));
         assert!(skill.workflow_steps.is_empty());
     }
 
@@ -493,7 +493,7 @@ Valid content
 name: skill-invalid
 description: Invalid skill
 metadata:
-  proxycast_workflow_ref: references/missing.json
+  lime_workflow_ref: references/missing.json
 ---
 Invalid content
 "#,

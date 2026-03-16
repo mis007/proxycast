@@ -7,7 +7,7 @@ use super::types::{
     ScheduledTask, TaskFilter, DEFAULT_TASK_COOLDOWN_SECS, DEFAULT_TASK_FAILURE_THRESHOLD,
 };
 use async_trait::async_trait;
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 
 /// 调度器 Trait
 ///
@@ -101,7 +101,7 @@ impl AgentScheduler {
 
     /// 初始化数据库表
     pub fn init_tables(db: &DbConnection) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         SchedulerDao::create_tables(&conn).map_err(|e| format!("创建调度器表失败: {e}"))
     }
 }
@@ -109,7 +109,7 @@ impl AgentScheduler {
 #[async_trait]
 impl SchedulerTrait for AgentScheduler {
     async fn create_task(&self, task: ScheduledTask) -> Result<String, String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let task_id = task.id.clone();
         SchedulerDao::create_task(&conn, &task).map_err(|e| format!("创建任务失败: {e}"))?;
         tracing::info!("[AgentScheduler] 创建任务: {} ({})", task.name, task_id);
@@ -117,22 +117,22 @@ impl SchedulerTrait for AgentScheduler {
     }
 
     async fn get_task(&self, id: &str) -> Result<Option<ScheduledTask>, String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         SchedulerDao::get_task(&conn, id).map_err(|e| format!("获取任务失败: {e}"))
     }
 
     async fn list_tasks(&self, filter: TaskFilter) -> Result<Vec<ScheduledTask>, String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         SchedulerDao::list_tasks(&conn, &filter).map_err(|e| format!("查询任务列表失败: {e}"))
     }
 
     async fn update_task(&self, task: ScheduledTask) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         SchedulerDao::update_task(&conn, &task).map_err(|e| format!("更新任务失败: {e}"))
     }
 
     async fn delete_task(&self, id: &str) -> Result<bool, String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let deleted =
             SchedulerDao::delete_task(&conn, id).map_err(|e| format!("删除任务失败: {e}"))?;
         if deleted {
@@ -142,12 +142,12 @@ impl SchedulerTrait for AgentScheduler {
     }
 
     async fn get_due_tasks(&self, limit: usize) -> Result<Vec<ScheduledTask>, String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         SchedulerDao::get_due_tasks(&conn, limit).map_err(|e| format!("获取到期任务失败: {e}"))
     }
 
     async fn mark_task_running(&self, id: &str) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let mut task = SchedulerDao::get_task(&conn, id)
             .map_err(|e| format!("获取任务失败: {e}"))?
             .ok_or_else(|| format!("任务不存在: {id}"))?;
@@ -171,7 +171,7 @@ impl SchedulerTrait for AgentScheduler {
         id: &str,
         result: Option<serde_json::Value>,
     ) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let mut task = SchedulerDao::get_task(&conn, id)
             .map_err(|e| format!("获取任务失败: {e}"))?
             .ok_or_else(|| format!("任务不存在: {id}"))?;
@@ -183,7 +183,7 @@ impl SchedulerTrait for AgentScheduler {
     }
 
     async fn mark_task_failed(&self, id: &str, error: String) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let mut task = SchedulerDao::get_task(&conn, id)
             .map_err(|e| format!("获取任务失败: {e}"))?
             .ok_or_else(|| format!("任务不存在: {id}"))?;
@@ -213,7 +213,7 @@ impl SchedulerTrait for AgentScheduler {
     }
 
     async fn mark_task_cancelled(&self, id: &str) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(&self.db)?;
+        let conn = lime_core::database::lock_db(&self.db)?;
         let mut task = SchedulerDao::get_task(&conn, id)
             .map_err(|e| format!("获取任务失败: {e}"))?
             .ok_or_else(|| format!("任务不存在: {id}"))?;

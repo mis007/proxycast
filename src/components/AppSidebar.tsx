@@ -515,9 +515,9 @@ export function AppSidebar({
       <HeaderArea>
         <UserButton onClick={() => onNavigate("agent", buildHomeAgentParams())}>
           <Avatar>
-            <img src="/logo.png" alt="ProxyCast" />
+            <img src="/logo.png" alt="Lime" />
           </Avatar>
-          <UserName>ProxyCast</UserName>
+          <UserName>Lime</UserName>
           <ChevronDown size={14} />
         </UserButton>
 

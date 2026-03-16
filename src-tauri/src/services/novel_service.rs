@@ -3,9 +3,9 @@
 //! 提供小说项目、设定、章节生成与一致性检查能力。
 
 use crate::database::{lock_db, DbConnection};
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
-use proxycast_skills::{LlmProvider, ProxyCastLlmProvider};
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::provider_pool_service::ProviderPoolService;
+use lime_skills::{LimeLlmProvider, LlmProvider};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -1448,14 +1448,14 @@ impl NovelService {
         let preferred_provider = normalize_provider(provider);
 
         let llm = if let Some(provider_name) = preferred_provider {
-            ProxyCastLlmProvider::with_preferred_provider(
+            LimeLlmProvider::with_preferred_provider(
                 pool_service,
                 api_key_service,
                 self.db.clone(),
                 provider_name,
             )
         } else {
-            ProxyCastLlmProvider::new(pool_service, api_key_service, self.db.clone())
+            LimeLlmProvider::new(pool_service, api_key_service, self.db.clone())
         };
 
         let content = llm

@@ -95,17 +95,17 @@ describe("getSkillSource", () => {
     * - "builtin" if sourceKind="builtin"
     * - "project" if catalogSource="project" and sourceKind!="builtin"
    * - "local" if catalogSource="user"
-   * - "official" if repoOwner="proxycast" AND repoName="skills"
-   * - "community" if repoOwner and repoName are present but not proxycast/skills
+   * - "official" if repoOwner="lime" AND repoName="skills"
+   * - "community" if repoOwner and repoName are present but not lime/skills
    * - "local" if repoOwner or repoName is missing
    *
    * **Validates: Requirements 5.1, 5.2**
    */
   describe("Property 4: Source Classification Logic", () => {
-    // 生成有效的仓库所有者名（非 proxycast）
-    const nonProxycastOwnerArb = fc
+    // 生成有效的仓库所有者名（非 lime）
+    const nonLimeOwnerArb = fc
       .stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{0,20}$/)
-      .filter((s) => s !== "proxycast");
+      .filter((s) => s !== "lime");
 
     // 生成有效的仓库名（非 skills）
     const nonSkillsNameArb = fc
@@ -115,10 +115,10 @@ describe("getSkillSource", () => {
     // 生成任意有效的仓库名
     const repoNameArb = fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{0,20}$/);
 
-    test.prop([fc.constant("proxycast"), fc.constant("skills")], {
+    test.prop([fc.constant("lime"), fc.constant("skills")], {
       numRuns: 100,
     })(
-      "官方仓库 (proxycast/skills) 应返回 'official'",
+      "官方仓库 (lime/skills) 应返回 'official'",
       (repoOwner, repoName) => {
         const skill = createSkill({
           catalogSource: "remote",
@@ -130,8 +130,8 @@ describe("getSkillSource", () => {
       },
     );
 
-    test.prop([nonProxycastOwnerArb, repoNameArb], { numRuns: 100 })(
-      "非 proxycast 所有者的仓库应返回 'community'",
+    test.prop([nonLimeOwnerArb, repoNameArb], { numRuns: 100 })(
+      "非 lime 所有者的仓库应返回 'community'",
       (repoOwner, repoName) => {
         const skill = createSkill({
           catalogSource: "remote",
@@ -143,8 +143,8 @@ describe("getSkillSource", () => {
       },
     );
 
-    test.prop([fc.constant("proxycast"), nonSkillsNameArb], { numRuns: 100 })(
-      "proxycast 所有者但非 skills 仓库应返回 'community'",
+    test.prop([fc.constant("lime"), nonSkillsNameArb], { numRuns: 100 })(
+      "lime 所有者但非 skills 仓库应返回 'community'",
       (repoOwner, repoName) => {
         const skill = createSkill({
           catalogSource: "remote",
@@ -201,7 +201,7 @@ describe("getSkillSource", () => {
     it("用户级 skills 应优先返回 'local'", () => {
       const skill = createSkill({
         catalogSource: "user",
-        repoOwner: "proxycast",
+        repoOwner: "lime",
         repoName: "skills",
       });
       expect(getSkillSource(skill)).toBe("local" as SkillSource);
@@ -276,7 +276,7 @@ describe("canViewLocalSkillContent", () => {
     const skill = createSkill({
       installed: true,
       sourceKind: "other",
-      repoOwner: "proxycast",
+      repoOwner: "lime",
       repoName: "skills",
     });
     expect(canViewLocalSkillContent(skill)).toBe(false);
@@ -308,7 +308,7 @@ describe("canInspectSkill", () => {
     const skill = createSkill({
       installed: false,
       catalogSource: "remote",
-      repoOwner: "proxycast",
+      repoOwner: "lime",
       repoName: "skills",
       repoBranch: "main",
     });
@@ -340,7 +340,7 @@ describe("getInspectActionLabel", () => {
     const skill = createSkill({
       installed: false,
       catalogSource: "remote",
-      repoOwner: "proxycast",
+      repoOwner: "lime",
       repoName: "skills",
       repoBranch: "main",
     });
@@ -365,7 +365,7 @@ it("内置技能应优先返回 'builtin'", () => {
   const skill = createSkill({
     sourceKind: "builtin",
     catalogSource: "remote",
-    repoOwner: "proxycast",
+    repoOwner: "lime",
     repoName: "skills",
   });
   expect(getSkillSource(skill)).toBe("builtin" as SkillSource);

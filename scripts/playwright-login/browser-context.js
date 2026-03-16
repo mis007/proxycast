@@ -162,7 +162,7 @@ export function getAvailableBrowserPath() {
  * @returns {string} 用户数据目录的绝对路径
  */
 export function getUserDataDir() {
-  return join(homedir(), '.proxycast', 'playwright-data');
+  return join(homedir(), '.lime', 'playwright-data');
 }
 
 /**

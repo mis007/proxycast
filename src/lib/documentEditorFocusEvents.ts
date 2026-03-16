@@ -1,4 +1,4 @@
-export const DOCUMENT_EDITOR_FOCUS_EVENT = "proxycast:document-editor-focus";
+export const DOCUMENT_EDITOR_FOCUS_EVENT = "lime:document-editor-focus";
 
 export interface DocumentEditorFocusDetail {
   focused: boolean;

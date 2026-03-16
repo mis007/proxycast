@@ -3,9 +3,9 @@
 //! 从内嵌资源加载模型数据，管理本地缓存，提供模型搜索等功能
 //! 模型数据在构建时从 aiclientproxy/models 仓库打包进应用
 
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::model_registry::{
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::database::DbConnection;
+use lime_core::models::model_registry::{
     EnhancedModelMetadata, ModelCapabilities, ModelLimits, ModelPricing, ModelSource, ModelStatus,
     ModelSyncState, ModelTier, ProviderAliasConfig, UserModelPreference,
 };
@@ -137,7 +137,7 @@ impl ModelRegistryService {
     /// 获取用户 host_alias 覆盖文件路径
     pub fn resolve_user_host_alias_path() -> Option<std::path::PathBuf> {
         dirs::data_dir().map(|dir| {
-            dir.join("proxycast")
+            dir.join("lime")
                 .join("models")
                 .join(MODELS_HOST_ALIASES_USER_FILE)
         })
@@ -1567,8 +1567,8 @@ pub struct FetchModelsResult {
 #[cfg(test)]
 mod tests {
     use super::{HostAliasRule, ModelRegistryService};
-    use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-    use proxycast_core::database::DbConnection;
+    use lime_core::database::dao::api_key_provider::ApiProviderType;
+    use lime_core::database::DbConnection;
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
     use tempfile::tempdir;

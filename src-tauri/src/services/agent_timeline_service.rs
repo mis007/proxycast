@@ -1,10 +1,10 @@
 use chrono::Utc;
-use proxycast_agent::TauriAgentEvent;
-use proxycast_core::database::dao::agent_timeline::{
+use lime_agent::TauriAgentEvent;
+use lime_core::database::dao::agent_timeline::{
     AgentRequestOption, AgentRequestQuestion, AgentThreadItem, AgentThreadItemPayload,
     AgentThreadItemStatus, AgentThreadTurn, AgentThreadTurnStatus, AgentTimelineDao,
 };
-use proxycast_core::database::{lock_db, DbConnection};
+use lime_core::database::{lock_db, DbConnection};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter};

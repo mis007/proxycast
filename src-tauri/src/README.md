@@ -11,7 +11,7 @@ Tauri 后端核心代码，处理系统级功能和 API 服务。
 
 - `commands/` - Tauri 命令处理（前端调用入口）
 - `config/` - 配置管理（导入/导出/热重载）
-- `connect/` - ProxyCast Connect 模块（中转商生态合作）
+- `connect/` - Lime Connect 模块（中转商生态合作）
 - `converter/` - 协议转换（OpenAI ↔ CW/Claude/Antigravity）
 - `credential/` - 凭证池管理（负载均衡、健康检查）
 - `database/` - 数据库层（SQLite + DAO）

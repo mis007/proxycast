@@ -22,9 +22,9 @@ use tracing::{debug, warn};
 use crate::material_service::MaterialService;
 use crate::persona_service::PersonaService;
 use crate::template_service::TemplateService;
-use proxycast_core::errors::project_error::ProjectError;
-use proxycast_core::models::project_model::{Material, Persona, ProjectContext, Template};
-use proxycast_core::workspace::{Workspace, WorkspaceSettings, WorkspaceType};
+use lime_core::errors::project_error::ProjectError;
+use lime_core::models::project_model::{Material, Persona, ProjectContext, Template};
+use lime_core::workspace::{Workspace, WorkspaceSettings, WorkspaceType};
 
 // ============================================================================
 // 项目上下文构建器
@@ -455,8 +455,8 @@ impl ProjectContextBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::database::schema::create_tables;
-    use proxycast_core::models::project_model::CreatePersonaRequest;
+    use lime_core::database::schema::create_tables;
+    use lime_core::models::project_model::CreatePersonaRequest;
 
     /// 创建测试数据库连接
     fn setup_test_db() -> Connection {
@@ -586,7 +586,7 @@ mod tests {
         create_test_project(&conn, "project-1", "测试项目");
 
         // 创建素材
-        use proxycast_core::models::project_model::UploadMaterialRequest;
+        use lime_core::models::project_model::UploadMaterialRequest;
         let req = UploadMaterialRequest {
             project_id: "project-1".to_string(),
             name: "参考文档".to_string(),
@@ -616,7 +616,7 @@ mod tests {
         create_test_project(&conn, "project-1", "测试项目");
 
         // 创建模板
-        use proxycast_core::models::project_model::CreateTemplateRequest;
+        use lime_core::models::project_model::CreateTemplateRequest;
         let req = CreateTemplateRequest {
             project_id: "project-1".to_string(),
             name: "小红书模板".to_string(),
@@ -667,7 +667,7 @@ mod tests {
         PersonaService::set_default_persona(&conn, "project-1", &persona.id).unwrap();
 
         // 创建素材
-        use proxycast_core::models::project_model::UploadMaterialRequest;
+        use lime_core::models::project_model::UploadMaterialRequest;
         let material_req = UploadMaterialRequest {
             project_id: "project-1".to_string(),
             name: "素材1".to_string(),
@@ -680,7 +680,7 @@ mod tests {
         MaterialService::upload_material(&conn, material_req).unwrap();
 
         // 创建模板
-        use proxycast_core::models::project_model::CreateTemplateRequest;
+        use lime_core::models::project_model::CreateTemplateRequest;
         let template_req = CreateTemplateRequest {
             project_id: "project-1".to_string(),
             name: "测试模板".to_string(),

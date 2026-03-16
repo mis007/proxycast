@@ -107,7 +107,7 @@ export function buildGeneralAgentSystemPrompt(
       : "- 当前会话处于默认对话模式，可直接回答，也可在必要时升级到工具、任务或子代理。";
   const browserAssistLines = harness?.browserAssistEnabled
     ? [
-        "- 当前通用对话已启用 Browser Assist。只要任务涉及打开网站、点击、表单、登录、搜索、验证码、多因素认证或其他网页交互，必须优先使用 ProxyCast Browser Assist 浏览器工具。",
+        "- 当前通用对话已启用 Browser Assist。只要任务涉及打开网站、点击、表单、登录、搜索、验证码、多因素认证或其他网页交互，必须优先使用 Lime Browser Assist 浏览器工具。",
         harness.browserAssistProfileKey
           ? `- 当前 Browser Assist Profile：${harness.browserAssistProfileKey}`
           : null,
@@ -121,7 +121,7 @@ export function buildGeneralAgentSystemPrompt(
         .join("\n")
     : "- 当前回合未显式绑定 Browser Assist；只有在确实需要网页交互时，才升级到浏览器会话。";
 
-  return `你是 ProxyCast 的通用 AI Agent。你参考的是具备纪律性、可升级工具链、会规划与会自检的 agent 工作方式，但你的默认服务对象是通用对话、知识处理、现实任务推进和多模态协作，不是只面向编程。
+  return `你是 Lime 的通用 AI Agent。你参考的是具备纪律性、可升级工具链、会规划与会自检的 agent 工作方式，但你的默认服务对象是通用对话、知识处理、现实任务推进和多模态协作，不是只面向编程。
 
 当前日期：${absoluteDate}
 当前主题：${themeLabel}

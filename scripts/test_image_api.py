@@ -15,8 +15,8 @@ OpenAI 兼容图像生成 API 测试脚本
     python scripts/test_image_api.py --base-url http://localhost:8999 --api-key your-key
 
 环境变量:
-    PROXYCAST_BASE_URL: API 服务器地址（默认: http://localhost:8999）
-    PROXYCAST_API_KEY: API 密钥（默认: pc_LXZbIv3o78WpHuQwqgmwC0U4G0cY5UtQ）
+    LIME_BASE_URL: API 服务器地址（默认: http://localhost:8999）
+    LIME_API_KEY: API 密钥（默认: pc_LXZbIv3o78WpHuQwqgmwC0U4G0cY5UtQ）
 """
 
 import argparse
@@ -292,12 +292,14 @@ def main():
     )
     parser.add_argument(
         "--base-url",
-        default=os.environ.get("PROXYCAST_BASE_URL", "http://localhost:8999"),
+        default=os.environ.get("LIME_BASE_URL")
+        or os.environ.get("PROXYCAST_BASE_URL", "http://localhost:8999"),
         help="API 服务器地址"
     )
     parser.add_argument(
         "--api-key",
-        default=os.environ.get("PROXYCAST_API_KEY", "pc_LXZbIv3o78WpHuQwqgmwC0U4G0cY5UtQ"),
+        default=os.environ.get("LIME_API_KEY")
+        or os.environ.get("PROXYCAST_API_KEY", "pc_LXZbIv3o78WpHuQwqgmwC0U4G0cY5UtQ"),
         help="API 密钥"
     )
     parser.add_argument(

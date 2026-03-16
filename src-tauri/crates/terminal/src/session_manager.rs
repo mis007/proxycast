@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 
 use crate::block_controller::ControllerRegistry;
 use crate::emitter::{DynEmitter, TerminalEventEmit};
@@ -126,7 +126,7 @@ impl TerminalSessionManager {
     /// - `app_handle`: 事件发射器（实现 TerminalEventEmit trait）
     pub fn new(app_handle: impl TerminalEventEmit) -> Self {
         let block_file_base_dir = BlockFile::default_base_dir()
-            .unwrap_or_else(|_| PathBuf::from(".proxycast/terminal_blocks"));
+            .unwrap_or_else(|_| PathBuf::from(".lime/terminal_blocks"));
 
         tracing::info!(
             "[终端] 会话管理器已初始化，块文件目录: {:?}",

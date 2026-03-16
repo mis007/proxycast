@@ -16,10 +16,10 @@
 
 use rusqlite::Connection;
 
-use proxycast_core::database::dao::brand_persona_dao::BrandPersonaDao;
-use proxycast_core::database::dao::persona_dao::PersonaDao;
-use proxycast_core::errors::project_error::PersonaError;
-use proxycast_core::models::project_model::{
+use lime_core::database::dao::brand_persona_dao::BrandPersonaDao;
+use lime_core::database::dao::persona_dao::PersonaDao;
+use lime_core::errors::project_error::PersonaError;
+use lime_core::models::project_model::{
     BrandPersona, BrandPersonaExtension, BrandPersonaTemplate, CreateBrandExtensionRequest,
     CreatePersonaRequest, Persona, PersonaTemplate, PersonaUpdate, UpdateBrandExtensionRequest,
 };
@@ -401,7 +401,7 @@ impl PersonaService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::database::schema::create_tables;
+    use lime_core::database::schema::create_tables;
 
     /// 创建测试数据库连接
     fn setup_test_db() -> Connection {
@@ -693,7 +693,7 @@ mod tests {
 
     #[test]
     fn test_get_brand_persona() {
-        use proxycast_core::models::project_model::{BrandTone, DesignConfig};
+        use lime_core::models::project_model::{BrandTone, DesignConfig};
 
         let conn = setup_test_db();
         create_test_project(&conn, "project-1");
@@ -742,7 +742,7 @@ mod tests {
 
     #[test]
     fn test_save_brand_extension_creates_new() {
-        use proxycast_core::models::project_model::BrandTone;
+        use lime_core::models::project_model::BrandTone;
 
         let conn = setup_test_db();
         create_test_project(&conn, "project-1");
@@ -782,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_save_brand_extension_updates_existing() {
-        use proxycast_core::models::project_model::BrandTone;
+        use lime_core::models::project_model::BrandTone;
 
         let conn = setup_test_db();
         create_test_project(&conn, "project-1");

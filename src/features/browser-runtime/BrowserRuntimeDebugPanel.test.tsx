@@ -94,7 +94,7 @@ beforeEach(() => {
   });
   mockBrowserExecuteAction.mockResolvedValue({
     success: true,
-    backend: "proxycast_extension_bridge",
+    backend: "lime_extension_bridge",
     action: "read_page",
     request_id: "browser-attach-default",
     attempts: [],
@@ -385,7 +385,7 @@ describe("BrowserRuntimeDebugPanel", () => {
     mockBrowserExecuteAction
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-1",
         attempts: [],
@@ -412,7 +412,7 @@ describe("BrowserRuntimeDebugPanel", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "switch_tab",
         request_id: "browser-switch-1",
         attempts: [],
@@ -427,7 +427,7 @@ describe("BrowserRuntimeDebugPanel", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-2",
         attempts: [],
@@ -490,7 +490,7 @@ describe("BrowserRuntimeDebugPanel", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(1, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "list_tabs",
       timeout_ms: 30000,
     });
@@ -507,7 +507,7 @@ describe("BrowserRuntimeDebugPanel", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(2, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "switch_tab",
       args: {
         target: "202",
@@ -517,7 +517,7 @@ describe("BrowserRuntimeDebugPanel", () => {
     });
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(3, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "list_tabs",
       timeout_ms: 30000,
     });
@@ -594,7 +594,7 @@ describe("BrowserRuntimeDebugPanel", () => {
       .mockImplementationOnce(() => deferredReadPage.promise)
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-race-1",
         attempts: [],
@@ -621,7 +621,7 @@ describe("BrowserRuntimeDebugPanel", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "switch_tab",
         request_id: "browser-switch-race-1",
         attempts: [],
@@ -636,7 +636,7 @@ describe("BrowserRuntimeDebugPanel", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "browser-tabs-race-2",
         attempts: [],
@@ -708,7 +708,7 @@ describe("BrowserRuntimeDebugPanel", () => {
     await act(async () => {
       deferredReadPage.resolve({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "read_page",
         request_id: "browser-read-race-1",
         attempts: [],

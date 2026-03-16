@@ -1,6 +1,6 @@
-const CANVAS_IMAGE_INSERT_EVENT = "proxycast:canvas-image-insert-request";
-const CANVAS_IMAGE_INSERT_ACK_EVENT = "proxycast:canvas-image-insert-ack";
-const CANVAS_IMAGE_INSERT_QUEUE_KEY = "proxycast:canvas-image-insert-queue";
+const CANVAS_IMAGE_INSERT_EVENT = "lime:canvas-image-insert-request";
+const CANVAS_IMAGE_INSERT_ACK_EVENT = "lime:canvas-image-insert-ack";
+const CANVAS_IMAGE_INSERT_QUEUE_KEY = "lime:canvas-image-insert-queue";
 const MAX_QUEUE_SIZE = 40;
 
 export type CanvasImageInsertSource =

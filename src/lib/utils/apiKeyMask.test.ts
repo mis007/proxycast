@@ -3,7 +3,7 @@
  * @description 测试 API Key 脱敏功能的正确性
  * @module lib/utils/apiKeyMask.test
  *
- * **Feature: proxycast-connect, Property 4: API Key Masking Format**
+ * **Feature: lime-connect, Property 4: API Key Masking Format**
  * **Validates: Requirements 3.2**
  */
 

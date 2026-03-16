@@ -106,7 +106,7 @@ describe("existingSessionBridgeClient", () => {
   it("应以 navigate 命令附着已有登录态页面", async () => {
     mockBrowserExecuteAction.mockResolvedValue({
       success: true,
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "navigate",
       request_id: "attach-1",
       attempts: [],
@@ -127,7 +127,7 @@ describe("existingSessionBridgeClient", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenCalledWith({
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "navigate",
       args: {
         url: "https://weibo.com/home",
@@ -142,7 +142,7 @@ describe("existingSessionBridgeClient", () => {
     mockBrowserExecuteAction
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "list_tabs",
         request_id: "tabs-1",
         attempts: [],
@@ -162,7 +162,7 @@ describe("existingSessionBridgeClient", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         action: "switch_tab",
         request_id: "switch-1",
         attempts: [],
@@ -194,14 +194,14 @@ describe("existingSessionBridgeClient", () => {
 
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(1, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "list_tabs",
       args: undefined,
       timeout_ms: 30000,
     });
     expect(mockBrowserExecuteAction).toHaveBeenNthCalledWith(2, {
       profile_key: "weibo_attach",
-      backend: "proxycast_extension_bridge",
+      backend: "lime_extension_bridge",
       action: "switch_tab",
       args: {
         target: "202",

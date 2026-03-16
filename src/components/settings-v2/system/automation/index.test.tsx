@@ -152,7 +152,7 @@ beforeEach(() => {
       delivery: {
         mode: "announce",
         channel: "local_file",
-        target: "/tmp/proxycast/browser-output.json",
+        target: "/tmp/lime/browser-output.json",
         best_effort: false,
         output_schema: "json",
         output_format: "json",
@@ -172,7 +172,7 @@ beforeEach(() => {
         success: false,
         message: "写入本地文件失败: permission denied",
         channel: "local_file",
-        target: "/tmp/proxycast/browser-output.json",
+        target: "/tmp/lime/browser-output.json",
         output_kind: "json",
         output_schema: "json",
         output_format: "json",
@@ -234,7 +234,7 @@ beforeEach(() => {
           success: false,
           message: "写入本地文件失败: permission denied",
           channel: "local_file",
-          target: "/tmp/proxycast/browser-output.json",
+          target: "/tmp/lime/browser-output.json",
           output_kind: "json",
           output_schema: "json",
           output_format: "json",
@@ -262,7 +262,7 @@ beforeEach(() => {
       browser_source: "system",
       browser_path:
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      profile_dir: "/tmp/proxycast/chrome_profiles/shop_us",
+      profile_dir: "/tmp/lime/chrome_profiles/shop_us",
       remote_debugging_port: 13001,
       pid: 12345,
       started_at: "2026-03-16T00:00:00Z",
@@ -366,7 +366,7 @@ describe("AutomationSettings", () => {
           mode: "announce",
           channel: "google_sheets",
           target:
-            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/proxycast/service-account.json",
+            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/lime/service-account.json",
           best_effort: true,
           output_schema: "table",
           output_format: "json",
@@ -387,7 +387,7 @@ describe("AutomationSettings", () => {
           message: "Google Sheets 已追加 2 行",
           channel: "google_sheets",
           target:
-            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/proxycast/service-account.json",
+            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/lime/service-account.json",
           output_kind: "table",
           output_schema: "table",
           output_format: "json",

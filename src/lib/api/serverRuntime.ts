@@ -159,7 +159,7 @@ export interface WindowsStartupCheck {
 export interface WindowsStartupDiagnostics {
   platform: string;
   app_data_dir?: string | null;
-  legacy_proxycast_dir?: string | null;
+  legacy_lime_dir?: string | null;
   db_path?: string | null;
   webview2_version?: string | null;
   current_exe?: string | null;

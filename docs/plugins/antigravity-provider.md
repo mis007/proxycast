@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Antigravity Provider 是 ProxyCast 的 OAuth Provider 插件，用于对接 **Google 内部 Gemini CLI** 服务（Antigravity）。它支持 **动态协议选择**：根据模型类型自动选择输出协议（Claude 模型 → Anthropic，Gemini 模型 → Gemini）。
+Antigravity Provider 是 Lime 的 OAuth Provider 插件，用于对接 **Google 内部 Gemini CLI** 服务（Antigravity）。它支持 **动态协议选择**：根据模型类型自动选择输出协议（Claude 模型 → Anthropic，Gemini 模型 → Gemini）。
 
 ### 1.2 核心能力
 
@@ -87,13 +87,13 @@ antigravity-provider/
   "name": "antigravity-provider",
   "version": "1.0.0",
   "description": "Antigravity (Google Gemini CLI) OAuth Provider - 支持 Gemini 和 Claude 模型",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/antigravity-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "antigravity-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "antigravity",
@@ -599,13 +599,13 @@ impl AntigravityProvider {
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { AntigravityForm } from './components/AntigravityForm';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -684,7 +684,7 @@ export default function AntigravityProviderUI({ sdk, pluginId }: PluginProps) {
 type AddMode = 'oauth' | 'file';
 
 interface AntigravityFormProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -917,7 +917,7 @@ export function CredentialCard({ credential, onRefresh, onDelete }: CredentialCa
 // src/components/SettingsPanel.tsx
 
 interface SettingsPanelProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
   onClose: () => void;
 }
@@ -1240,4 +1240,4 @@ pnpm test
 
 - [Google Cloud AI Platform](https://cloud.google.com/ai-platform)
 - [Gemini API 文档](https://ai.google.dev/docs)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)

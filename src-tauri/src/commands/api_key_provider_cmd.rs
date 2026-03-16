@@ -10,7 +10,7 @@ use crate::database::dao::api_key_provider::{
 };
 use crate::database::system_providers::get_system_providers;
 use crate::database::DbConnection;
-use proxycast_services::api_key_provider_service::{
+use lime_services::api_key_provider_service::{
     ApiKeyProviderService, ChatTestResult, ConnectionTestResult, ImportResult,
 };
 use serde::{Deserialize, Serialize};
@@ -203,7 +203,7 @@ fn provider_with_keys_to_display(
 /// 为系统 Provider 提供兼容旧版本的别名 ID
 fn get_legacy_ids(provider_id: &str) -> Vec<String> {
     match provider_id {
-        "proxycast-hub" => vec![format!("{}{}", "lobe", "hub")],
+        "lime-hub" => vec![format!("{}{}", "lobe", "hub")],
         "google" => vec!["gemini".to_string()],
         "zhipuai" => vec!["zhipu".to_string()],
         "alibaba" => vec!["dashscope".to_string(), "qwen".to_string()],

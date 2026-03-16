@@ -21,7 +21,7 @@ import { sendScreenshotChat } from "@/lib/api/screenshotChat";
 import { useVoiceSound } from "@/hooks/useVoiceSound";
 import "./smart-input.css";
 
-// ProxyCast Logo组件
+// Lime Logo组件
 function Logo() {
   return (
     <svg

@@ -5,7 +5,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tauri::{AppHandle, Emitter};
 
-use proxycast_skills::{
+use lime_skills::{
     events, ExecutionCallback, ExecutionCompletePayload, StepCompletePayload, StepErrorPayload,
     StepStartPayload,
 };

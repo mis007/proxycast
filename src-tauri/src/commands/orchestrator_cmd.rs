@@ -4,7 +4,7 @@
 
 use crate::database::dao::provider_pool::ProviderPoolDao;
 use crate::database::DbConnection;
-use proxycast_core::orchestrator::{
+use lime_core::orchestrator::{
     get_global_orchestrator, init_global_orchestrator, AvailableModel, CredentialInfo,
     OrchestratorConfig, PoolStats, ProviderType, SelectionContext, SelectionResult, ServiceTier,
     StrategyInfo, TaskHint,

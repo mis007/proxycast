@@ -229,7 +229,7 @@ export function ProviderList({ appType }: ProviderListProps) {
   // 始终读取当前生效的配置（用于检测外部变更）
   useEffect(() => {
     const loadConfig = async () => {
-      if (appType === "proxycast") return;
+      if (appType === "lime") return;
       setLoadingLiveConfig(true);
       try {
         const config = await switchApi.readLiveSettings(appType);

@@ -2,7 +2,7 @@
 
 ## 目的
 
-本文件用于指导 AI Agent 在 ProxyCast 中继续进行浏览器端 E2E 测试，特别适用于以下场景：
+本文件用于指导 AI Agent 在 Lime 中继续进行浏览器端 E2E 测试，特别适用于以下场景：
 
 - 用户说“继续测试”“继续复现”“继续用 Playwright MCP 验证”
 - 需要复用当前浏览器标签页和已有页面状态
@@ -79,7 +79,7 @@ npm run bridge:health -- --timeout-ms 120000
 优先顺序：
 
 1. 调用 `browser_tabs` 查看当前标签页
-2. 如果已有 `ProxyCast` 标签页，先查看当前 URL、标题、页面状态
+2. 如果已有 `Lime` 标签页，先查看当前 URL、标题、页面状态
 3. 如果页面已漂移到旧状态，直接重新导航到 `http://127.0.0.1:1420/`
 
 建议：
@@ -113,7 +113,7 @@ npm run bridge:health -- --timeout-ms 120000
 - 页面中明确可见的标题文本
 - `browser_snapshot` 返回的 ref 作为精确交互目标
 
-## ProxyCast 推荐 E2E 主路径
+## Lime 推荐 E2E 主路径
 
 ### 首页基础验证
 

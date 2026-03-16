@@ -26,7 +26,7 @@ use crate::database::DbConnection;
 use crate::models::project_model::{
     Material, MaterialFilter, MaterialUpdate, UploadMaterialRequest,
 };
-use proxycast_services::material_service::MaterialService;
+use lime_services::material_service::MaterialService;
 
 const IMPORT_MAX_FILE_SIZE: usize = 50 * 1024 * 1024;
 
@@ -256,7 +256,7 @@ async fn load_material_bytes(raw_url: &str) -> Result<(Vec<u8>, Option<String>),
 }
 
 fn create_temp_file(bytes: &[u8], extension: &str) -> Result<String, String> {
-    let file_name = format!("proxycast-material-{}.{}", Uuid::new_v4(), extension);
+    let file_name = format!("lime-material-{}.{}", Uuid::new_v4(), extension);
     let file_path = std::env::temp_dir().join(file_name);
     fs::write(&file_path, bytes).map_err(|e| format!("写入临时文件失败: {e}"))?;
     Ok(file_path.to_string_lossy().to_string())

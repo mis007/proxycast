@@ -1,6 +1,6 @@
 import type { AutoContinueSettings } from "../types";
 
-const STORAGE_KEY_PREFIX = "proxycast_doc_auto_continue_settings_project_";
+const STORAGE_KEY_PREFIX = "lime_doc_auto_continue_settings_project_";
 
 export const DEFAULT_AUTO_CONTINUE_SETTINGS: AutoContinueSettings = {
   enabled: true,

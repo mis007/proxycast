@@ -119,7 +119,7 @@ impl BlockFile {
     pub fn default_base_dir() -> Result<PathBuf, TerminalError> {
         let home = dirs::home_dir()
             .ok_or_else(|| TerminalError::BlockFileError("无法获取主目录".to_string()))?;
-        Ok(home.join(".proxycast").join("terminal_blocks"))
+        Ok(home.join(".lime").join("terminal_blocks"))
     }
 
     /// 获取块 ID

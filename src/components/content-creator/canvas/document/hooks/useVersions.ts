@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { DocumentVersion } from "../types";
 
-const STORAGE_KEY_PREFIX = "proxycast_doc_versions_";
+const STORAGE_KEY_PREFIX = "lime_doc_versions_";
 
 /**
  * 版本管理 Hook

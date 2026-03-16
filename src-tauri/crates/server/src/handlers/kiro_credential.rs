@@ -16,8 +16,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
-use proxycast_core::database::dao::provider_pool::ProviderPoolDao;
-use proxycast_core::models::provider_pool_model::{
+use lime_core::database::dao::provider_pool::ProviderPoolDao;
+use lime_core::models::provider_pool_model::{
     CachedTokenInfo, PoolProviderType, ProviderCredential,
 };
 

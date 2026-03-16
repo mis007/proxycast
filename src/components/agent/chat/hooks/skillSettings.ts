@@ -9,8 +9,8 @@ export type SkillProviderOverrideMode =
   | "always_current"
   | "auto_fallback";
 
-const STORAGE_KEY_MODE = "proxycast_skill_provider_override_mode";
-const STORAGE_KEY_PROVIDERS = "proxycast_skill_tool_compatible_providers";
+const STORAGE_KEY_MODE = "lime_skill_provider_override_mode";
+const STORAGE_KEY_PROVIDERS = "lime_skill_tool_compatible_providers";
 
 export const DEFAULT_SKILL_TOOL_COMPATIBLE_PROVIDERS = [
   "anthropic",

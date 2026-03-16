@@ -4,9 +4,9 @@ use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
 
-use proxycast_core::app_paths;
-use proxycast_core::models::parse_skill_manifest_from_content;
-use proxycast_core::models::{
+use lime_core::app_paths;
+use lime_core::models::parse_skill_manifest_from_content;
+use lime_core::models::{
     BROADCAST_GENERATE_SKILL_DIRECTORY, COVER_GENERATE_SKILL_DIRECTORY,
     IMAGE_GENERATE_SKILL_DIRECTORY, LIBRARY_SKILL_DIRECTORY, MODAL_RESOURCE_SEARCH_SKILL_DIRECTORY,
     RESEARCH_SKILL_DIRECTORY, SOCIAL_POST_WITH_COVER_SKILL_DIRECTORY, TYPESETTING_SKILL_DIRECTORY,
@@ -129,7 +129,7 @@ fn parse_skill_version(content: &str) -> Option<(u32, u32, u32)> {
     let version_str = manifest
         .metadata
         .metadata
-        .get("proxycast_version")
+        .get("lime_version")
         .cloned()
         .or_else(|| manifest.raw_string("version"))?;
     let parts: Vec<&str> = version_str.split('.').collect();
@@ -263,7 +263,7 @@ mod tests {
         let current_content = fs::read_to_string(&skill_md_path).expect("read skill");
         assert_ne!(current_content, old_content, "旧版本内容应被替换");
         assert!(
-            current_content.contains("proxycast_workflow_ref"),
+            current_content.contains("lime_workflow_ref"),
             "升级后应包含 workflow 引用字段"
         );
     }
@@ -287,7 +287,7 @@ mod tests {
             .contains("allowed-tools: social_generate_cover_image, search_query"));
         assert!(SOCIAL_POST_WITH_COVER_SKILL_CONTENT.contains("**配图说明**"));
         assert!(SOCIAL_POST_WITH_COVER_SKILL_CONTENT.contains("状态：{成功/失败}"));
-        assert!(SOCIAL_POST_WITH_COVER_SKILL_CONTENT.contains("proxycast_workflow_ref"));
+        assert!(SOCIAL_POST_WITH_COVER_SKILL_CONTENT.contains("lime_workflow_ref"));
         assert!(SOCIAL_POST_WITH_COVER_WORKFLOW_CONTENT.contains("\"id\": \"research\""));
     }
 

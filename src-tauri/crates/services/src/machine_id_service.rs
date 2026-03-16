@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use dirs;
-use proxycast_core::models::machine_id::*;
+use lime_core::models::machine_id::*;
 use serde_json;
 use std::fs;
 use std::path::PathBuf;
@@ -21,7 +21,7 @@ impl MachineIdService {
     pub fn new() -> Result<Self, String> {
         let app_data_dir = dirs::data_dir()
             .ok_or("Failed to get app data directory")?
-            .join("proxycast");
+            .join("lime");
 
         let backup_dir = app_data_dir.join("machine_id_backups");
         let history_file = app_data_dir.join("machine_id_history.json");
@@ -456,7 +456,7 @@ impl MachineIdService {
     fn read_macos_override(&self) -> Result<String, String> {
         let override_file = dirs::data_dir()
             .ok_or("Failed to get app data directory")?
-            .join("proxycast")
+            .join("lime")
             .join("machine-id-override");
 
         fs::read_to_string(override_file).map_err(|e| format!("No override file found: {e}"))
@@ -466,7 +466,7 @@ impl MachineIdService {
     fn write_macos_override(&self, new_id: &str) -> Result<(), String> {
         let override_dir = dirs::data_dir()
             .ok_or("Failed to get app data directory")?
-            .join("proxycast");
+            .join("lime");
 
         fs::create_dir_all(&override_dir)
             .map_err(|e| format!("Failed to create override directory: {e}"))?;

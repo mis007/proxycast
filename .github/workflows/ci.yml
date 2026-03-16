@@ -47,4 +47,4 @@ jobs:
 
       - name: Run OpenClaw install regression tests
         shell: pwsh
-        run: cargo test -p proxycast-core openclaw_install --manifest-path "src-tauri/Cargo.toml"
+        run: cargo test -p lime-core openclaw_install --manifest-path "src-tauri/Cargo.toml"

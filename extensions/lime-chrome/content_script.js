@@ -1,17 +1,21 @@
 // 使用 IIFE 避免重复注入时的变量冲突
 (function () {
   // 检查是否已经注入过
-  if (window.__PROXYCAST_CONTENT_SCRIPT_LOADED__) {
+  if (
+    window.__LIME_CONTENT_SCRIPT_LOADED__ ||
+    window.__PROXYCAST_CONTENT_SCRIPT_LOADED__
+  ) {
     return;
   }
+  window.__LIME_CONTENT_SCRIPT_LOADED__ = true;
   window.__PROXYCAST_CONTENT_SCRIPT_LOADED__ = true;
 
 let refCounter = 0;
-const REF_ATTR = "proxycast-id";
+const REF_ATTR = "lime-id";
 
 function nextRefId() {
   refCounter += 1;
-  return `proxycast-${refCounter}`;
+  return `lime-${refCounter}`;
 }
 
 function resetRefs() {

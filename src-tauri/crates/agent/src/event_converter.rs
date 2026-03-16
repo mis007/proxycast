@@ -5,7 +5,7 @@
 
 use aster::agents::AgentEvent;
 use aster::conversation::message::{ActionRequiredData, Message, MessageContent};
-use proxycast_core::database::dao::agent_timeline::{AgentThreadItem, AgentThreadTurn};
+use lime_core::database::dao::agent_timeline::{AgentThreadItem, AgentThreadTurn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -166,7 +166,7 @@ fn extract_tool_result_text<T: serde::Serialize>(result: &T) -> String {
 }
 
 fn dynamic_filtering_enabled() -> bool {
-    proxycast_core::tool_calling::tool_calling_dynamic_filtering_enabled()
+    lime_core::tool_calling::tool_calling_dynamic_filtering_enabled()
 }
 
 fn maybe_filter_web_content(raw: &str) -> String {

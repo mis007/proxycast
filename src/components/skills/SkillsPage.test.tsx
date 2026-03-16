@@ -259,7 +259,7 @@ describe("SkillsPage", () => {
           name: "Remote Skill",
           directory: "remote-skill",
           catalogSource: "remote",
-          repoOwner: "proxycast",
+          repoOwner: "lime",
           repoName: "skills",
           sourceKind: "other",
         }),
@@ -366,7 +366,7 @@ describe("SkillsPage", () => {
 
     expect(mockInspectLocalSkill).toHaveBeenCalledWith(
       "local-skill",
-      "proxycast",
+      "lime",
     );
     expect(mockInspectRemoteSkill).not.toHaveBeenCalled();
   });
@@ -381,7 +381,7 @@ describe("SkillsPage", () => {
           installed: false,
           sourceKind: "other",
           catalogSource: "remote",
-          repoOwner: "proxycast",
+          repoOwner: "lime",
           repoName: "skills",
           repoBranch: "main",
         }),
@@ -407,7 +407,7 @@ describe("SkillsPage", () => {
     });
 
     expect(mockInspectRemoteSkill).toHaveBeenCalledWith({
-      owner: "proxycast",
+      owner: "lime",
       name: "skills",
       branch: "main",
       directory: "remote-skill",
@@ -471,7 +471,7 @@ describe("SkillsPage", () => {
         name: "Draft Skill",
         description: "Create a standard scaffold",
       },
-      "proxycast",
+      "lime",
     );
     expect(refresh).toHaveBeenCalledTimes(1);
   });
@@ -507,7 +507,7 @@ describe("SkillsPage", () => {
     });
     expect(mockImportLocalSkill).toHaveBeenCalledWith(
       "/tmp/imported-skill",
-      "proxycast",
+      "lime",
     );
     expect(refresh).toHaveBeenCalledTimes(1);
   });

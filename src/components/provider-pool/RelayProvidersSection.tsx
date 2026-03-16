@@ -178,7 +178,7 @@ export function RelayProvidersSection() {
         <div>
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold">ProxyCast Connect</h3>
+            <h3 className="font-semibold">Lime Connect</h3>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             浏览已验证的 AI API 中转服务商，获取 API Key
@@ -245,7 +245,7 @@ export function RelayProvidersSection() {
       {providers.length > 0 && (
         <div className="text-center text-xs text-muted-foreground pt-4 border-t">
           <p>
-            获取 API Key 后，中转商会提供一个 <code>proxycast://</code>{" "}
+            获取 API Key 后，中转商会提供一个 <code>lime://</code>{" "}
             链接，点击即可一键添加到凭证池
           </p>
         </div>

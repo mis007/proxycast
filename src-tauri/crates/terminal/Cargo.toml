@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-terminal"
+name = "lime-terminal"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,7 +8,7 @@ homepage.workspace = true
 
 [dependencies]
 # 项目内 crate
-proxycast-core = { path = "../core" }
+lime-core = { path = "../core" }
 
 # 序列化
 serde.workspace = true

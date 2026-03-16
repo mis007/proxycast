@@ -4,7 +4,7 @@
 
 ## 概述
 
-Agent 测试验证 Aster Agent 在 ProxyCast 中的集成，包括：
+Agent 测试验证 Aster Agent 在 Lime 中的集成，包括：
 - 基础对话功能
 - 流式响应
 - 工具调用

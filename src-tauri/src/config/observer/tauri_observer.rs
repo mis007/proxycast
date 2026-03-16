@@ -3,9 +3,9 @@
 //! 将配置变更事件转发到前端
 
 use async_trait::async_trait;
-use proxycast_config::observer::events::ConfigChangeEvent;
-use proxycast_config::observer::traits::ConfigObserver;
-use proxycast_core::config::Config;
+use lime_config::observer::events::ConfigChangeEvent;
+use lime_config::observer::traits::ConfigObserver;
+use lime_core::config::Config;
 use tauri::{AppHandle, Emitter};
 
 /// Tauri 前端通知观察者

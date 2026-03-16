@@ -1,8 +1,8 @@
-# ProxyCast 技术规格文档
+# Lime 技术规格文档
 
 ## 项目概述
 
-ProxyCast 是一个桌面端 AI API 代理工具，将各种大模型客户端 API（Gemini CLI、Qwen Code、Kiro Claude 等）统一转换为本地 OpenAI 兼容接口。
+Lime 是一个桌面端 AI API 代理工具，将各种大模型客户端 API（Gemini CLI、Qwen Code、Kiro Claude 等）统一转换为本地 OpenAI 兼容接口。
 
 ## 技术栈
 

@@ -1,4 +1,4 @@
-const ACTIVE_CONTENT_TARGET_KEY = "proxycast-active-content-target";
+const ACTIVE_CONTENT_TARGET_KEY = "lime-active-content-target";
 
 export type ActiveCanvasType =
   | "document"

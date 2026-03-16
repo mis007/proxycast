@@ -8,15 +8,13 @@
 use crate::provider_type_mapping::pool_provider_type_to_api_type;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use chrono::Utc;
-use proxycast_core::database::dao::api_key_provider::{
+use lime_core::database::dao::api_key_provider::{
     ApiKeyEntry, ApiKeyProvider, ApiKeyProviderDao, ApiProviderType, ProviderGroup,
     ProviderWithKeys,
 };
-use proxycast_core::database::system_providers::{get_system_providers, to_api_key_provider};
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::{
-    CredentialData, CredentialSource, PoolProviderType, ProviderCredential,
-};
+use lime_core::database::system_providers::{get_system_providers, to_api_key_provider};
+use lime_core::database::DbConnection;
+use lime_core::models::{CredentialData, CredentialSource, PoolProviderType, ProviderCredential};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -43,12 +41,59 @@ pub struct ConnectionTestResult {
 #[cfg(test)]
 mod tests {
     use super::ApiKeyProviderService;
-    use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-    use proxycast_core::database::{migration, schema, DbConnection};
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+    use chrono::Utc;
+    use lime_core::database::dao::api_key_provider::ApiProviderType;
+    use lime_core::database::dao::api_key_provider::{ApiKeyEntry, ApiKeyProviderDao};
+    use lime_core::database::{init_database, migration, schema, DbConnection};
     use rusqlite::Connection;
     use rusqlite::OptionalExtension;
     use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn resolve_legacy_machine_id() -> String {
+        if let Ok(id) = std::fs::read_to_string("/etc/machine-id") {
+            return id.trim().to_string();
+        }
+        if let Ok(id) = std::fs::read_to_string("/var/lib/dbus/machine-id") {
+            return id.trim().to_string();
+        }
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(output) = std::process::Command::new("ioreg")
+                .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+                .output()
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    if line.contains("IOPlatformUUID") {
+                        if let Some(uuid) = line.split('"').nth(3) {
+                            return uuid.to_string();
+                        }
+                    }
+                }
+            }
+        }
+        "proxycast-default-machine-id".to_string()
+    }
+
+    fn encrypt_with_legacy_proxycast_format(plaintext: &str) -> String {
+        use sha2::{Digest, Sha256};
+
+        let machine_id = resolve_legacy_machine_id();
+        let mut hasher = Sha256::new();
+        hasher.update(machine_id.as_bytes());
+        hasher.update(b"proxycast-api-key-encryption-salt");
+        let key = hasher.finalize().to_vec();
+
+        let encrypted: Vec<u8> = plaintext
+            .as_bytes()
+            .iter()
+            .enumerate()
+            .map(|(i, b)| b ^ key[i % key.len()])
+            .collect();
+        BASE64.encode(encrypted)
+    }
 
     fn init_test_database() -> DbConnection {
         let conn = Connection::open_in_memory().expect("创建内存数据库失败");
@@ -58,9 +103,11 @@ mod tests {
     }
 
     fn resolve_real_codex_provider_id(
-        db: &proxycast_core::database::DbConnection,
+        db: &lime_core::database::DbConnection,
     ) -> Result<String, String> {
-        if let Ok(explicit) = std::env::var("PROXYCAST_REAL_PROVIDER_ID") {
+        if let Some(explicit) =
+            lime_core::env_compat::var(&["LIME_REAL_PROVIDER_ID", "PROXYCAST_REAL_PROVIDER_ID"])
+        {
             let trimmed = explicit.trim();
             if !trimmed.is_empty() {
                 return Ok(trimmed.to_string());
@@ -225,6 +272,45 @@ data: [DONE]\n";
         let content = ApiKeyProviderService::parse_openai_responses_content(&body)
             .expect("应解析 output.content");
         assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_legacy_proxycast_api_key_can_be_read_and_reencrypted() {
+        let db = init_test_database();
+        let service = ApiKeyProviderService::new();
+
+        service
+            .initialize_system_providers(&db)
+            .expect("初始化系统 Provider 失败");
+
+        let legacy_ciphertext = encrypt_with_legacy_proxycast_format("sk-legacy-compatible");
+        {
+            let conn = db.lock().expect("获取数据库锁失败");
+            let key = ApiKeyEntry {
+                id: "legacy-key".to_string(),
+                provider_id: "openai".to_string(),
+                api_key_encrypted: legacy_ciphertext.clone(),
+                alias: Some("legacy".to_string()),
+                enabled: true,
+                usage_count: 0,
+                error_count: 0,
+                last_used_at: None,
+                created_at: Utc::now(),
+            };
+            ApiKeyProviderDao::insert_api_key(&conn, &key).expect("插入 legacy key 失败");
+        }
+
+        let api_key = service
+            .get_next_api_key(&db, "openai")
+            .expect("读取 API Key 失败")
+            .expect("应返回 API Key");
+        assert_eq!(api_key, "sk-legacy-compatible");
+
+        let conn = db.lock().expect("获取数据库锁失败");
+        let persisted = ApiKeyProviderDao::get_api_key_by_id(&conn, "legacy-key")
+            .expect("读取 API Key 失败")
+            .expect("legacy key 应存在");
+        assert_ne!(persisted.api_key_encrypted, legacy_ciphertext);
     }
 
     async fn spawn_single_response_server(
@@ -410,19 +496,21 @@ data: [DONE]\n";
     }
 
     #[tokio::test]
-    #[ignore = "真实联网测试：设置 PROXYCAST_REAL_API_TEST=1 后执行"]
+    #[ignore = "真实联网测试：设置 LIME_REAL_API_TEST=1 后执行"]
     async fn test_real_codex_provider_chat_gpt_5_3_codex() {
-        if std::env::var("PROXYCAST_REAL_API_TEST").ok().as_deref() != Some("1") {
+        if lime_core::env_compat::var(&["LIME_REAL_API_TEST", "PROXYCAST_REAL_API_TEST"]).as_deref()
+            != Some("1")
+        {
             return;
         }
 
         let db = init_database().expect("初始化数据库失败");
         let service = ApiKeyProviderService::new();
         let provider_id = resolve_real_codex_provider_id(&db).expect("解析 Codex Provider 失败");
-        let model =
-            std::env::var("PROXYCAST_REAL_MODEL").unwrap_or_else(|_| "gpt-5.3-codex".to_string());
-        let prompt = std::env::var("PROXYCAST_REAL_PROMPT")
-            .unwrap_or_else(|_| "请仅回复 REAL_OK".to_string());
+        let model = lime_core::env_compat::var(&["LIME_REAL_MODEL", "PROXYCAST_REAL_MODEL"])
+            .unwrap_or_else(|| "gpt-5.3-codex".to_string());
+        let prompt = lime_core::env_compat::var(&["LIME_REAL_PROMPT", "PROXYCAST_REAL_PROMPT"])
+            .unwrap_or_else(|| "请仅回复 REAL_OK".to_string());
 
         let result = service
             .test_chat(&db, &provider_id, Some(model.clone()), prompt)
@@ -459,21 +547,41 @@ pub struct ChatTestResult {
 /// 使用 XOR 加密 + Base64 编码
 /// 注意：这是一个简单的混淆方案，不是强加密
 struct EncryptionService {
-    /// 加密密钥（从机器 ID 派生）
-    key: Vec<u8>,
+    /// 当前加密密钥（Lime）
+    current_key: Vec<u8>,
+    /// 兼容旧版 ProxyCast 的历史加密密钥
+    legacy_keys: Vec<Vec<u8>>,
+}
+
+struct DecryptionResult {
+    plaintext: String,
+    used_legacy_key: bool,
 }
 
 impl EncryptionService {
+    const CURRENT_SALT: &'static [u8] = b"lime-api-key-encryption-salt";
+    const LEGACY_SALT: &'static [u8] = b"proxycast-api-key-encryption-salt";
+    const CURRENT_DEFAULT_MACHINE_ID: &'static str = "lime-default-machine-id";
+    const LEGACY_DEFAULT_MACHINE_ID: &'static str = "proxycast-default-machine-id";
+
     /// 创建新的加密服务
     fn new() -> Self {
         // 使用机器特定信息生成密钥
         let machine_id = Self::get_machine_id();
-        let mut hasher = Sha256::new();
-        hasher.update(machine_id.as_bytes());
-        hasher.update(b"proxycast-api-key-encryption-salt");
-        let key = hasher.finalize().to_vec();
+        let current_key = Self::derive_key(&machine_id, Self::CURRENT_SALT);
+        let mut legacy_keys = vec![Self::derive_key(&machine_id, Self::LEGACY_SALT)];
 
-        Self { key }
+        if machine_id == Self::CURRENT_DEFAULT_MACHINE_ID {
+            legacy_keys.push(Self::derive_key(
+                Self::LEGACY_DEFAULT_MACHINE_ID,
+                Self::LEGACY_SALT,
+            ));
+        }
+
+        Self {
+            current_key,
+            legacy_keys,
+        }
     }
 
     /// 获取机器 ID
@@ -503,31 +611,73 @@ impl EncryptionService {
             }
         }
         // 默认值
-        "proxycast-default-machine-id".to_string()
+        Self::CURRENT_DEFAULT_MACHINE_ID.to_string()
+    }
+
+    fn derive_key(machine_id: &str, salt: &[u8]) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(machine_id.as_bytes());
+        hasher.update(salt);
+        hasher.finalize().to_vec()
+    }
+
+    fn xor_bytes(input: &[u8], key: &[u8]) -> Vec<u8> {
+        input
+            .iter()
+            .enumerate()
+            .map(|(i, b)| b ^ key[i % key.len()])
+            .collect()
+    }
+
+    fn looks_like_api_key_candidate(value: &str) -> bool {
+        let trimmed = value.trim();
+        trimmed.len() >= 8
+            && trimmed.is_ascii()
+            && !trimmed
+                .chars()
+                .any(|ch| ch.is_ascii_control() || ch.is_whitespace())
     }
 
     /// 加密 API Key
     fn encrypt(&self, plaintext: &str) -> String {
-        let encrypted: Vec<u8> = plaintext
-            .as_bytes()
-            .iter()
-            .enumerate()
-            .map(|(i, b)| b ^ self.key[i % self.key.len()])
-            .collect();
+        let encrypted = Self::xor_bytes(plaintext.as_bytes(), &self.current_key);
         BASE64.encode(encrypted)
+    }
+
+    fn decrypt_with_compatibility(&self, ciphertext: &str) -> Result<DecryptionResult, String> {
+        let encrypted = BASE64
+            .decode(ciphertext)
+            .map_err(|e| format!("Base64 解码失败: {e}"))?;
+
+        let mut last_error: Option<String> = None;
+
+        for (key, used_legacy_key) in std::iter::once((&self.current_key, false))
+            .chain(self.legacy_keys.iter().map(|key| (key, true)))
+        {
+            let decrypted = Self::xor_bytes(&encrypted, key);
+            match String::from_utf8(decrypted) {
+                Ok(plaintext) if Self::looks_like_api_key_candidate(&plaintext) => {
+                    return Ok(DecryptionResult {
+                        plaintext,
+                        used_legacy_key,
+                    });
+                }
+                Ok(_) => {
+                    last_error = Some("解密结果不符合 API Key 格式".to_string());
+                }
+                Err(error) => {
+                    last_error = Some(format!("UTF-8 解码失败: {error}"));
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| "API Key 解密失败".to_string()))
     }
 
     /// 解密 API Key
     fn decrypt(&self, ciphertext: &str) -> Result<String, String> {
-        let encrypted = BASE64
-            .decode(ciphertext)
-            .map_err(|e| format!("Base64 解码失败: {e}"))?;
-        let decrypted: Vec<u8> = encrypted
-            .iter()
-            .enumerate()
-            .map(|(i, b)| b ^ self.key[i % self.key.len()])
-            .collect();
-        String::from_utf8(decrypted).map_err(|e| format!("UTF-8 解码失败: {e}"))
+        self.decrypt_with_compatibility(ciphertext)
+            .map(|result| result.plaintext)
     }
 
     /// 检查是否为加密后的值（非明文）
@@ -565,6 +715,70 @@ impl ApiKeyProviderService {
             encryption: EncryptionService::new(),
             round_robin_index: RwLock::new(HashMap::new()),
         }
+    }
+
+    fn decrypt_api_key_entry_with_migration(
+        &self,
+        conn: &rusqlite::Connection,
+        key: &ApiKeyEntry,
+    ) -> Result<String, String> {
+        let result = self
+            .encryption
+            .decrypt_with_compatibility(&key.api_key_encrypted)?;
+
+        if result.used_legacy_key {
+            let reencrypted = self.encryption.encrypt(&result.plaintext);
+            if reencrypted != key.api_key_encrypted {
+                ApiKeyProviderDao::update_api_key_encrypted(conn, &key.id, &reencrypted)
+                    .map_err(|e| format!("升级旧版 API Key 加密格式失败: {e}"))?;
+                tracing::info!(
+                    "[ApiKeyProviderService] 已自动升级旧版 API Key 加密格式: {}",
+                    key.id
+                );
+            }
+        }
+
+        Ok(result.plaintext)
+    }
+
+    pub fn migrate_legacy_api_key_encryption(&self, db: &DbConnection) -> Result<usize, String> {
+        let conn = lime_core::database::lock_db(db)?;
+        let providers = ApiKeyProviderDao::get_all_providers_with_keys(&conn)
+            .map_err(|e| format!("读取 API Key 列表失败: {e}"))?;
+
+        let mut migrated = 0usize;
+        for provider in providers {
+            for key in provider.api_keys {
+                match self
+                    .encryption
+                    .decrypt_with_compatibility(&key.api_key_encrypted)
+                {
+                    Ok(result) if result.used_legacy_key => {
+                        let reencrypted = self.encryption.encrypt(&result.plaintext);
+                        if reencrypted != key.api_key_encrypted {
+                            ApiKeyProviderDao::update_api_key_encrypted(
+                                &conn,
+                                &key.id,
+                                &reencrypted,
+                            )
+                            .map_err(|e| format!("升级 API Key 加密格式失败: {e}"))?;
+                            migrated += 1;
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::warn!(
+                            "[ApiKeyProviderService] 跳过异常 API Key {} (provider={}): {}",
+                            key.id,
+                            provider.provider.id,
+                            error
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(migrated)
     }
 
     pub async fn test_chat(
@@ -695,8 +909,8 @@ impl ApiKeyProviderService {
         model: &str,
         prompt: &str,
     ) -> Result<(String, String), String> {
-        use proxycast_core::models::openai::{ChatCompletionRequest, ChatMessage, MessageContent};
-        use proxycast_providers::providers::openai_custom::OpenAICustomProvider;
+        use lime_core::models::openai::{ChatCompletionRequest, ChatMessage, MessageContent};
+        use lime_providers::providers::openai_custom::OpenAICustomProvider;
 
         let provider =
             OpenAICustomProvider::with_config(api_key.to_string(), Some(api_host.to_string()));
@@ -779,7 +993,7 @@ impl ApiKeyProviderService {
         model: &str,
         prompt: &str,
     ) -> Result<(String, String), String> {
-        use proxycast_providers::providers::claude_custom::ClaudeCustomProvider;
+        use lime_providers::providers::claude_custom::ClaudeCustomProvider;
 
         let provider =
             ClaudeCustomProvider::with_config(api_key.to_string(), Some(api_host.to_string()));
@@ -929,7 +1143,7 @@ impl ApiKeyProviderService {
         model: &str,
         prompt: &str,
     ) -> Result<(String, String), String> {
-        use proxycast_providers::providers::codex::CodexProvider;
+        use lime_providers::providers::codex::CodexProvider;
 
         let url = CodexProvider::build_responses_url(api_host);
         let request_body = Self::build_openai_responses_request(model, prompt, false);
@@ -985,7 +1199,7 @@ impl ApiKeyProviderService {
         model: &str,
         prompt: &str,
     ) -> Result<(String, String), String> {
-        use proxycast_providers::providers::codex::CodexProvider;
+        use lime_providers::providers::codex::CodexProvider;
 
         let url = CodexProvider::build_responses_url(api_host);
 
@@ -1060,7 +1274,7 @@ impl ApiKeyProviderService {
     /// 检查数据库中是否存在系统 Provider，如果不存在则插入
     /// **Validates: Requirements 9.3**
     pub fn initialize_system_providers(&self, db: &DbConnection) -> Result<usize, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let system_providers = get_system_providers();
         let mut inserted_count = 0;
 
@@ -1090,7 +1304,7 @@ impl ApiKeyProviderService {
         // 首先确保系统 Provider 已初始化
         self.initialize_system_providers(db)?;
 
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let providers =
             ApiKeyProviderDao::get_all_providers_with_keys(&conn).map_err(|e| e.to_string())?;
 
@@ -1117,7 +1331,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         id: &str,
     ) -> Result<Option<ProviderWithKeys>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let provider =
             ApiKeyProviderDao::get_provider_by_id(&conn, id).map_err(|e| e.to_string())?;
 
@@ -1167,7 +1381,7 @@ impl ApiKeyProviderService {
             updated_at: now,
         };
 
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::insert_provider(&conn, &provider).map_err(|e| e.to_string())?;
 
         Ok(provider)
@@ -1189,7 +1403,7 @@ impl ApiKeyProviderService {
         region: Option<String>,
         custom_models: Option<Vec<String>>,
     ) -> Result<ApiKeyProvider, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let mut provider = ApiKeyProviderDao::get_provider_by_id(&conn, id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Provider not found: {id}"))?;
@@ -1235,7 +1449,7 @@ impl ApiKeyProviderService {
     /// 删除自定义 Provider
     /// 系统 Provider 不允许删除
     pub fn delete_custom_provider(&self, db: &DbConnection, id: &str) -> Result<bool, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 检查是否为系统 Provider
         let provider = ApiKeyProviderDao::get_provider_by_id(&conn, id)
@@ -1267,7 +1481,7 @@ impl ApiKeyProviderService {
             provider_id
         );
 
-        let mut conn = proxycast_core::database::lock_db(db)?;
+        let mut conn = lime_core::database::lock_db(db)?;
 
         // 使用事务确保操作的原子性
         let tx = conn
@@ -1353,7 +1567,7 @@ impl ApiKeyProviderService {
 
     /// 删除 API Key
     pub fn delete_api_key(&self, db: &DbConnection, key_id: &str) -> Result<bool, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::delete_api_key(&conn, key_id).map_err(|e| e.to_string())
     }
 
@@ -1364,7 +1578,7 @@ impl ApiKeyProviderService {
         key_id: &str,
         enabled: bool,
     ) -> Result<ApiKeyEntry, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let mut key = ApiKeyProviderDao::get_api_key_by_id(&conn, key_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("API Key not found: {key_id}"))?;
@@ -1382,7 +1596,7 @@ impl ApiKeyProviderService {
         key_id: &str,
         alias: Option<String>,
     ) -> Result<ApiKeyEntry, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let mut key = ApiKeyProviderDao::get_api_key_by_id(&conn, key_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("API Key not found: {key_id}"))?;
@@ -1402,7 +1616,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         provider_id: &str,
     ) -> Result<Option<String>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 获取所有启用的 API Keys
         let keys = ApiKeyProviderDao::get_enabled_api_keys_by_provider(&conn, provider_id)
@@ -1425,7 +1639,7 @@ impl ApiKeyProviderService {
         let selected_key = &keys[index % keys.len()];
 
         // 解密并返回
-        let decrypted = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+        let decrypted = self.decrypt_api_key_entry_with_migration(&conn, selected_key)?;
         Ok(Some(decrypted))
     }
 
@@ -1435,7 +1649,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         provider_id: &str,
     ) -> Result<Option<(String, String)>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 获取所有启用的 API Keys
         let keys = ApiKeyProviderDao::get_enabled_api_keys_by_provider(&conn, provider_id)
@@ -1458,13 +1672,13 @@ impl ApiKeyProviderService {
         let selected_key = &keys[index % keys.len()];
 
         // 解密并返回
-        let decrypted = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+        let decrypted = self.decrypt_api_key_entry_with_migration(&conn, selected_key)?;
         Ok(Some((selected_key.id.clone(), decrypted)))
     }
 
     /// 记录 API Key 使用
     pub fn record_usage(&self, db: &DbConnection, key_id: &str) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let key = ApiKeyProviderDao::get_api_key_by_id(&conn, key_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("API Key not found: {key_id}"))?;
@@ -1480,7 +1694,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         provider_id: &str,
     ) -> Result<Option<(String, ApiKeyProvider)>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 获取 Provider 信息
         let provider = match ApiKeyProviderDao::get_provider_by_id(&conn, provider_id)
@@ -1516,7 +1730,7 @@ impl ApiKeyProviderService {
         let selected_key = &keys[index % keys.len()];
 
         // 解密并返回
-        let decrypted = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+        let decrypted = self.decrypt_api_key_entry_with_migration(&conn, selected_key)?;
         Ok(Some((decrypted, provider)))
     }
 
@@ -1527,7 +1741,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         provider_type: ApiProviderType,
     ) -> Result<Option<(String, String, ApiKeyProvider)>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 获取所有启用的 API Keys（按类型）
         let keys = ApiKeyProviderDao::get_enabled_api_keys_by_type(&conn, provider_type)
@@ -1551,13 +1765,13 @@ impl ApiKeyProviderService {
         let (selected_key, provider) = &keys[index % keys.len()];
 
         // 解密并返回
-        let decrypted = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+        let decrypted = self.decrypt_api_key_entry_with_migration(&conn, selected_key)?;
         Ok(Some((selected_key.id.clone(), decrypted, provider.clone())))
     }
 
     /// 记录 API Key 错误
     pub fn record_error(&self, db: &DbConnection, key_id: &str) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::increment_api_key_error(&conn, key_id).map_err(|e| e.to_string())
     }
 
@@ -1582,13 +1796,13 @@ impl ApiKeyProviderService {
 
     /// 获取 UI 状态
     pub fn get_ui_state(&self, db: &DbConnection, key: &str) -> Result<Option<String>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::get_ui_state(&conn, key).map_err(|e| e.to_string())
     }
 
     /// 设置 UI 状态
     pub fn set_ui_state(&self, db: &DbConnection, key: &str, value: &str) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::set_ui_state(&conn, key, value).map_err(|e| e.to_string())
     }
 
@@ -1599,7 +1813,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         sort_orders: Vec<(String, i32)>,
     ) -> Result<(), String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         ApiKeyProviderDao::update_provider_sort_orders(&conn, &sort_orders)
             .map_err(|e| e.to_string())
     }
@@ -1612,7 +1826,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         include_keys: bool,
     ) -> Result<serde_json::Value, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let providers =
             ApiKeyProviderDao::get_all_providers_with_keys(&conn).map_err(|e| e.to_string())?;
 
@@ -1672,7 +1886,7 @@ impl ApiKeyProviderService {
             .as_array()
             .ok_or_else(|| "配置格式错误: 缺少 providers 数组".to_string())?;
 
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
         let mut imported_providers = 0;
         let mut skipped_providers = 0;
         let mut errors = Vec::new();
@@ -1744,7 +1958,7 @@ impl ApiKeyProviderService {
         db: &DbConnection,
         pool_type: &PoolProviderType,
         provider_id_hint: Option<&str>,
-        client_type: Option<&proxycast_core::models::client_type::ClientType>,
+        client_type: Option<&lime_core::models::client_type::ClientType>,
     ) -> Result<Option<ProviderCredential>, String> {
         eprintln!(
             "[get_fallback_credential] 开始查找: pool_type={pool_type:?}, provider_id_hint={provider_id_hint:?}"
@@ -1792,7 +2006,7 @@ impl ApiKeyProviderService {
         pool_type: &PoolProviderType,
         api_type: &ApiProviderType,
     ) -> Result<Option<ProviderCredential>, String> {
-        let conn = proxycast_core::database::lock_db(db)?;
+        let conn = lime_core::database::lock_db(db)?;
 
         // 查找该类型的启用的 Provider（按 sort_order 排序）
         let providers = ApiKeyProviderDao::get_all_providers(&conn).map_err(|e| e.to_string())?;
@@ -1827,7 +2041,7 @@ impl ApiKeyProviderService {
             let selected_key = &keys[index % keys.len()];
 
             // 解密 API Key
-            let api_key = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+            let api_key = self.decrypt_api_key_entry_with_migration(&conn, selected_key)?;
 
             // 转换为 ProviderCredential
             let credential = self.convert_to_provider_credential(
@@ -1858,11 +2072,11 @@ impl ApiKeyProviderService {
         &self,
         db: &DbConnection,
         provider_id: &str,
-        client_type: Option<&proxycast_core::models::client_type::ClientType>,
+        client_type: Option<&lime_core::models::client_type::ClientType>,
     ) -> Result<Option<ProviderCredential>, String> {
         // First, get all data we need while holding the lock
         let (provider, keys) = {
-            let conn = proxycast_core::database::lock_db(db)?;
+            let conn = lime_core::database::lock_db(db)?;
 
             // 直接按 provider_id 查找
             let provider = ApiKeyProviderDao::get_provider_by_id(&conn, provider_id)
@@ -1921,7 +2135,10 @@ impl ApiKeyProviderService {
             let candidate_key = &keys[index % keys.len()];
 
             // 解密 API Key 进行测试
-            let api_key = self.encryption.decrypt(&candidate_key.api_key_encrypted)?;
+            let api_key = {
+                let conn = lime_core::database::lock_db(db)?;
+                self.decrypt_api_key_entry_with_migration(&conn, candidate_key)?
+            };
 
             // 检查客户端兼容性（仅对 Anthropic 类型进行检查）
             if provider.provider_type == ApiProviderType::Anthropic {
@@ -1929,7 +2146,7 @@ impl ApiKeyProviderService {
                     // 对于 Claude Code 客户端，可以使用任何 Claude 凭证
                     if matches!(
                         client,
-                        proxycast_core::models::client_type::ClientType::ClaudeCode
+                        lime_core::models::client_type::ClientType::ClaudeCode
                     ) {
                         selected_key = Some(candidate_key);
                         break;
@@ -1969,7 +2186,10 @@ impl ApiKeyProviderService {
         };
 
         // 解密 API Key
-        let api_key = self.encryption.decrypt(&selected_key.api_key_encrypted)?;
+        let api_key = {
+            let conn = lime_core::database::lock_db(db)?;
+            self.decrypt_api_key_entry_with_migration(&conn, selected_key)?
+        };
 
         // 根据 Provider 类型转换为对应的 ProviderCredential
         let credential =
@@ -2293,7 +2513,7 @@ impl ApiKeyProviderService {
         api_key: &str,
         api_host: &str,
     ) -> Result<Vec<String>, String> {
-        use proxycast_providers::providers::openai_custom::OpenAICustomProvider;
+        use lime_providers::providers::openai_custom::OpenAICustomProvider;
 
         let provider =
             OpenAICustomProvider::with_config(api_key.to_string(), Some(api_host.to_string()));
@@ -2338,7 +2558,7 @@ impl ApiKeyProviderService {
         api_key: &str,
         api_host: &str,
     ) -> Result<(), String> {
-        use proxycast_providers::providers::claude_custom::ClaudeCustomProvider;
+        use lime_providers::providers::claude_custom::ClaudeCustomProvider;
 
         let provider =
             ClaudeCustomProvider::with_config(api_key.to_string(), Some(api_host.to_string()));
@@ -2377,7 +2597,7 @@ impl ApiKeyProviderService {
         api_host: &str,
         model: &str,
     ) -> Result<Vec<String>, String> {
-        use proxycast_providers::providers::claude_custom::ClaudeCustomProvider;
+        use lime_providers::providers::claude_custom::ClaudeCustomProvider;
 
         let provider =
             ClaudeCustomProvider::with_config(api_key.to_string(), Some(api_host.to_string()));

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ProxyCast",
-  "version": "0.88.0",
-  "identifier": "com.proxycast.app",
+  "productName": "Lime",
+  "version": "0.89.0",
+  "identifier": "com.lime.app",
   "build": {
     "beforeDevCommand": "npm run dev:web-bridge",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "ProxyCast",
+        "title": "Lime",
         "visible": false,
         "width": 1200,
         "height": 800,
@@ -59,7 +59,7 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "proxycast"
+          "lime"
         ]
       }
     }

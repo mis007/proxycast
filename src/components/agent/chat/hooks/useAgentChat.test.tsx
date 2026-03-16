@@ -374,7 +374,7 @@ describe("useAgentChat 会话创建", () => {
     }
   });
 
-  it("旧链路收到带 ProxyCast 元数据块的 tool_end error 时应清洗错误文本", async () => {
+  it("旧链路收到带 Lime 元数据块的 tool_end error 时应清洗错误文本", async () => {
     const harness = mountHook("ws-native-tool-error");
 
     let streamHandler: ((event: { payload: unknown }) => void) | null = null;
@@ -416,12 +416,12 @@ describe("useAgentChat 会话创建", () => {
               error: [
                 "CDP 会话已断开，请重试",
                 "",
-                "[ProxyCast 工具元数据开始]",
+                "[Lime 工具元数据开始]",
                 JSON.stringify({
                   reported_success: false,
                   exit_code: 1,
                 }),
-                "[ProxyCast 工具元数据结束]",
+                "[Lime 工具元数据结束]",
               ].join("\n"),
             },
           },
@@ -437,7 +437,7 @@ describe("useAgentChat 会话创建", () => {
 
       expect(toolCall?.status).toBe("failed");
       expect(toolCall?.result?.error).toBe("CDP 会话已断开，请重试");
-      expect(toolCall?.result?.error).not.toContain("ProxyCast 工具元数据");
+      expect(toolCall?.result?.error).not.toContain("Lime 工具元数据");
       expect(toolCall?.result?.metadata).toMatchObject({
         reported_success: false,
         exit_code: 1,

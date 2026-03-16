@@ -4,7 +4,7 @@
 //!
 //! ## 目录结构
 //! ```text
-//! {应用数据目录}/proxycast/sessions/
+//! {应用数据目录}/lime/sessions/
 //! ├── {session-id}/
 //! │   ├── .meta.json          # 会话元数据
 //! │   ├── files/              # 生成的文件

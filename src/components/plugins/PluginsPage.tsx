@@ -19,7 +19,7 @@ export function PluginsPage({ onNavigate: _onNavigate }: PluginsPageProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">插件中心</h1>
-        <p className="text-muted-foreground mt-1">管理和配置 ProxyCast 插件</p>
+        <p className="text-muted-foreground mt-1">管理和配置 Lime 插件</p>
       </div>
 
       <PluginManager onNavigate={_onNavigate} />

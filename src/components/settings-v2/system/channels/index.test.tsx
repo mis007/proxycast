@@ -129,7 +129,7 @@ beforeEach(() => {
         local_host: "127.0.0.1",
         local_port: 3000,
         cloudflare: {
-          tunnel_name: "proxycast",
+          tunnel_name: "lime",
           dns_name: "bot.example.com",
         },
       },

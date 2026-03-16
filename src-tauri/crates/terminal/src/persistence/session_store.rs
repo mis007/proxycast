@@ -14,7 +14,7 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::error::TerminalError;
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 
 /// 会话记录（存储在 SQLite）
 ///

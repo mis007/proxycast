@@ -1,11 +1,11 @@
 //! MCP 桥接客户端
 //!
 //! 实现 Aster 的 McpClientTrait，将工具调用转发到
-//! ProxyCast 已有的 MCP RunningService，避免重复启动进程。
+//! Lime 已有的 MCP RunningService，避免重复启动进程。
 
 use aster::agents::mcp_client::{Error as McpError, McpClientTrait};
 use aster::session_context::{current_session_id, SESSION_ID_HEADER};
-use proxycast_mcp::client::ProxyCastMcpClient;
+use lime_mcp::client::LimeMcpClient;
 use rmcp::model::{
     CallToolRequest, CallToolRequestParam, CallToolResult, CancelledNotification,
     CancelledNotificationMethod, CancelledNotificationParam, ClientRequest, GetPromptRequest,
@@ -24,16 +24,16 @@ use tokio_util::sync::CancellationToken;
 
 /// MCP 桥接客户端
 ///
-/// 持有 ProxyCast 的 rmcp RunningService 引用，
+/// 持有 Lime 的 rmcp RunningService 引用，
 /// 将 Aster 的工具调用转发到已有的 MCP 连接。
 #[allow(dead_code)]
 pub struct McpBridgeClient {
     /// 服务器名称
     name: String,
-    /// ProxyCast 的 rmcp RunningService
-    service: Arc<RunningService<RoleClient, ProxyCastMcpClient>>,
-    /// ProxyCast MCP 客户端处理器
-    handler: Arc<ProxyCastMcpClient>,
+    /// Lime 的 rmcp RunningService
+    service: Arc<RunningService<RoleClient, LimeMcpClient>>,
+    /// Lime MCP 客户端处理器
+    handler: Arc<LimeMcpClient>,
     /// 服务器初始化信息
     server_info: Option<InitializeResult>,
     /// 请求超时时间
@@ -43,8 +43,8 @@ pub struct McpBridgeClient {
 impl McpBridgeClient {
     pub fn new(
         name: String,
-        service: Arc<RunningService<RoleClient, ProxyCastMcpClient>>,
-        handler: Arc<ProxyCastMcpClient>,
+        service: Arc<RunningService<RoleClient, LimeMcpClient>>,
+        handler: Arc<LimeMcpClient>,
         server_info: Option<InitializeResult>,
     ) -> Self {
         Self {

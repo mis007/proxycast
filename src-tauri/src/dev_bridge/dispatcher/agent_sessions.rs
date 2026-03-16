@@ -1,7 +1,7 @@
 use super::{args_or_default, get_db};
 use crate::database::dao::agent::AgentDao;
 use crate::dev_bridge::DevBridgeState;
-use proxycast_core::agent::types::AgentSession;
+use lime_core::agent::types::AgentSession;
 use serde_json::Value as JsonValue;
 
 type DynError = Box<dyn std::error::Error>;
@@ -60,7 +60,7 @@ pub(super) fn try_handle(
 
             serde_json::json!({
                 "session_id": session_id,
-                "credential_name": "ProxyCast",
+                "credential_name": "Lime",
                 "credential_uuid": null,
                 "provider_type": provider_type,
                 "model": model_name,

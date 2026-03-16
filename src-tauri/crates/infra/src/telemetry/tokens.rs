@@ -5,8 +5,8 @@
 #![allow(dead_code)]
 
 use chrono::{DateTime, Duration, Utc};
+use lime_core::ProviderType;
 use parking_lot::RwLock;
-use proxycast_core::ProviderType;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 

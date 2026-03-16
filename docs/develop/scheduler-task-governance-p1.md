@@ -73,8 +73,8 @@
 
 关键测试：
 
-- `proxycast-scheduler`：
+- `lime-scheduler`：
   - `scheduler::tests::test_mark_task_failed_should_trigger_cooldown`
   - `dao::tests::test_create_tables_should_add_missing_columns_for_existing_table`
-- `proxycast-websocket`：
+- `lime-websocket`：
   - `handlers::rpc_handler::tests::test_cron_run_should_block_when_task_in_cooldown`

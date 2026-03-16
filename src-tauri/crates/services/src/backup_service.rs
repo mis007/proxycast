@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use chrono::{DateTime, Duration, Utc};
-use proxycast_core::database::{get_db_path, DbConnection};
+use lime_core::database::{get_db_path, DbConnection};
 use rusqlite::DatabaseName;
 use std::path::{Path, PathBuf};
 
@@ -27,14 +27,14 @@ impl BackupService {
 
     pub fn with_defaults() -> Result<Self, String> {
         let home = dirs::home_dir().ok_or_else(|| "无法获取主目录".to_string())?;
-        let backup_dir = home.join(".proxycast").join("backups");
+        let backup_dir = home.join(".lime").join("backups");
         Self::new(backup_dir, 7)
     }
 
     pub fn backup_database(&self) -> Result<PathBuf, String> {
         let db_path = get_db_path()?;
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-        let backup_path = self.backup_dir.join(format!("proxycast_{timestamp}.db"));
+        let backup_path = self.backup_dir.join(format!("lime_{timestamp}.db"));
 
         std::fs::copy(&db_path, &backup_path).map_err(|e| format!("备份失败: {e}"))?;
 
@@ -44,7 +44,7 @@ impl BackupService {
 
     pub fn backup_database_with_connection(&self, db: &DbConnection) -> Result<PathBuf, String> {
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-        let backup_path = self.backup_dir.join(format!("proxycast_{timestamp}.db"));
+        let backup_path = self.backup_dir.join(format!("lime_{timestamp}.db"));
         let conn = db.lock().map_err(|_| "数据库锁已被占用".to_string())?;
         let progress: Option<fn(rusqlite::backup::Progress)> = None;
         conn.backup(DatabaseName::Main, &backup_path, progress)

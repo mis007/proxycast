@@ -17,21 +17,21 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::AppState;
-use proxycast_core::errors::GatewayErrorCode;
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
-use proxycast_core::models::openai::ChatCompletionRequest;
-use proxycast_core::models::provider_pool_model::ProviderCredential;
-use proxycast_core::websocket::WsErrorCode;
-use proxycast_processor::RequestContext;
-use proxycast_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
-use proxycast_providers::converter::openai_to_antigravity::{
+use lime_core::errors::GatewayErrorCode;
+use lime_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::models::openai::ChatCompletionRequest;
+use lime_core::models::provider_pool_model::ProviderCredential;
+use lime_core::websocket::WsErrorCode;
+use lime_processor::RequestContext;
+use lime_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
+use lime_providers::converter::openai_to_antigravity::{
     convert_antigravity_to_openai_response, convert_openai_to_antigravity_with_context,
 };
-use proxycast_providers::providers::{
+use lime_providers::providers::{
     AntigravityProvider, ClaudeCustomProvider, KiroProvider, OpenAICustomProvider,
 };
-use proxycast_server_utils::parse_cw_response;
-use proxycast_websocket::{
+use lime_server_utils::parse_cw_response;
+use lime_websocket::{
     WsApiRequest, WsApiResponse, WsEndpoint, WsError, WsMessage as WsProtoMessage,
 };
 
@@ -508,7 +508,7 @@ pub async fn call_provider_openai_for_ws(
     credential: &ProviderCredential,
     request: &ChatCompletionRequest,
 ) -> Result<serde_json::Value, String> {
-    use proxycast_core::models::provider_pool_model::CredentialData;
+    use lime_core::models::provider_pool_model::CredentialData;
 
     match &credential.credential {
         CredentialData::KiroOAuth { creds_file_path } => {
@@ -787,7 +787,7 @@ pub async fn call_provider_anthropic_for_ws(
     credential: &ProviderCredential,
     request: &AnthropicMessagesRequest,
 ) -> Result<serde_json::Value, String> {
-    use proxycast_core::models::provider_pool_model::CredentialData;
+    use lime_core::models::provider_pool_model::CredentialData;
 
     match &credential.credential {
         CredentialData::ClaudeKey { api_key, base_url } => {

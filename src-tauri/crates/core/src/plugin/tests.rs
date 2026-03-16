@@ -17,7 +17,7 @@ fn test_plugin_manifest_validation() {
         plugin_type: PluginType::Script,
         config_schema: None,
         hooks: vec!["on_request".to_string()],
-        min_proxycast_version: None,
+        min_lime_version: None,
         binary: None,
         ui: None,
     };
@@ -155,7 +155,7 @@ fn test_plugin_manifest_serde() {
             }
         })),
         hooks: vec!["on_request".to_string(), "on_response".to_string()],
-        min_proxycast_version: Some("0.13.0".to_string()),
+        min_lime_version: Some("0.13.0".to_string()),
         binary: None,
         ui: None,
     };
@@ -178,12 +178,12 @@ fn test_machine_id_tool_manifest_parsing() {
         "name": "machine-id-tool",
         "version": "0.4.0",
         "description": "Machine ID 管理工具",
-        "author": "ProxyCast Team",
+        "author": "Lime Team",
         "homepage": "https://github.com/aiclientproxy/MachineIdTool",
         "license": "MIT",
         "plugin_type": "script",
         "entry": "config.json",
-        "min_proxycast_version": "1.0.0",
+        "min_lime_version": "1.0.0",
         "ui": {
             "surfaces": ["tools", "sidebar"],
             "entry": "dist/index.js",

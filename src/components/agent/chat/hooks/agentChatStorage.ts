@@ -34,7 +34,7 @@ const initAudio = () => {
 };
 
 const getSoundEnabled = (): boolean => {
-  return localStorage.getItem("proxycast_sound_enabled") === "true";
+  return localStorage.getItem("lime_sound_enabled") === "true";
 };
 
 export const playToolcallSound = () => {

@@ -1,8 +1,8 @@
 //! 处理器模块测试
 
 use crate::ProviderType;
-use proxycast_processor::*;
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_processor::*;
+use lime_services::provider_pool_service::ProviderPoolService;
 use std::sync::Arc;
 
 #[test]

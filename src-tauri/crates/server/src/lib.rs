@@ -14,35 +14,35 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use proxycast_core::config::{
+use lime_core::config::{
     Config, ConfigChangeKind, ConfigManager, EndpointProvidersConfig, FileChangeEvent, FileWatcher,
     HotReloadManager, ReloadResult,
 };
-use proxycast_core::database::dao::provider_pool::ProviderPoolDao;
-use proxycast_core::database::DbConnection;
-use proxycast_core::logger::LogStore;
-use proxycast_core::models::anthropic::*;
-use proxycast_core::models::openai::*;
-use proxycast_core::models::provider_pool_model::CredentialData;
-use proxycast_core::models::route_model::{RouteInfo, RouteListResponse};
-use proxycast_credential::CredentialSyncService;
-use proxycast_infra::injection::Injector;
-use proxycast_processor::{RequestContext, RequestProcessor};
-use proxycast_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
-use proxycast_providers::providers::antigravity::AntigravityProvider;
-use proxycast_providers::providers::claude_custom::ClaudeCustomProvider;
-use proxycast_providers::providers::gemini::GeminiProvider;
-use proxycast_providers::providers::kiro::KiroProvider;
-use proxycast_providers::providers::openai_custom::OpenAICustomProvider;
-use proxycast_server_utils::{
+use lime_core::database::dao::provider_pool::ProviderPoolDao;
+use lime_core::database::DbConnection;
+use lime_core::logger::LogStore;
+use lime_core::models::anthropic::*;
+use lime_core::models::openai::*;
+use lime_core::models::provider_pool_model::CredentialData;
+use lime_core::models::route_model::{RouteInfo, RouteListResponse};
+use lime_credential::CredentialSyncService;
+use lime_infra::injection::Injector;
+use lime_processor::{RequestContext, RequestProcessor};
+use lime_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
+use lime_providers::providers::antigravity::AntigravityProvider;
+use lime_providers::providers::claude_custom::ClaudeCustomProvider;
+use lime_providers::providers::gemini::GeminiProvider;
+use lime_providers::providers::kiro::KiroProvider;
+use lime_providers::providers::openai_custom::OpenAICustomProvider;
+use lime_server_utils::{
     build_anthropic_response, build_anthropic_stream_response, build_error_response,
     build_error_response_with_status, build_gemini_cli_request, build_gemini_native_request,
     models, parse_cw_response,
 };
-use proxycast_services::kiro_event_service::KiroEventService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
-use proxycast_services::token_cache_service::TokenCacheService;
-use proxycast_websocket::{WsConfig, WsConnectionManager, WsStats};
+use lime_services::kiro_event_service::KiroEventService;
+use lime_services::provider_pool_service::ProviderPoolService;
+use lime_services::token_cache_service::TokenCacheService;
+use lime_websocket::{WsConfig, WsConnectionManager, WsStats};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -54,12 +54,12 @@ use tower_http::timeout::TimeoutLayer;
 pub fn record_request_telemetry(
     state: &AppState,
     ctx: &RequestContext,
-    status: proxycast_infra::telemetry::RequestStatus,
+    status: lime_infra::telemetry::RequestStatus,
     error_message: Option<String>,
 ) {
-    use proxycast_infra::telemetry::RequestLog;
+    use lime_infra::telemetry::RequestLog;
 
-    let provider = ctx.provider.unwrap_or(proxycast_core::ProviderType::Kiro);
+    let provider = ctx.provider.unwrap_or(lime_core::ProviderType::Kiro);
 
     // 清理错误消息中的敏感信息
     let sanitized_error = error_message.map(|msg| state.sanitizer.sanitize(&msg));
@@ -73,19 +73,15 @@ pub fn record_request_telemetry(
 
     // 设置状态和持续时间
     match status {
-        proxycast_infra::telemetry::RequestStatus::Success => {
-            log.mark_success(ctx.elapsed_ms(), 200)
-        }
-        proxycast_infra::telemetry::RequestStatus::Failed => log.mark_failed(
+        lime_infra::telemetry::RequestStatus::Success => log.mark_success(ctx.elapsed_ms(), 200),
+        lime_infra::telemetry::RequestStatus::Failed => log.mark_failed(
             ctx.elapsed_ms(),
             None,
             sanitized_error.clone().unwrap_or_default(),
         ),
-        proxycast_infra::telemetry::RequestStatus::Timeout => log.mark_timeout(ctx.elapsed_ms()),
-        proxycast_infra::telemetry::RequestStatus::Cancelled => {
-            log.mark_cancelled(ctx.elapsed_ms())
-        }
-        proxycast_infra::telemetry::RequestStatus::Retrying => {
+        lime_infra::telemetry::RequestStatus::Timeout => log.mark_timeout(ctx.elapsed_ms()),
+        lime_infra::telemetry::RequestStatus::Cancelled => log.mark_cancelled(ctx.elapsed_ms()),
+        lime_infra::telemetry::RequestStatus::Retrying => {
             log.duration_ms = ctx.elapsed_ms();
         }
     }
@@ -126,14 +122,14 @@ pub fn record_token_usage(
     input_tokens: Option<u32>,
     output_tokens: Option<u32>,
 ) {
-    use proxycast_infra::telemetry::{TokenSource, TokenUsageRecord};
+    use lime_infra::telemetry::{TokenSource, TokenUsageRecord};
 
     // 只有当至少有一个 Token 值时才记录
     if input_tokens.is_none() && output_tokens.is_none() {
         return;
     }
 
-    let provider = ctx.provider.unwrap_or(proxycast_core::ProviderType::Kiro);
+    let provider = ctx.provider.unwrap_or(lime_core::ProviderType::Kiro);
     let record = TokenUsageRecord::new(
         uuid::Uuid::new_v4().to_string(),
         provider,
@@ -211,7 +207,7 @@ pub struct ServerDiagnostics {
     pub running: bool,
     pub host: String,
     pub port: u16,
-    pub telemetry_summary: proxycast_infra::telemetry::StatsSummary,
+    pub telemetry_summary: lime_infra::telemetry::StatsSummary,
     pub capability_routing:
         middleware::capability_routing_metrics::CapabilityRoutingMetricsSnapshot,
     pub response_cache: ResponseCacheDiagnostics,
@@ -253,7 +249,7 @@ pub fn build_server_diagnostics(
     running: bool,
     host: String,
     port: u16,
-    telemetry_summary: proxycast_infra::telemetry::StatsSummary,
+    telemetry_summary: lime_infra::telemetry::StatsSummary,
     capability_routing: middleware::capability_routing_metrics::CapabilityRoutingMetricsSnapshot,
     response_cache_store: &middleware::response_cache::ResponseCacheStore,
     request_dedup_store: &middleware::request_dedup::RequestDedupStore,
@@ -283,7 +279,7 @@ pub struct ServerState {
     pub claude_custom_provider: ClaudeCustomProvider,
     pub default_provider_ref: Arc<RwLock<String>>,
     /// 路由器引用（用于动态更新默认 Provider）
-    pub router_ref: Option<Arc<RwLock<proxycast_core::router::Router>>>,
+    pub router_ref: Option<Arc<RwLock<lime_core::router::Router>>>,
     shutdown_tx: Option<oneshot::Sender<()>>,
     /// 服务器运行时使用的 API key（启动时从配置复制）
     /// 用于 test_api 命令，确保测试使用的 API key 和服务器一致
@@ -404,9 +400,9 @@ impl ServerState {
         pool_service: Arc<ProviderPoolService>,
         token_cache: Arc<TokenCacheService>,
         db: Option<DbConnection>,
-        shared_stats: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::StatsAggregator>>>,
-        shared_tokens: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::TokenTracker>>>,
-        shared_logger: Option<Arc<proxycast_infra::telemetry::RequestLogger>>,
+        shared_stats: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::StatsAggregator>>>,
+        shared_tokens: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::TokenTracker>>>,
+        shared_logger: Option<Arc<lime_infra::telemetry::RequestLogger>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.start_with_telemetry_and_flow_monitor(
             logs,
@@ -430,9 +426,9 @@ impl ServerState {
         pool_service: Arc<ProviderPoolService>,
         token_cache: Arc<TokenCacheService>,
         db: Option<DbConnection>,
-        shared_stats: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::StatsAggregator>>>,
-        shared_tokens: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::TokenTracker>>>,
-        shared_logger: Option<Arc<proxycast_infra::telemetry::RequestLogger>>,
+        shared_stats: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::StatsAggregator>>>,
+        shared_tokens: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::TokenTracker>>>,
+        shared_logger: Option<Arc<lime_infra::telemetry::RequestLogger>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.running {
             return Ok(());
@@ -478,7 +474,7 @@ impl ServerState {
 
         // 获取配置和配置路径用于热重载
         let config = self.config.clone();
-        let config_path = proxycast_core::config::ConfigManager::default_config_path();
+        let config_path = lime_core::config::ConfigManager::default_config_path();
 
         // 创建请求处理器（在 spawn 之前创建，以便保存 router_ref）
         let processor = match (&shared_stats, &shared_tokens) {
@@ -495,7 +491,7 @@ impl ServerState {
             let default_provider_str = &config.routing.default_provider;
 
             // 尝试解析为 ProviderType 枚举
-            match default_provider_str.parse::<proxycast_core::ProviderType>() {
+            match default_provider_str.parse::<lime_core::ProviderType>() {
                 Ok(provider_type) => {
                     let mut router = processor.router.write().await;
                     router.set_default_provider(provider_type);
@@ -630,18 +626,18 @@ pub struct AppState {
     /// 热重载管理器
     pub hot_reload_manager: Option<Arc<HotReloadManager>>,
     /// 请求日志记录器（与 TelemetryState 共享）
-    pub request_logger: Option<Arc<proxycast_infra::telemetry::RequestLogger>>,
+    pub request_logger: Option<Arc<lime_infra::telemetry::RequestLogger>>,
     /// Amp CLI 路由器
-    pub amp_router: Arc<proxycast_core::router::AmpRouter>,
+    pub amp_router: Arc<lime_core::router::AmpRouter>,
     /// 端点 Provider 配置
     pub endpoint_providers: Arc<RwLock<EndpointProvidersConfig>>,
     /// Provider 维度模型配置（用于能力感知回退）
     pub provider_models:
-        Arc<std::collections::HashMap<String, proxycast_core::config::ProviderModelsConfig>>,
+        Arc<std::collections::HashMap<String, lime_core::config::ProviderModelsConfig>>,
     /// Kiro 事件服务
     pub kiro_event_service: Arc<KiroEventService>,
     /// API Key Provider 服务（用于智能降级）
-    pub api_key_service: Arc<proxycast_services::api_key_provider_service::ApiKeyProviderService>,
+    pub api_key_service: Arc<lime_services::api_key_provider_service::ApiKeyProviderService>,
     /// 速率限制器
     pub rate_limiter: Option<Arc<middleware::rate_limit::SlidingWindowRateLimiter>>,
     /// 幂等性存储
@@ -654,7 +650,7 @@ pub struct AppState {
     pub capability_routing_metrics_store:
         Arc<middleware::capability_routing_metrics::CapabilityRoutingMetricsStore>,
     /// 凭证清理器
-    pub sanitizer: Arc<proxycast_core::sanitizer::CredentialSanitizer>,
+    pub sanitizer: Arc<lime_core::sanitizer::CredentialSanitizer>,
 }
 
 /// 启动配置文件监控
@@ -821,7 +817,7 @@ async fn update_processor_config(processor: &RequestProcessor, config: &Config) 
         match config
             .routing
             .default_provider
-            .parse::<proxycast_core::ProviderType>()
+            .parse::<lime_core::ProviderType>()
         {
             Ok(provider_type) => {
                 router.set_default_provider(provider_type);
@@ -887,7 +883,7 @@ async fn sync_credential_pool_from_config(
     // 从配置加载凭证
     let credentials = sync_service.load_from_config().map_err(|e| e.to_string())?;
 
-    let conn = proxycast_core::database::lock_db(db)?;
+    let conn = lime_core::database::lock_db(db)?;
     let mut synced_count = 0;
 
     for cred in &credentials {
@@ -934,9 +930,9 @@ async fn run_server(
     db: Option<DbConnection>,
     injector: Injector,
     injection_enabled: bool,
-    shared_stats: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::StatsAggregator>>>,
-    shared_tokens: Option<Arc<parking_lot::RwLock<proxycast_infra::telemetry::TokenTracker>>>,
-    shared_logger: Option<Arc<proxycast_infra::telemetry::RequestLogger>>,
+    shared_stats: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::StatsAggregator>>>,
+    shared_tokens: Option<Arc<parking_lot::RwLock<lime_infra::telemetry::TokenTracker>>>,
+    shared_logger: Option<Arc<lime_infra::telemetry::RequestLogger>>,
     config: Option<Config>,
     config_path: Option<PathBuf>,
     processor: Option<Arc<RequestProcessor>>,
@@ -976,7 +972,7 @@ async fn run_server(
         let default_provider_str = &cfg.routing.default_provider;
 
         // 尝试解析为 ProviderType 枚举
-        match default_provider_str.parse::<proxycast_core::ProviderType>() {
+        match default_provider_str.parse::<lime_core::ProviderType>() {
             Ok(provider_type) => {
                 let mut router = processor.router.write().await;
                 router.set_default_provider(provider_type);
@@ -1022,7 +1018,7 @@ async fn run_server(
     let db_clone = db.clone();
 
     // 初始化 Amp CLI 路由器
-    let amp_router = Arc::new(proxycast_core::router::AmpRouter::new(
+    let amp_router = Arc::new(lime_core::router::AmpRouter::new(
         config
             .as_ref()
             .map(|c| c.ampcode.clone())
@@ -1048,7 +1044,7 @@ async fn run_server(
 
     // 创建 API Key Provider 服务
     let api_key_service =
-        Arc::new(proxycast_services::api_key_provider_service::ApiKeyProviderService::new());
+        Arc::new(lime_services::api_key_provider_service::ApiKeyProviderService::new());
 
     // 是否允许自动降级/切换 Provider（默认开启，兼容旧行为）
     let allow_provider_fallback = config
@@ -1088,7 +1084,7 @@ async fn run_server(
         request_dedup_store,
         response_cache_store,
         capability_routing_metrics_store,
-        sanitizer: Arc::new(proxycast_core::sanitizer::CredentialSanitizer::with_defaults()),
+        sanitizer: Arc::new(lime_core::sanitizer::CredentialSanitizer::with_defaults()),
     };
 
     // ========== 开发模式：通过回调启动桥接服务器 ==========
@@ -1177,7 +1173,7 @@ async fn run_server(
         .route("/v1/chat/completions", post(
             |State(state): State<AppState>,
              headers: HeaderMap,
-             Json(request): Json<proxycast_core::models::openai::ChatCompletionRequest>| async {
+             Json(request): Json<lime_core::models::openai::ChatCompletionRequest>| async {
                 handlers::chat_completions(State(state), headers, Json(request)).await
             }
         ))
@@ -1198,11 +1194,11 @@ async fn run_server(
         .route("/v1/ws", get(handlers::ws_upgrade_handler))
         .route("/ws", get(handlers::ws_upgrade_handler))
         .route(
-            "/proxycast-chrome-observer/:proxycast_key",
+            "/lime-chrome-observer/:lime_key",
             get(handlers::chrome_observer_ws_upgrade),
         )
         .route(
-            "/proxycast-chrome-control/:proxycast_key",
+            "/lime-chrome-control/:lime_key",
             get(handlers::chrome_control_ws_upgrade),
         )
         // 多供应商路由
@@ -1273,7 +1269,7 @@ fn parse_base_url_host_port(base_url: &str) -> (String, u16) {
 
 fn build_diagnostics_from_app_state(
     state: &AppState,
-    stats_range: Option<proxycast_infra::telemetry::TimeRange>,
+    stats_range: Option<lime_infra::telemetry::TimeRange>,
 ) -> ServerDiagnostics {
     let telemetry_summary = state.processor.stats.read().summary(stats_range);
     let (host, port) = parse_base_url_host_port(&state.base_url);
@@ -1330,7 +1326,7 @@ async fn stats_diagnostics(
     Query(query): Query<StatsQuery>,
 ) -> Response {
     let days = query.days.unwrap_or(7).clamp(1, 30);
-    let range = proxycast_infra::telemetry::TimeRange::last_days(days as i64);
+    let range = lime_infra::telemetry::TimeRange::last_days(days as i64);
     let diagnostics = build_diagnostics_from_app_state(&state, Some(range));
     (
         [
@@ -1535,7 +1531,7 @@ async fn gemini_generate_content(
             let proj_id = antigravity.project_id.clone().unwrap_or_else(|| {
                 // 最后的后备：生成随机 ID
                 let uuid = uuid::Uuid::new_v4();
-                format!("proxycast-{}", &uuid.to_string()[..8])
+                format!("lime-{}", &uuid.to_string()[..8])
             });
 
             state
@@ -1667,7 +1663,7 @@ async fn gemini_generate_content(
 
             let proj_id = gemini.project_id.clone().unwrap_or_else(|| {
                 let uuid = uuid::Uuid::new_v4();
-                format!("proxycast-{}", &uuid.to_string()[..8])
+                format!("lime-{}", &uuid.to_string()[..8])
             });
 
             state
@@ -1761,7 +1757,7 @@ async fn list_routes(State(state): State<AppState>) -> impl IntoResponse {
             host == "0.0.0.0"
         } else {
             // 检查 IP 是否在当前网卡列表中
-            if let Ok(network_info) = proxycast_core::network::get_network_info() {
+            if let Ok(network_info) = lime_core::network::get_network_info() {
                 !network_info.all_ips.contains(&host.to_string())
             } else {
                 false
@@ -1771,7 +1767,7 @@ async fn list_routes(State(state): State<AppState>) -> impl IntoResponse {
         if should_replace {
             // 获取局域网 IP 进行替换
             // 优先选择 192.168.x.x 或 10.x.x.x 开头的 IP（真正的局域网 IP）
-            if let Ok(network_info) = proxycast_core::network::get_network_info() {
+            if let Ok(network_info) = lime_core::network::get_network_info() {
                 let new_ip = network_info
                     .all_ips
                     .iter()
@@ -1806,12 +1802,12 @@ async fn list_routes(State(state): State<AppState>) -> impl IntoResponse {
         provider_type: default_provider.clone(),
         credential_count: 1,
         endpoints: vec![
-            proxycast_core::models::route_model::RouteEndpoint {
+            lime_core::models::route_model::RouteEndpoint {
                 path: "/v1/messages".to_string(),
                 protocol: "claude".to_string(),
                 url: format!("{display_base_url}/v1/messages"),
             },
-            proxycast_core::models::route_model::RouteEndpoint {
+            lime_core::models::route_model::RouteEndpoint {
                 path: "/v1/chat/completions".to_string(),
                 protocol: "openai".to_string(),
                 url: format!("{display_base_url}/v1/chat/completions"),

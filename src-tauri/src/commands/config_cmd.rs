@@ -26,7 +26,7 @@ fn get_config_dir(app_type: &AppType) -> Option<PathBuf> {
         AppType::Claude => Some(home.join(".claude")),
         AppType::Codex => Some(home.join(".codex")),
         AppType::Gemini => Some(home.join(".gemini")),
-        AppType::ProxyCast => dirs::config_dir().map(|d| d.join("proxycast")),
+        AppType::Lime => dirs::config_dir().map(|d| d.join("lime")),
     }
 }
 
@@ -39,7 +39,7 @@ pub fn get_config_status(app_type: String) -> Result<ConfigStatus, String> {
         AppType::Claude => config_dir.join("settings.json"),
         AppType::Codex => config_dir.join("auth.json"),
         AppType::Gemini => config_dir.join(".env"),
-        AppType::ProxyCast => config_dir.join("config.yaml"),
+        AppType::Lime => config_dir.join("config.yaml"),
     };
 
     let has_env = match app {
@@ -51,13 +51,13 @@ pub fn get_config_status(app_type: String) -> Result<ConfigStatus, String> {
         }
         AppType::Codex => config_dir.join("auth.json").exists(),
         AppType::Gemini => config_dir.join(".env").exists(),
-        AppType::ProxyCast => {
+        AppType::Lime => {
             config_dir.join("config.yaml").exists() || config_dir.join("config.json").exists()
         }
     };
 
     let exists = match app {
-        AppType::ProxyCast => {
+        AppType::Lime => {
             config_dir.join("config.yaml").exists() || config_dir.join("config.json").exists()
         }
         _ => main_config.exists(),
@@ -243,7 +243,7 @@ pub fn export_config(config: Config, redact_secrets: bool) -> Result<ExportResul
     // 生成带时间戳的文件名
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     let suffix = if redact_secrets { "_redacted" } else { "" };
-    let suggested_filename = format!("proxycast_config_{timestamp}{suffix}.yaml");
+    let suggested_filename = format!("lime_config_{timestamp}{suffix}.yaml");
 
     Ok(ExportResult {
         content,
@@ -358,7 +358,7 @@ pub fn get_config_paths() -> Result<ConfigPathInfo, String> {
     let yaml_path = ConfigManager::default_config_path();
     let json_path = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("config.json");
 
     Ok(ConfigPathInfo {
@@ -436,7 +436,7 @@ pub fn export_bundle(
         (false, true) => "credentials",
         (false, false) => "empty",
     };
-    let suggested_filename = format!("proxycast_{scope}_{timestamp}{suffix}.json");
+    let suggested_filename = format!("lime_{scope}_{timestamp}{suffix}.json");
 
     Ok(UnifiedExportResult {
         content,
@@ -461,7 +461,7 @@ pub fn export_config_yaml(config: Config, redact_secrets: bool) -> Result<Export
     // 生成带时间戳的文件名
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     let suffix = if redact_secrets { "_redacted" } else { "" };
-    let suggested_filename = format!("proxycast_config_{timestamp}{suffix}.yaml");
+    let suggested_filename = format!("lime_config_{timestamp}{suffix}.yaml");
 
     Ok(ExportResult {
         content,
@@ -597,7 +597,7 @@ pub struct VersionCheckResult {
     pub error: Option<String>,
 }
 
-const FALLBACK_RELEASES_URL: &str = "https://github.com/aiclientproxy/proxycast/releases";
+const FALLBACK_RELEASES_URL: &str = "https://github.com/aiclientproxy/lime/releases";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct UpdateCheckCache {
@@ -613,8 +613,7 @@ struct UpdateCheckCache {
 #[tauri::command]
 pub async fn check_for_updates() -> Result<VersionCheckResult, String> {
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-    const GITHUB_API_URL: &str =
-        "https://api.github.com/repos/aiclientproxy/proxycast/releases/latest";
+    const GITHUB_API_URL: &str = "https://api.github.com/repos/aiclientproxy/lime/releases/latest";
     const UPDATE_CHECK_CACHE_TTL_SECS: u64 = 10 * 60;
 
     let now_unix = current_unix_timestamp();
@@ -635,7 +634,7 @@ pub async fn check_for_updates() -> Result<VersionCheckResult, String> {
     let client = reqwest::Client::new();
     let mut request = client
         .get(GITHUB_API_URL)
-        .header("User-Agent", "ProxyCast")
+        .header("User-Agent", "Lime")
         .header("Accept", "application/vnd.github+json");
 
     if let Some(cache) = &cached {
@@ -734,7 +733,7 @@ fn get_update_check_cache_path() -> PathBuf {
         .or_else(dirs::config_dir)
         .unwrap_or_else(|| PathBuf::from("."));
 
-    base_dir.join("proxycast").join("update-check-cache.json")
+    base_dir.join("lime").join("update-check-cache.json")
 }
 
 fn is_update_cache_fresh(cache: &UpdateCheckCache, now_unix: u64, ttl_secs: u64) -> bool {
@@ -946,7 +945,7 @@ pub async fn download_update(app_handle: AppHandle) -> Result<DownloadResult, St
 
     match client
         .get(&download_url)
-        .header("User-Agent", "ProxyCast")
+        .header("User-Agent", "Lime")
         .send()
         .await
     {
@@ -1020,12 +1019,12 @@ pub async fn download_update(app_handle: AppHandle) -> Result<DownloadResult, St
 /// 从 GitHub API 获取实际的文件列表并匹配平台
 async fn get_platform_download_from_github(version: &str) -> Result<(String, String), String> {
     let api_url =
-        format!("https://api.github.com/repos/aiclientproxy/proxycast/releases/tags/v{version}");
+        format!("https://api.github.com/repos/aiclientproxy/lime/releases/tags/v{version}");
 
     let client = reqwest::Client::new();
     let response = client
         .get(&api_url)
-        .header("User-Agent", "ProxyCast")
+        .header("User-Agent", "Lime")
         .send()
         .await
         .map_err(|e| format!("请求 GitHub API 失败: {e}"))?;
@@ -1130,7 +1129,7 @@ fn get_download_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
 
     // 回退到应用数据目录
     let _ = app_handle;
-    let app_data_dir = proxycast_core::app_paths::preferred_data_dir()
+    let app_data_dir = lime_core::app_paths::preferred_data_dir()
         .map_err(|e| format!("无法获取应用数据目录: {e}"))?;
 
     let download_dir = app_data_dir.join("downloads");

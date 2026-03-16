@@ -5,11 +5,13 @@
 use crate::services::auto_memory_service::{get_auto_memory_index, resolve_auto_memory_root};
 use crate::services::memory_import_parser_service::{parse_memory_file, MemoryImportParseOptions};
 use crate::services::memory_rules_loader_service::load_rules;
-use proxycast_agent::{
+use lime_agent::{
     resolve_durable_memory_root, to_virtual_memory_path, DURABLE_MEMORY_VIRTUAL_ROOT,
 };
-use proxycast_core::app_paths;
-use proxycast_core::config::{Config, MemoryConfig};
+#[cfg(test)]
+use lime_agent::{LEGACY_DURABLE_MEMORY_ROOT_ENV, LIME_DURABLE_MEMORY_ROOT_ENV};
+use lime_core::app_paths;
+use lime_core::config::{Config, MemoryConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -766,18 +768,18 @@ fn default_user_memory_path() -> PathBuf {
 fn default_managed_policy_path() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
-        return PathBuf::from("/Library/Application Support/ProxyCast/AGENTS.md");
+        return PathBuf::from("/Library/Application Support/Lime/AGENTS.md");
     }
     #[cfg(target_os = "linux")]
     {
-        return PathBuf::from("/etc/proxycast/AGENTS.md");
+        return PathBuf::from("/etc/lime/AGENTS.md");
     }
     #[cfg(target_os = "windows")]
     {
-        return PathBuf::from("C:/Program Files/ProxyCast/AGENTS.md");
+        return PathBuf::from("C:/Program Files/Lime/AGENTS.md");
     }
     #[allow(unreachable_code)]
-    PathBuf::from("/etc/proxycast/AGENTS.md")
+    PathBuf::from("/etc/lime/AGENTS.md")
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
@@ -833,8 +835,12 @@ mod tests {
 
     impl DurableMemoryEnvGuard {
         fn set(path: &Path) -> Self {
-            let previous = std::env::var_os("PROXYCAST_DURABLE_MEMORY_DIR");
-            std::env::set_var("PROXYCAST_DURABLE_MEMORY_DIR", path.as_os_str());
+            let previous = lime_core::env_compat::var_os(&[
+                LIME_DURABLE_MEMORY_ROOT_ENV,
+                LEGACY_DURABLE_MEMORY_ROOT_ENV,
+            ]);
+            std::env::set_var(LIME_DURABLE_MEMORY_ROOT_ENV, path.as_os_str());
+            std::env::remove_var(LEGACY_DURABLE_MEMORY_ROOT_ENV);
             Self { previous }
         }
     }
@@ -842,10 +848,11 @@ mod tests {
     impl Drop for DurableMemoryEnvGuard {
         fn drop(&mut self) {
             if let Some(value) = &self.previous {
-                std::env::set_var("PROXYCAST_DURABLE_MEMORY_DIR", value);
+                std::env::set_var(LIME_DURABLE_MEMORY_ROOT_ENV, value);
             } else {
-                std::env::remove_var("PROXYCAST_DURABLE_MEMORY_DIR");
+                std::env::remove_var(LIME_DURABLE_MEMORY_ROOT_ENV);
             }
+            std::env::remove_var(LEGACY_DURABLE_MEMORY_ROOT_ENV);
         }
     }
 

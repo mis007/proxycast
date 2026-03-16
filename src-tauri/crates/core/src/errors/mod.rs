@@ -1,6 +1,6 @@
 //! 错误类型模块
 //!
-//! 定义 ProxyCast 应用中的各种错误类型。
+//! 定义 Lime 应用中的各种错误类型。
 //!
 //! ## 模块结构
 //! - `project_error`: 项目相关错误（ProjectError, PersonaError, MaterialError, TemplateError, MigrationError）

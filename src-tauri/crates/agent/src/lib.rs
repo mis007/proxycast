@@ -1,4 +1,4 @@
-//! ProxyCast Agent Crate
+//! Lime Agent Crate
 //!
 //! 包含 Agent 模块中不依赖主 crate 内部模块的纯逻辑部分。
 //! 深耦合部分（aster_state、aster_agent 流式桥接）留在主 crate。
@@ -34,9 +34,8 @@ pub use ask_bridge::{create_ask_callback, extract_response as extract_ask_respon
 pub use aster_state::{AsterAgentState, ProviderConfig};
 pub use aster_state::{QueueInsertResult, QueuedTurnTask, SessionTurnQueueManager};
 pub use aster_state_support::{
-    build_project_system_prompt, create_proxycast_identity, create_proxycast_tool_config,
-    create_session_config_with_project, message_helpers, reload_proxycast_skills,
-    SessionConfigBuilder,
+    build_project_system_prompt, create_lime_identity, create_lime_tool_config,
+    create_session_config_with_project, message_helpers, reload_lime_skills, SessionConfigBuilder,
 };
 pub use credential_bridge::{
     create_aster_provider, AsterProviderConfig, CredentialBridge, CredentialBridgeError,
@@ -44,7 +43,7 @@ pub use credential_bridge::{
 pub use durable_memory_fs::{
     durable_memory_permission_pattern, is_virtual_memory_path, resolve_durable_memory_root,
     resolve_virtual_memory_path, to_virtual_memory_path, virtual_memory_relative_path,
-    DURABLE_MEMORY_ROOT_ENV, DURABLE_MEMORY_VIRTUAL_ROOT,
+    DURABLE_MEMORY_VIRTUAL_ROOT, LEGACY_DURABLE_MEMORY_ROOT_ENV, LIME_DURABLE_MEMORY_ROOT_ENV,
 };
 pub use event_converter::{
     convert_agent_event, convert_to_tauri_message, TauriAgentEvent, TauriArtifactSnapshot,
@@ -65,8 +64,7 @@ pub use session_store::{
 };
 pub use shell_security::ShellSecurityChecker;
 pub use subagent_scheduler::{
-    ProxyCastScheduler, ProxyCastSubAgentExecutor, SchedulerEventEmitter, SubAgentProgressEvent,
-    SubAgentRole,
+    LimeScheduler, LimeSubAgentExecutor, SchedulerEventEmitter, SubAgentProgressEvent, SubAgentRole,
 };
 pub use tool_permissions::{DynamicPermissionCheck, PermissionBehavior};
 pub use tools::{BrowserAction, BrowserTool, BrowserToolError, BrowserToolResult};

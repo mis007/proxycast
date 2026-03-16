@@ -33,7 +33,7 @@ function buildObserverEndpoint(serverUrl, bridgeKey, profileKey) {
   if (!base || !key) {
     return "Observer URL: 未配置";
   }
-  return `Observer URL: ${base}/proxycast-chrome-observer/Proxycast_Key=${encodeURIComponent(key)}?profileKey=${profile}`;
+  return `Observer URL: ${base}/lime-chrome-observer/Lime_Key=${encodeURIComponent(key)}?profileKey=${profile}`;
 }
 
 function applyStatus(status) {
@@ -99,7 +99,7 @@ async function loadInitialState() {
     const status = await sendMessage({ type: "GET_STATUS" });
     applyStatus(status || {});
   } catch (error) {
-    console.warn("[ProxycastBridgePopup] 获取状态失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 获取状态失败", error?.message || String(error));
   }
 }
 
@@ -134,7 +134,7 @@ async function saveAndReconnect() {
       saveBtnEl.textContent = originalText;
       saveBtnEl.disabled = false;
     }, 1200);
-    console.warn("[ProxycastBridgePopup] 保存设置失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 保存设置失败", error?.message || String(error));
   }
 }
 
@@ -142,7 +142,7 @@ async function toggleConnection() {
   try {
     await sendMessage({ type: "TOGGLE_CONNECTION" });
   } catch (error) {
-    console.warn("[ProxycastBridgePopup] 切换连接失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 切换连接失败", error?.message || String(error));
   }
 }
 
@@ -150,7 +150,7 @@ async function toggleMonitoring() {
   try {
     await sendMessage({ type: "TOGGLE_MONITORING" });
   } catch (error) {
-    console.warn("[ProxycastBridgePopup] 切换监控失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 切换监控失败", error?.message || String(error));
   }
 }
 
@@ -162,7 +162,7 @@ async function capturePageNow() {
   try {
     await sendMessage({ type: "REQUEST_PAGE_CAPTURE" });
   } catch (error) {
-    console.warn("[ProxycastBridgePopup] 请求抓取失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 请求抓取失败", error?.message || String(error));
   } finally {
     setTimeout(() => {
       captureBtnEl.textContent = originalText;
@@ -208,7 +208,7 @@ async function pasteConfigFromClipboard() {
       pasteBtn.textContent = originalText;
       pasteBtn.disabled = false;
     }, 1500);
-    console.warn("[ProxycastBridgePopup] 粘贴配置失败", error?.message || String(error));
+    console.warn("[LimeBridgePopup] 粘贴配置失败", error?.message || String(error));
   }
 }
 

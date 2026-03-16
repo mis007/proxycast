@@ -32,7 +32,7 @@ impl BinaryDownloader {
         Self {
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(300))
-                .user_agent("ProxyCast")
+                .user_agent("Lime")
                 .build()
                 .expect("Failed to create HTTP client"),
         }
@@ -260,7 +260,7 @@ impl BinaryDownloader {
     pub fn get_plugins_dir() -> Result<PathBuf, String> {
         dirs::config_dir()
             .ok_or_else(|| "无法获取配置目录".to_string())
-            .map(|p| p.join("proxycast").join("plugins"))
+            .map(|p| p.join("lime").join("plugins"))
     }
 
     /// 获取特定组件的目录
@@ -306,6 +306,6 @@ mod tests {
         let result = BinaryDownloader::get_plugins_dir();
         assert!(result.is_ok());
         let path = result.unwrap();
-        assert!(path.ends_with("proxycast/plugins") || path.ends_with("proxycast\\plugins"));
+        assert!(path.ends_with("lime/plugins") || path.ends_with("lime\\plugins"));
     }
 }

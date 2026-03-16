@@ -3,7 +3,7 @@
 //! 将设置页中的网络搜索配置同步为 aster-rust 可读取的环境变量。
 
 use crate::services::environment_service::apply_web_search_environment;
-use proxycast_core::config::Config;
+use lime_core::config::Config;
 
 pub fn apply_web_search_runtime_env(config: &Config) {
     apply_web_search_environment(config);
@@ -12,8 +12,8 @@ pub fn apply_web_search_runtime_env(config: &Config) {
 #[cfg(test)]
 mod tests {
     use crate::services::environment_service::build_web_search_runtime_env;
-    use proxycast_core::config::{Config, WebSearchConfig, WebSearchProvider};
-    use proxycast_core::config::{MultiSearchConfig, SearchEngine};
+    use lime_core::config::{Config, WebSearchConfig, WebSearchProvider};
+    use lime_core::config::{MultiSearchConfig, SearchEngine};
 
     #[test]
     fn should_resolve_provider_priority_with_selected_provider_first() {
@@ -46,12 +46,12 @@ mod tests {
         let mut config = Config::default();
         config.web_search.provider = WebSearchProvider::MultiSearchEngine;
         config.web_search.multi_search.engines = vec![
-            proxycast_core::config::MultiSearchEngineEntryConfig {
+            lime_core::config::MultiSearchEngineEntryConfig {
                 name: "valid".to_string(),
                 url_template: "https://example.com/search?q={query}".to_string(),
                 enabled: true,
             },
-            proxycast_core::config::MultiSearchEngineEntryConfig {
+            lime_core::config::MultiSearchEngineEntryConfig {
                 name: "invalid".to_string(),
                 url_template: "https://example.com/search".to_string(),
                 enabled: true,

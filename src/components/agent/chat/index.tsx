@@ -62,8 +62,8 @@ import { ChatNavbar } from "./components/ChatNavbar";
 import { ChatSidebar } from "./components/ChatSidebar";
 import {
   ThemeWorkbenchSidebar,
-  type ThemeWorkbenchCreationTaskEvent,
 } from "./components/ThemeWorkbenchSidebar";
+import type { ThemeWorkbenchCreationTaskEvent } from "./components/themeWorkbenchWorkflowData";
 import { AgentRuntimeStrip } from "./components/AgentRuntimeStrip";
 import { HarnessStatusPanel } from "./components/HarnessStatusPanel";
 import { SocialMediaHarnessCard } from "./components/SocialMediaHarnessCard";
@@ -619,6 +619,27 @@ const PageContainer = styled.div`
   height: 100%;
   width: 100%;
   position: relative;
+  min-height: 0;
+  gap: 14px;
+  padding: 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(56, 189, 248, 0.1), transparent 30%),
+    radial-gradient(circle at 86% 14%, rgba(16, 185, 129, 0.08), transparent 28%),
+    radial-gradient(circle at 72% 84%, rgba(245, 158, 11, 0.06), transparent 24%),
+    linear-gradient(
+      180deg,
+      rgba(248, 250, 252, 0.98) 0%,
+      rgba(248, 250, 252, 0.96) 42%,
+      rgba(242, 251, 247, 0.94) 100%
+    );
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
 `;
 
 const MainArea = styled.div`
@@ -629,6 +650,20 @@ const MainArea = styled.div`
   min-height: 0;
   overflow: hidden;
   position: relative;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 32px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(248, 250, 252, 0.94) 56%,
+      rgba(248, 250, 252, 0.88) 100%
+    );
+  box-shadow:
+    0 24px 72px -36px rgba(15, 23, 42, 0.18),
+    0 16px 28px -24px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(18px);
 `;
 
 function resolveContentSyncTone(status: SyncStatus): {
@@ -639,31 +674,32 @@ function resolveContentSyncTone(status: SyncStatus): {
   switch (status) {
     case "syncing":
       return {
-        text: "hsl(var(--muted-foreground))",
+        text: "#475569",
         background:
-          "linear-gradient(180deg, hsl(var(--background) / 0.94) 0%, hsl(var(--secondary) / 0.82) 100%)",
-        border: "hsl(var(--border) / 0.9)",
+          "linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,250,252,0.92) 100%)",
+        border: "rgba(226, 232, 240, 0.9)",
       };
     case "success":
       return {
-        text: "hsl(142 72% 28%)",
+        text: "#047857",
         background:
-          "linear-gradient(180deg, hsl(142 65% 98%) 0%, hsl(142 52% 95%) 100%)",
-        border: "hsl(142 40% 78%)",
+          "linear-gradient(180deg, rgba(236,253,245,0.98) 0%, rgba(220,252,231,0.92) 100%)",
+        border: "rgba(167, 243, 208, 0.95)",
       };
     case "error":
       return {
-        text: "hsl(0 72% 42%)",
+        text: "#be123c",
         background:
-          "linear-gradient(180deg, hsl(0 100% 99%) 0%, hsl(0 88% 96%) 100%)",
-        border: "hsl(0 70% 86%)",
+          "linear-gradient(180deg, rgba(255,241,242,0.98) 0%, rgba(255,228,230,0.92) 100%)",
+        border: "rgba(254, 205, 211, 0.95)",
       };
     case "idle":
     default:
       return {
-        text: "hsl(var(--muted-foreground))",
-        background: "hsl(var(--background))",
-        border: "hsl(var(--border))",
+        text: "#475569",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,250,252,0.9) 100%)",
+        border: "rgba(226, 232, 240, 0.88)",
       };
   }
 }
@@ -707,6 +743,13 @@ const ChatContainerInner = styled.div`
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(248, 250, 252, 0.78) 0%,
+      rgba(255, 255, 255, 0.12) 18%,
+      rgba(255, 255, 255, 0) 100%
+    );
 `;
 
 const EntryBanner = styled.div`
@@ -715,18 +758,24 @@ const EntryBanner = styled.div`
   gap: 8px;
   margin: 8px 12px 0;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid hsl(var(--primary) / 0.18);
-  background: hsl(var(--primary) / 0.08);
-  color: hsl(var(--foreground));
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(239, 246, 255, 0.96) 0%,
+      rgba(248, 250, 252, 0.92) 100%
+    );
+  color: #0f172a;
   font-size: 13px;
+  box-shadow: 0 10px 22px -20px rgba(15, 23, 42, 0.16);
 `;
 
 const EntryBannerClose = styled.button`
   margin-left: auto;
   border: none;
   background: transparent;
-  color: hsl(var(--muted-foreground));
+  color: #64748b;
   cursor: pointer;
   font-size: 13px;
 `;
@@ -736,7 +785,7 @@ const ChatContent = styled.div`
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 0 8px;
+  padding: 0 10px 10px;
   overflow: hidden;
   height: 100%;
   position: relative;
@@ -751,9 +800,9 @@ const MessageViewport = styled.div`
 
 const FloatingInputbarContainer = styled.div`
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
   z-index: 20;
   pointer-events: none;
 
@@ -860,25 +909,36 @@ interface BrowserTaskPreflight {
 
 const ThemeWorkbenchLeftExpandButton = styled.button`
   position: absolute;
-  left: 6px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 20px;
-  height: 72px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  background: hsl(var(--background) / 0.95);
-  color: hsl(var(--muted-foreground));
+  width: 24px;
+  height: 78px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(248, 250, 252, 0.9) 100%
+    );
+  color: #64748b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 30;
+  box-shadow: 0 14px 28px -24px rgba(15, 23, 42, 0.2);
 
   &:hover {
-    color: hsl(var(--foreground));
-    border-color: hsl(var(--primary) / 0.4);
-    background: hsl(var(--accent) / 0.55);
+    color: #0f172a;
+    border-color: rgba(148, 163, 184, 0.84);
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(241, 245, 249, 0.92) 100%
+      );
   }
 `;
 
@@ -927,7 +987,7 @@ const THEME_WORKBENCH_DOCUMENT_META_KEY = "theme_workbench_document_v1";
 const MAX_PERSISTED_DOCUMENT_VERSIONS = 40;
 const SOCIAL_ARTICLE_SKILL_KEY = "social_post_with_cover";
 const THEME_WORKBENCH_CREATION_TASK_EVENT_NAME =
-  "proxycast://creation_task_submitted";
+  "lime://creation_task_submitted";
 const MAX_THEME_WORKBENCH_CREATION_TASK_EVENTS = 120;
 const BROWSER_PREFLIGHT_REQUEST_PREFIX = "browser-preflight:";
 
@@ -2114,7 +2174,7 @@ export interface WorkflowProgressSnapshot {
  * 判断画布状态是否为空
  * 用于决定是否自动触发 AI 引导
  */
-const HARNESS_PANEL_VISIBILITY_KEY = "proxycast.chat.harness-panel.visible.v1";
+const HARNESS_PANEL_VISIBILITY_KEY = "lime.chat.harness-panel.visible.v1";
 
 function isCanvasStateEmpty(state: CanvasStateUnion | null): boolean {
   if (!state) return true;
@@ -2271,6 +2331,7 @@ export function AgentChatPage({
   hideHistoryToggle = false,
   showChatPanel = true,
   hideTopBar = false,
+  topBarChrome = "full",
   onBackToProjectManagement,
   hideInlineStepProgress = false,
   onWorkflowProgressChange,
@@ -2295,6 +2356,7 @@ export function AgentChatPage({
   hideHistoryToggle?: boolean;
   showChatPanel?: boolean;
   hideTopBar?: boolean;
+  topBarChrome?: "full" | "workspace-compact";
   onBackToProjectManagement?: () => void;
   hideInlineStepProgress?: boolean;
   onWorkflowProgressChange?: (
@@ -2689,7 +2751,7 @@ export function AgentChatPage({
   const loadSkills = useCallback(async (): Promise<Skill[]> => {
     setSkillsLoading(true);
     try {
-      const loadedSkills = await skillsApi.getAll("proxycast");
+      const loadedSkills = await skillsApi.getAll("lime");
       setSkills(loadedSkills);
       return loadedSkills;
     } catch (error) {
@@ -8650,7 +8712,7 @@ export function AgentChatPage({
 
       if (isBrowserAssistArtifact) {
         return wrapPreviewWithWorkbenchTrigger(
-          <div className="relative h-full min-h-0 overflow-hidden bg-background">
+          <div className="relative h-full min-h-0 overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.92)_100%)]">
             <ArtifactRenderer
               artifact={previewArtifact}
               isStreaming={Boolean(
@@ -8675,7 +8737,7 @@ export function AgentChatPage({
       }
 
       return (
-        <div className="flex h-full flex-col rounded-[14px] border border-border bg-background">
+        <div className="flex h-full flex-col rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.94)_100%)] shadow-sm shadow-slate-950/5">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ArtifactToolbar
               artifact={toolbarArtifact}
@@ -8697,7 +8759,7 @@ export function AgentChatPage({
               }
               actionsSlot={stackedWorkbenchTrigger}
             />
-            <div className="relative flex-1 overflow-auto bg-background">
+            <div className="relative flex-1 overflow-auto bg-white/72">
               <ArtifactRenderer
                 artifact={previewArtifact}
                 isStreaming={Boolean(
@@ -8767,7 +8829,7 @@ export function AgentChatPage({
         return wrapPreviewWithWorkbenchTrigger(
           <div
             data-testid="canvas-loading-state"
-            className="flex h-full items-center justify-center rounded-[14px] border border-dashed border-border bg-background text-sm text-muted-foreground"
+            className="flex h-full items-center justify-center rounded-[24px] border border-dashed border-slate-200/90 bg-slate-50/82 text-sm text-slate-500"
           >
             {isInitialContentLoading
               ? "正在加载文稿内容..."
@@ -8875,7 +8937,7 @@ export function AgentChatPage({
           return wrapPreviewWithWorkbenchTrigger(
             <div
               data-testid="canvas-workbench-preview-loading"
-              className="flex h-full items-center justify-center rounded-[14px] border border-dashed border-border bg-background text-sm text-muted-foreground"
+              className="flex h-full items-center justify-center rounded-[24px] border border-dashed border-slate-200/90 bg-slate-50/82 text-sm text-slate-500"
             >
               正在准备预览...
             </div>,
@@ -8885,7 +8947,7 @@ export function AgentChatPage({
           return wrapPreviewWithWorkbenchTrigger(
             <div
               data-testid="canvas-workbench-preview-unsupported"
-              className="flex h-full items-center justify-center rounded-[14px] border border-dashed border-border bg-background px-6 text-sm text-muted-foreground"
+              className="flex h-full items-center justify-center rounded-[24px] border border-dashed border-slate-200/90 bg-slate-50/82 px-6 text-sm text-slate-500"
             >
               {target.reason}
             </div>,
@@ -8895,7 +8957,7 @@ export function AgentChatPage({
           return wrapPreviewWithWorkbenchTrigger(
             <div
               data-testid="canvas-workbench-preview-empty"
-              className="flex h-full items-center justify-center rounded-[14px] border border-dashed border-border bg-background text-sm text-muted-foreground"
+              className="flex h-full items-center justify-center rounded-[24px] border border-dashed border-slate-200/90 bg-slate-50/82 text-sm text-slate-500"
             >
               暂无可预览内容
             </div>,
@@ -9015,8 +9077,8 @@ export function AgentChatPage({
               data-testid="claw-empty-state"
               className="flex flex-1 items-start justify-center px-5 pb-6 pt-4"
             >
-              <div className="w-full max-w-[520px] rounded-[28px] border border-slate-200 bg-white/92 p-8 text-center shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-[#14171d]">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
+              <div className="w-full max-w-[540px] rounded-[30px] border border-emerald-200/70 bg-[linear-gradient(135deg,rgba(244,251,248,0.98)_0%,rgba(255,255,255,0.98)_52%,rgba(242,247,255,0.96)_100%)] p-8 text-center shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-[#14171d]">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                   <Clock3 className="h-6 w-6" />
                 </div>
                 <div className="mt-5 text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -9120,14 +9182,14 @@ export function AgentChatPage({
           {showChatLayout && (
             <>
               {(workspacePathMissing || workspaceHealthError) && (
-                <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                <div className="mx-4 mb-2 flex items-center gap-2 rounded-[18px] border border-amber-200/90 bg-amber-50/86 px-3.5 py-2.5 text-sm text-amber-800 shadow-sm shadow-amber-950/5 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                   <span className="flex-1">
                     工作区目录不存在，请重新选择一个本地目录后继续
                   </span>
                   <button
                     type="button"
                     onClick={() => void handleSelectWorkspaceDirectory()}
-                    className="shrink-0 rounded-md bg-amber-200 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100 dark:hover:bg-amber-700"
+                    className="shrink-0 rounded-xl border border-amber-200 bg-white/84 px-2.5 py-1 text-xs font-medium text-amber-900 transition hover:border-amber-300 hover:bg-white dark:bg-amber-800 dark:text-amber-100 dark:hover:bg-amber-700"
                   >
                     重新选择目录
                   </button>
@@ -9283,6 +9345,7 @@ export function AgentChatPage({
           <>
             <ChatNavbar
               isRunning={isSending}
+              chrome={topBarChrome}
               onToggleHistory={handleToggleSidebar}
               showHistoryToggle={!hideHistoryToggle && showChatPanel}
               onToggleFullscreen={() => {}}
@@ -9440,6 +9503,7 @@ export function AgentChatPage({
       syncStatus,
       themeWorkbenchHarnessDialog,
       themeWorkbenchRunState,
+      topBarChrome,
     ],
   );
 

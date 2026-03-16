@@ -9,8 +9,8 @@ use crate::services::automation_service::{
     AutomationCycleResult, AutomationJobDraft, AutomationJobRecord, AutomationJobUpdate,
     AutomationPayload, AutomationServiceState, AutomationStatus,
 };
-use proxycast_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
-use proxycast_core::database::dao::agent_run::AgentRun;
+use lime_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
+use lime_core::database::dao::agent_run::AgentRun;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 

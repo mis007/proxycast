@@ -1,7 +1,7 @@
 //! Aster SessionStore 实现
 //!
 //! 实现 aster::session::SessionStore trait，将 aster 的会话数据
-//! 存储到 ProxyCast 的 SQLite 数据库中。
+//! 存储到 Lime 的 SQLite 数据库中。
 //!
 //! 这是应用层接管框架层存储的关键桥接模块。
 
@@ -18,19 +18,19 @@ use aster::session::{
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-/// ProxyCast 的 SessionStore 实现
+/// Lime 的 SessionStore 实现
 ///
-/// 将 aster 的会话数据存储到 ProxyCast 的 SQLite 数据库
-pub struct ProxyCastSessionStore {
+/// 将 aster 的会话数据存储到 Lime 的 SQLite 数据库
+pub struct LimeSessionStore {
     db: DbConnection,
 }
 
-impl ProxyCastSessionStore {
+impl LimeSessionStore {
     /// 创建新的 SessionStore 实例
     pub fn new(db: DbConnection) -> Self {
         Self { db }
@@ -72,9 +72,9 @@ impl ProxyCastSessionStore {
             }
         }
 
-        // 2) 回退到 ~/.proxycast/projects/default
+        // 2) 回退到 ~/.lime/projects/default
         if let Some(home) = dirs::home_dir() {
-            let fallback = home.join(".proxycast").join("projects").join("default");
+            let fallback = home.join(".lime").join("projects").join("default");
             if !fallback.exists() {
                 let _ = fs::create_dir_all(&fallback);
             }
@@ -111,7 +111,7 @@ impl ProxyCastSessionStore {
 }
 
 #[async_trait]
-impl SessionStore for ProxyCastSessionStore {
+impl SessionStore for LimeSessionStore {
     async fn create_session(
         &self,
         working_dir: PathBuf,
@@ -683,7 +683,7 @@ impl SessionStore for ProxyCastSessionStore {
             memories_merged: 0,
             source_start_ts: None,
             source_end_ts: None,
-            warnings: vec!["ProxyCastSessionStore: memory commit skipped".to_string()],
+            warnings: vec!["LimeSessionStore: memory commit skipped".to_string()],
         })
     }
 
@@ -713,7 +713,7 @@ impl SessionStore for ProxyCastSessionStore {
     async fn memory_health(&self) -> Result<MemoryHealth> {
         Ok(MemoryHealth {
             healthy: true,
-            message: "ProxyCastSessionStore: memory subsystem disabled".to_string(),
+            message: "LimeSessionStore: memory subsystem disabled".to_string(),
         })
     }
 }
@@ -722,7 +722,7 @@ impl SessionStore for ProxyCastSessionStore {
 // 辅助方法
 // ============================================================================
 
-impl ProxyCastSessionStore {
+impl LimeSessionStore {
     /// 加载会话的对话历史
     fn load_conversation(
         &self,
@@ -783,14 +783,14 @@ impl ProxyCastSessionStore {
 mod tests {
     use super::*;
     use aster::session::{SessionStore, SessionType};
-    use proxycast_core::database::schema::create_tables;
+    use lime_core::database::schema::create_tables;
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
 
-    fn setup_test_store() -> ProxyCastSessionStore {
+    fn setup_test_store() -> LimeSessionStore {
         let conn = Connection::open_in_memory().expect("创建内存数据库失败");
         create_tables(&conn).expect("初始化表结构失败");
-        ProxyCastSessionStore::new(Arc::new(Mutex::new(conn)))
+        LimeSessionStore::new(Arc::new(Mutex::new(conn)))
     }
 
     #[tokio::test]

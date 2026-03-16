@@ -113,9 +113,9 @@ pub struct PluginManifest {
     /// 支持的钩子
     #[serde(default)]
     pub hooks: Vec<String>,
-    /// 最低 ProxyCast 版本要求
+    /// 最低 Lime 版本要求
     #[serde(default)]
-    pub min_proxycast_version: Option<String>,
+    pub min_lime_version: Option<String>,
     /// Binary 类型插件的扩展配置
     /// _需求: 5.2_
     #[serde(default)]
@@ -445,8 +445,8 @@ pub struct PluginInfo {
     pub path: PathBuf,
     /// 支持的钩子
     pub hooks: Vec<String>,
-    /// 最低 ProxyCast 版本要求
-    pub min_proxycast_version: Option<String>,
+    /// 最低 Lime 版本要求
+    pub min_lime_version: Option<String>,
     /// 配置 schema
     pub config_schema: Option<serde_json::Value>,
     /// 当前配置
@@ -530,7 +530,7 @@ impl PluginInstance {
             status: self.state.status,
             path: self.path.clone(),
             hooks: manifest.hooks.clone(),
-            min_proxycast_version: manifest.min_proxycast_version.clone(),
+            min_lime_version: manifest.min_lime_version.clone(),
             config_schema: manifest.config_schema.clone(),
             config: self.config.clone(),
             state: self.state.clone(),
@@ -639,7 +639,7 @@ mod tests {
             "[a-z0-9_-]{1,20}",                                           // entry
             arb_plugin_type(),                                            // plugin_type
             prop::collection::vec("[a-z_]{1,15}", 0..5),                  // hooks
-            proptest::option::of("[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2}"), // min_proxycast_version
+            proptest::option::of("[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2}"), // min_lime_version
             proptest::option::of(arb_binary_manifest()),                  // binary
             proptest::option::of(arb_ui_manifest()),                      // ui
         )
@@ -654,7 +654,7 @@ mod tests {
                     entry,
                     plugin_type,
                     hooks,
-                    min_proxycast_version,
+                    min_lime_version,
                     binary,
                     ui,
                 )| {
@@ -669,7 +669,7 @@ mod tests {
                         plugin_type,
                         config_schema: None, // JSON Schema 太复杂，跳过
                         hooks,
-                        min_proxycast_version,
+                        min_lime_version,
                         binary,
                         ui,
                     }
@@ -724,14 +724,14 @@ mod tests {
             name: "machine-id-tool".to_string(),
             version: "0.1.0".to_string(),
             description: "Machine ID 管理工具".to_string(),
-            author: Some("ProxyCast Team".to_string()),
+            author: Some("Lime Team".to_string()),
             homepage: Some("https://github.com/user/machine-id-tool".to_string()),
             license: Some("MIT".to_string()),
             entry: "machine-id-tool".to_string(),
             plugin_type: PluginType::Binary,
             config_schema: None,
             hooks: vec![],
-            min_proxycast_version: Some("1.0.0".to_string()),
+            min_lime_version: Some("1.0.0".to_string()),
             binary: Some(BinaryManifest {
                 binary_name: "machine-id-tool".to_string(),
                 github_owner: "user".to_string(),

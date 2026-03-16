@@ -137,7 +137,7 @@ impl OSCParser {
     ///
     /// # 示例
     /// ```ignore
-    /// use proxycast_terminal::integration::osc_parser::{OSCParser, OSCSequence};
+    /// use lime_terminal::integration::osc_parser::{OSCParser, OSCSequence};
     ///
     /// let data = b"\x1b]7;file://localhost/home/user\x07";
     /// let results = OSCParser::parse(data);

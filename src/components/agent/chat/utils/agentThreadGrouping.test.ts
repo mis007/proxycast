@@ -53,7 +53,7 @@ describe("agentThreadGrouping", () => {
         ...createBaseItem("search-1", 3),
         type: "web_search",
         action: "web_search",
-        query: "ProxyCast CDP 并行渲染",
+        query: "Lime CDP 并行渲染",
       },
       {
         ...createBaseItem("browser-3", 4),
@@ -71,7 +71,7 @@ describe("agentThreadGrouping", () => {
     ]);
     expect(model.groups[0]?.items).toHaveLength(2);
     expect(model.groups[0]?.previewLines).toContain("打开 https://example.com");
-    expect(model.groups[1]?.previewLines).toContain("ProxyCast CDP 并行渲染");
+    expect(model.groups[1]?.previewLines).toContain("Lime CDP 并行渲染");
     expect(model.summaryChips).toEqual([
       { kind: "browser", label: "浏览器操作", count: 3 },
       { kind: "search", label: "联网检索", count: 1 },

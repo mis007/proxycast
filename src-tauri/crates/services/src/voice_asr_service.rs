@@ -9,7 +9,7 @@
 //! - 讯飞语音识别（WebSocket 流式）
 //!
 //! ## 模型文件路径
-//! Whisper 模型文件存储在：`~/Library/Application Support/proxycast/models/whisper/`
+//! Whisper 模型文件存储在：`~/Library/Application Support/lime/models/whisper/`
 //!
 //! 支持的模型：
 //! - `ggml-tiny.bin` (~75MB)
@@ -27,8 +27,8 @@
 use std::path::PathBuf;
 
 #[cfg(feature = "local-whisper")]
-use proxycast_core::config::WhisperModelSize;
-use proxycast_core::config::{AsrCredentialEntry, AsrProviderType};
+use lime_core::config::WhisperModelSize;
+use lime_core::config::{AsrCredentialEntry, AsrProviderType};
 
 use super::voice_config_service;
 use voice_core::asr_client::{AsrClient, BaiduClient, OpenAIWhisperClient, XunfeiClient};
@@ -189,10 +189,10 @@ impl AsrService {
             WhisperModelSize::Medium => "ggml-medium.bin",
         };
 
-        // 模型存储目录：~/Library/Application Support/proxycast/models/whisper/
+        // 模型存储目录：~/Library/Application Support/lime/models/whisper/
         let models_dir = dirs::data_dir()
             .ok_or("无法获取数据目录")?
-            .join("proxycast")
+            .join("lime")
             .join("models")
             .join("whisper");
 

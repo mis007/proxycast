@@ -1,6 +1,6 @@
 //! Workspace 管理模块
 //!
-//! Workspace 是 ProxyCast 应用层的概念，用于组织和管理 AI Agent 的工作上下文。
+//! Workspace 是 Lime 应用层的概念，用于组织和管理 AI Agent 的工作上下文。
 //! 它是对 Aster 框架 `Session.working_dir` 的命名和配置包装。
 //!
 //! ## 核心功能

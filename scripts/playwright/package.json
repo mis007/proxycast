@@ -1,7 +1,7 @@
 {
-  "name": "proxycast-playwright-tools",
+  "name": "lime-playwright-tools",
   "version": "1.0.0",
-  "description": "Playwright browser automation tools for ProxyCast AI Agent",
+  "description": "Playwright browser automation tools for Lime AI Agent",
   "type": "module",
   "scripts": {
     "test": "node browser-tool.mjs --action '{\"open\":{\"url\":\"https://example.com\"}}' --no-headless",

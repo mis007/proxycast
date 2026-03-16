@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-scheduler"
+name = "lime-scheduler"
 version = "0.61.0"
 edition = "2021"
 
@@ -28,6 +28,6 @@ chrono = { workspace = true }
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 # 项目内依赖
-proxycast-core = { workspace = true }
-proxycast-agent = { workspace = true }
+lime-core = { workspace = true }
+lime-agent = { workspace = true }
 aster = { workspace = true }

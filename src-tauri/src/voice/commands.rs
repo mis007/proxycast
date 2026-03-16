@@ -2,8 +2,8 @@
 //!
 //! 提供前端调用的语音输入相关命令。
 
-use proxycast_core::config::{VoiceInputConfig, VoiceInstruction};
-use proxycast_services::voice_command_service;
+use lime_core::config::{VoiceInputConfig, VoiceInstruction};
+use lime_services::voice_command_service;
 use tauri::{command, AppHandle};
 
 use super::config;
@@ -128,7 +128,7 @@ pub async fn close_voice_window(app: AppHandle) -> Result<(), String> {
     super::window::close_voice_window(&app)
 }
 
-pub use proxycast_services::voice_command_service::{PolishResult, TranscribeResult};
+pub use lime_services::voice_command_service::{PolishResult, TranscribeResult};
 
 /// 执行语音识别
 #[command]

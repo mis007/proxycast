@@ -48,45 +48,43 @@ import iconZhihu from "@/assets/platforms/zhihu.png";
 import iconToutiao from "@/assets/platforms/toutiao.png";
 import iconJuejin from "@/assets/platforms/juejin.png";
 import iconCsdn from "@/assets/platforms/csdn.png";
-
-const selectTriggerClassName =
-  "h-8 rounded-full border-slate-200/80 bg-white/88 px-3 text-xs text-slate-700 shadow-none transition-colors hover:border-slate-300 hover:bg-white focus:ring-1 focus:ring-slate-200";
-
-const passiveBadgeClassName =
-  "h-8 rounded-full border border-slate-200/80 bg-white/88 px-3 text-xs font-normal text-slate-600 shadow-none hover:border-slate-300 hover:bg-white hover:text-slate-900";
-
-const iconToolButtonClassName =
-  "ml-1 h-8 w-8 rounded-full border-slate-200/80 bg-white/92 text-slate-500 shadow-none transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-700";
+import {
+  EMPTY_STATE_ICON_TOOL_BUTTON_CLASSNAME,
+  EMPTY_STATE_PASSIVE_BADGE_CLASSNAME,
+  EMPTY_STATE_PRIMARY_ACTION_BUTTON_CLASSNAME,
+  EMPTY_STATE_SELECT_TRIGGER_CLASSNAME,
+  getEmptyStateIconToolButtonClassName,
+} from "./emptyStateSurfaceTokens";
 
 const InputCard = styled.div`
   width: 100%;
   position: relative;
   background: linear-gradient(
     180deg,
-    hsl(var(--card) / 0.96) 0%,
-    hsl(var(--card)) 100%
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(248, 250, 252, 0.92) 100%
   );
-  border: 1px solid hsl(var(--border) / 0.75);
-  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: 24px;
   box-shadow:
-    0 14px 28px -12px rgba(0, 0, 0, 0.028),
-    0 5px 10px -5px rgba(0, 0, 0, 0.022);
+    0 18px 32px -24px rgba(15, 23, 42, 0.14),
+    0 10px 18px -16px rgba(15, 23, 42, 0.08);
   overflow: visible;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 
   &:hover {
     box-shadow:
-      0 16px 30px -14px rgba(0, 0, 0, 0.035),
-      0 8px 14px -8px rgba(0, 0, 0, 0.024);
-    border-color: hsl(var(--primary) / 0.18);
+      0 20px 36px -24px rgba(15, 23, 42, 0.16),
+      0 12px 20px -18px rgba(15, 23, 42, 0.1);
+    border-color: rgba(203, 213, 225, 0.92);
   }
 
   &:focus-within {
-    border-color: hsl(var(--primary) / 0.42);
+    border-color: rgba(148, 163, 184, 0.86);
     box-shadow:
-      0 0 0 3px hsl(var(--primary) / 0.06),
-      0 18px 32px -16px rgba(0, 0, 0, 0.04);
+      0 0 0 3px rgba(226, 232, 240, 0.78),
+      0 20px 36px -24px rgba(15, 23, 42, 0.12);
   }
 `;
 
@@ -98,10 +96,10 @@ const StyledTextarea = styled(Textarea)`
   line-height: 1.5;
   resize: none;
   background: transparent;
-  color: hsl(var(--foreground));
+  color: #0f172a;
 
   &::placeholder {
-    color: hsl(var(--muted-foreground) / 0.7);
+    color: rgba(100, 116, 139, 0.82);
     font-weight: 300;
   }
 
@@ -123,15 +121,15 @@ const Toolbar = styled.div`
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 10px;
-  padding: 8px 14px 10px 14px;
+  padding: 10px 14px 12px 14px;
   background: linear-gradient(
     180deg,
-    hsl(var(--background) / 0) 0%,
-    hsl(var(--muted) / 0.14) 100%
+    rgba(255, 255, 255, 0) 0%,
+    rgba(241, 245, 249, 0.82) 100%
   );
-  border-top: 1px solid hsl(var(--border) / 0.7);
-  border-bottom-left-radius: 22px;
-  border-bottom-right-radius: 22px;
+  border-top: 1px solid rgba(226, 232, 240, 0.82);
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
 `;
 
 const ToolLoginLeft = styled.div`
@@ -177,14 +175,15 @@ const GridItem = styled.div<{ $active?: boolean }>`
   padding: 10px;
   border-radius: 8px;
   border: 1px solid
-    ${(props) => (props.$active ? "hsl(var(--primary))" : "transparent")};
+    ${(props) =>
+      props.$active ? "rgba(148, 163, 184, 0.82)" : "transparent"};
   background-color: ${(props) =>
-    props.$active ? "hsl(var(--primary)/0.08)" : "hsl(var(--muted)/0.3)"};
+    props.$active ? "rgba(241, 245, 249, 0.96)" : "rgba(248, 250, 252, 0.92)"};
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background-color: hsl(var(--primary) / 0.05);
+    background-color: rgba(255, 255, 255, 0.96);
   }
 `;
 
@@ -195,10 +194,10 @@ const EntryTaskContainer = styled.div`
   padding: 10px 16px 6px 16px;
   background: linear-gradient(
     180deg,
-    hsl(var(--muted) / 0.12) 0%,
-    hsl(var(--background) / 0) 100%
+    rgba(248, 250, 252, 0.84) 0%,
+    rgba(255, 255, 255, 0) 100%
   );
-  border-bottom: 1px dashed hsl(var(--border) / 0.8);
+  border-bottom: 1px dashed rgba(203, 213, 225, 0.9);
 `;
 
 const EntryTaskTabs = styled.div`
@@ -215,29 +214,31 @@ const EntryTaskTab = styled.button<{ $active?: boolean }>`
   border: 1px solid
     ${(props) =>
       props.$active
-        ? "hsl(var(--primary) / 0.45)"
-        : "hsl(var(--border) / 0.8)"};
+        ? "rgba(203, 213, 225, 0.92)"
+        : "rgba(226, 232, 240, 0.9)"};
   color: ${(props) =>
-    props.$active ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"};
+    props.$active ? "#0f172a" : "#64748b"};
   background: ${(props) =>
-    props.$active ? "hsl(var(--primary) / 0.08)" : "hsl(var(--background))"};
+    props.$active ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 255, 255, 0.78)"};
+  box-shadow: ${(props) =>
+    props.$active ? "0 10px 22px -20px rgba(15, 23, 42, 0.24)" : "none"};
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: hsl(var(--primary) / 0.28);
-    color: hsl(var(--foreground));
+    border-color: rgba(203, 213, 225, 0.92);
+    color: #0f172a;
   }
 `;
 
 const EntryTaskPreview = styled.div`
   font-size: 14px;
   line-height: 1.6;
-  color: hsl(var(--foreground));
+  color: #0f172a;
 `;
 
 const SlotToken = styled.span`
-  color: hsl(var(--primary));
-  background: hsl(var(--primary) / 0.12);
+  color: #0369a1;
+  background: rgba(224, 242, 254, 0.95);
   border-radius: 8px;
   padding: 2px 8px;
   font-size: 13px;
@@ -489,7 +490,7 @@ export function EmptyStateComposerPanel({
       />
 
       {pendingImagesCount > 0 ? (
-        <div className="px-6 pb-2 text-xs text-muted-foreground">
+        <div className="px-6 pb-2 text-xs text-slate-500">
           已添加图片 {pendingImagesCount} 张
         </div>
       ) : null}
@@ -527,7 +528,7 @@ export function EmptyStateComposerPanel({
               closeOnMouseLeave
             >
               <SelectTrigger
-                className={`${selectTriggerClassName} min-w-[120px]`}
+                className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} min-w-[120px]`}
               >
                 <div className="flex items-center gap-2">
                   {getPlatformIcon(platform) ? (
@@ -540,7 +541,7 @@ export function EmptyStateComposerPanel({
                 </div>
               </SelectTrigger>
               <SelectContent className="p-1" side="top">
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                <div className="px-2 py-1.5 text-xs font-medium text-slate-500">
                   选择要创作的内容平台
                 </div>
                 {Object.keys(PLATFORM_LABEL_MAP).map((item) => (
@@ -568,7 +569,7 @@ export function EmptyStateComposerPanel({
               }
             >
               <SelectTrigger
-                className={`${selectTriggerClassName} min-w-[120px]`}
+                className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} min-w-[120px]`}
               >
                 <div className="flex items-center gap-2">
                   {CREATION_MODE_CONFIG[creationMode].icon}
@@ -576,7 +577,7 @@ export function EmptyStateComposerPanel({
                 </div>
               </SelectTrigger>
               <SelectContent className="min-w-[200px] p-1" side="top">
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                <div className="px-2 py-1.5 text-xs font-medium text-slate-500">
                   选择创作模式
                 </div>
                 {(
@@ -600,16 +601,16 @@ export function EmptyStateComposerPanel({
             <>
               <Badge
                 variant="secondary"
-                className={`cursor-pointer gap-1 ${passiveBadgeClassName}`}
+                className={`cursor-pointer gap-1 ${EMPTY_STATE_PASSIVE_BADGE_CLASSNAME}`}
               >
                 <Search className="mr-1 h-3.5 w-3.5" />
                 联网搜索
               </Badge>
               <Select value={depth} onValueChange={setDepth}>
                 <SelectTrigger
-                  className={`${selectTriggerClassName} w-[110px]`}
+                  className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} w-[110px]`}
                 >
-                  <BrainCircuit className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <BrainCircuit className="mr-2 h-3.5 w-3.5 text-slate-500" />
                   <SelectValue placeholder="深度" />
                 </SelectTrigger>
                 <SelectContent side="top">
@@ -623,7 +624,7 @@ export function EmptyStateComposerPanel({
           {activeTheme === "planning" ? (
             <Badge
               variant="outline"
-              className={passiveBadgeClassName}
+              className={EMPTY_STATE_PASSIVE_BADGE_CLASSNAME}
             >
               <Globe className="mr-1 h-3.5 w-3.5" />
               旅行/职业/活动
@@ -643,7 +644,7 @@ export function EmptyStateComposerPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`${selectTriggerClassName} text-xs font-normal`}
+                    className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} text-xs font-normal`}
                   >
                     <div className="mr-2 flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border border-current text-[6px]">
                       3:4
@@ -653,11 +654,11 @@ export function EmptyStateComposerPanel({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="w-64 border bg-background p-2 shadow-lg"
+                  className="w-64 rounded-[20px] border border-slate-200/80 bg-white/96 p-2 shadow-lg shadow-slate-950/10"
                   align="start"
                   side="top"
                 >
-                  <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">
+                  <div className="mb-2 px-2 text-xs font-medium text-slate-500">
                     宽高比
                   </div>
                   <GridSelect>
@@ -691,7 +692,7 @@ export function EmptyStateComposerPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`${selectTriggerClassName} text-xs font-normal`}
+                    className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} text-xs font-normal`}
                   >
                     <ColorDot $color="#3b82f6" className="mr-2" />
                     {style === "minimal"
@@ -703,7 +704,7 @@ export function EmptyStateComposerPanel({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="w-48 border bg-background p-1 shadow-lg"
+                  className="w-48 rounded-[18px] border border-slate-200/80 bg-white/96 p-1 shadow-lg shadow-slate-950/10"
                   align="start"
                   side="top"
                 >
@@ -738,7 +739,7 @@ export function EmptyStateComposerPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className={iconToolButtonClassName}
+                className={EMPTY_STATE_ICON_TOOL_BUTTON_CLASSNAME}
                 onClick={() => imageInputRef.current?.click()}
                 title="上传文件"
               >
@@ -747,11 +748,10 @@ export function EmptyStateComposerPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className={`${iconToolButtonClassName} ${
-                  thinkingEnabled
-                    ? "border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
-                    : ""
-                }`}
+                className={getEmptyStateIconToolButtonClassName(
+                  thinkingEnabled,
+                  "amber",
+                )}
                 onClick={() => onThinkingEnabledChange?.(!thinkingEnabled)}
                 aria-pressed={thinkingEnabled}
                 title={thinkingEnabled ? "关闭深度思考" : "开启深度思考"}
@@ -761,11 +761,10 @@ export function EmptyStateComposerPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className={`${iconToolButtonClassName} ${
-                  taskEnabled
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-                    : ""
-                }`}
+                className={getEmptyStateIconToolButtonClassName(
+                  taskEnabled,
+                  "emerald",
+                )}
                 onClick={() => onTaskEnabledChange?.(!taskEnabled)}
                 aria-pressed={taskEnabled}
                 title={taskEnabled ? "关闭后台任务偏好" : "开启后台任务偏好"}
@@ -775,11 +774,10 @@ export function EmptyStateComposerPanel({
               <Button
                 variant="outline"
                 size="icon"
-                className={`${iconToolButtonClassName} ${
-                  subagentEnabled
-                    ? "border-violet-300 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                    : ""
-                }`}
+                className={getEmptyStateIconToolButtonClassName(
+                  subagentEnabled,
+                  "slate",
+                )}
                 onClick={() => onSubagentEnabledChange?.(!subagentEnabled)}
                 aria-pressed={subagentEnabled}
                 title={subagentEnabled ? "关闭多代理偏好" : "开启多代理偏好"}
@@ -792,11 +790,10 @@ export function EmptyStateComposerPanel({
           <Button
             variant="outline"
             size="icon"
-            className={`${iconToolButtonClassName} ${
-              webSearchEnabled
-                ? "border-sky-300 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-                : ""
-            }`}
+            className={getEmptyStateIconToolButtonClassName(
+              webSearchEnabled,
+              "sky",
+            )}
             onClick={() => onWebSearchEnabledChange?.(!webSearchEnabled)}
             aria-pressed={webSearchEnabled}
             title={webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
@@ -814,10 +811,10 @@ export function EmptyStateComposerPanel({
               }
             >
               <SelectTrigger
-                className={`${selectTriggerClassName} min-w-[124px]`}
+                className={`${EMPTY_STATE_SELECT_TRIGGER_CLASSNAME} min-w-[124px]`}
               >
                 <div className="flex items-center gap-1.5">
-                  <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Code2 className="h-3.5 w-3.5 text-slate-500" />
                   <span className="whitespace-nowrap">
                     {executionStrategyLabel}
                   </span>
@@ -854,7 +851,7 @@ export function EmptyStateComposerPanel({
             disabled={
               !input.trim() && !isEntryTheme && pendingImagesCount === 0
             }
-            className="h-9 w-full rounded-full bg-slate-900 px-5 text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-slate-800 sm:w-auto"
+            className={EMPTY_STATE_PRIMARY_ACTION_BUTTON_CLASSNAME}
           >
             开始生成
             <ArrowRight className="ml-2 h-4 w-4" />

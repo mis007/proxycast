@@ -287,7 +287,7 @@ impl ChromeBridgeHub {
         validate_command(&request.command, &request.url)?;
 
         let timeout = normalize_timeout_ms(request.timeout_ms);
-        let source_client_id = format!("proxycast-api-{}", Uuid::new_v4());
+        let source_client_id = format!("lime-api-{}", Uuid::new_v4());
         let request_id = format!("cb-api-{}", Uuid::new_v4());
 
         let (observer_id, observer_sender) = {

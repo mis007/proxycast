@@ -129,6 +129,18 @@ describe("ChatNavbar", () => {
     expect(onToggleHarnessPanel).toHaveBeenCalledTimes(1);
   });
 
+  it("工作区紧凑顶栏应保留执行入口但隐藏项目选择器", () => {
+    const container = renderChatNavbar({
+      chrome: "workspace-compact",
+      showHistoryToggle: true,
+      showHarnessToggle: true,
+    });
+
+    expect(container.querySelector('[aria-label="切换历史"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="展开Harness"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="project-selector"]')).toBeNull();
+  });
+
   it("点击顶栏按钮后应切换 Harness 面板显隐", () => {
     function HarnessToggleHarness() {
       const [visible, setVisible] = useState(false);

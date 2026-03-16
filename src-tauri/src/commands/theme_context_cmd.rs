@@ -13,7 +13,7 @@ use crate::services::web_search_prompt_service::merge_system_prompt_with_web_sea
 use crate::services::web_search_runtime_service::apply_web_search_runtime_env;
 use crate::services::workspace_health_service::ensure_workspace_ready_with_auto_relocate;
 use crate::workspace::WorkspaceManager;
-use proxycast_agent::{
+use lime_agent::{
     resolve_request_tool_policy_with_mode, stream_reply_with_policy, RequestToolPolicyMode,
     SessionConfigBuilder,
 };
@@ -23,7 +23,7 @@ use tauri::State;
 use url::Url;
 use uuid::Uuid;
 
-const CONTEXT_SEARCH_SESSION_PREFIX: &str = "__proxycast_theme_context_search__";
+const CONTEXT_SEARCH_SESSION_PREFIX: &str = "__lime_theme_context_search__";
 const FALLBACK_SUMMARY_LENGTH: usize = 420;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -88,7 +88,7 @@ fn build_context_search_prompt(query: &str, mode: ThemeContextSearchMode) -> Str
     };
 
     [
-        "你是 ProxyCast 的资料检索助手。",
+        "你是 Lime 的资料检索助手。",
         "请先执行联网搜索，再输出整理结果。",
         "你必须返回且仅返回一个 JSON 对象，不要使用 Markdown 代码块，不要输出多余说明。",
         "JSON 结构如下：",
@@ -387,7 +387,7 @@ pub async fn aster_agent_theme_context_search(
         false,
     );
     let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let system_prompt = proxycast_agent::merge_system_prompt_with_request_tool_policy(
+    let system_prompt = lime_agent::merge_system_prompt_with_request_tool_policy(
         merge_system_prompt_with_web_search(
             merge_system_prompt_with_memory_sources(
                 merge_system_prompt_with_memory_profile(project_prompt, &runtime_config),

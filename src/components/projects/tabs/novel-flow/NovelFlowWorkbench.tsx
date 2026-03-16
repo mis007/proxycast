@@ -1128,7 +1128,7 @@ export function NovelFlowWorkbench({
     });
     const date = new Date(lastActionError.occurredAt);
     const pad = (value: number) => value.toString().padStart(2, "0");
-    const filename = `proxycast-novel-error-${date.getFullYear()}${pad(
+    const filename = `lime-novel-error-${date.getFullYear()}${pad(
       date.getMonth() + 1,
     )}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(
       date.getSeconds(),

@@ -3,7 +3,7 @@
 //! 根据请求内容生成稳定的会话指纹（Session Fingerprint），
 //! 用于实现会话粘性和 Prompt Caching 优化。
 
-use proxycast_core::models::openai::ChatCompletionRequest;
+use lime_core::models::openai::ChatCompletionRequest;
 use sha2::{Digest, Sha256};
 
 /// 会话管理器
@@ -155,7 +155,7 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::models::openai::{ChatCompletionRequest, ChatMessage};
+    use lime_core::models::openai::{ChatCompletionRequest, ChatMessage};
 
     #[test]
     fn test_session_id_stability() {
@@ -163,7 +163,7 @@ mod tests {
             model: "gpt-4".to_string(),
             messages: vec![ChatMessage {
                 role: "user".to_string(),
-                content: Some(proxycast_core::models::openai::MessageContent::Text(
+                content: Some(lime_core::models::openai::MessageContent::Text(
                     "Hello, how are you?".to_string(),
                 )),
                 tool_calls: None,
@@ -195,7 +195,7 @@ mod tests {
             model: "gpt-4".to_string(),
             messages: vec![ChatMessage {
                 role: "user".to_string(),
-                content: Some(proxycast_core::models::openai::MessageContent::Text(
+                content: Some(lime_core::models::openai::MessageContent::Text(
                     "Hello, how are you?".to_string(),
                 )),
                 tool_calls: None,
@@ -215,7 +215,7 @@ mod tests {
             model: "gpt-4".to_string(),
             messages: vec![ChatMessage {
                 role: "user".to_string(),
-                content: Some(proxycast_core::models::openai::MessageContent::Text(
+                content: Some(lime_core::models::openai::MessageContent::Text(
                     "What is the weather today?".to_string(),
                 )),
                 tool_calls: None,

@@ -32,13 +32,12 @@ pub(super) fn try_handle(
 
             with_db_or_json(state, serde_json::json!([]), |db| {
                 let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-                let materials =
-                    proxycast_services::material_service::MaterialService::list_materials(
-                        &conn,
-                        &project_id,
-                        filter,
-                    )
-                    .map_err(|e| format!("获取素材列表失败: {e}"))?;
+                let materials = lime_services::material_service::MaterialService::list_materials(
+                    &conn,
+                    &project_id,
+                    filter,
+                )
+                .map_err(|e| format!("获取素材列表失败: {e}"))?;
                 Ok(serde_json::to_value(materials)?)
             })?
         }

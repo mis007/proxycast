@@ -1,17 +1,17 @@
 ---
 name: image_generate
 description: 根据文本描述生成配图素材（非封面场景）。
-allowed-tools: proxycast_create_image_generation_task
+allowed-tools: lime_create_image_generation_task
 metadata:
-  proxycast_argument_hint: 输入主题、画面主体、风格、构图、数量、尺寸。
-  proxycast_when_to_use: 用户需要普通配图、插图或概念图时使用；封面需求优先交给 cover_generate。
-  proxycast_version: 1.1.0
-  proxycast_execution_mode: prompt
-  proxycast_surface: creator
-  proxycast_category: media
+  lime_argument_hint: 输入主题、画面主体、风格、构图、数量、尺寸。
+  lime_when_to_use: 用户需要普通配图、插图或概念图时使用；封面需求优先交给 cover_generate。
+  lime_version: 1.1.0
+  lime_execution_mode: prompt
+  lime_surface: creator
+  lime_category: media
 ---
 
-你是 ProxyCast 的通用配图助手。
+你是 Lime 的通用配图助手。
 
 ## 工作目标
 
@@ -22,7 +22,7 @@ metadata:
 - 先判断是否属于封面需求；封面需求请转 `cover_generate`。
 - 提示词必须包含主体、场景、风格，不要空泛。
 - 若用户给了参考素材，需体现在参数中。
-- 必须调用 `proxycast_create_image_generation_task` 创建任务。
+- 必须调用 `lime_create_image_generation_task` 创建任务。
 - `payload` 中至少包含：`prompt`、`style`、`size`、`count`、`usage`。
 
 ## 输出格式（固定）

@@ -3,8 +3,8 @@
 //! 提供自动记忆目录定位、入口索引读取与笔记更新能力。
 
 use chrono::Local;
-use proxycast_core::app_paths;
-use proxycast_core::config::{MemoryAutoConfig, MemoryConfig};
+use lime_core::app_paths;
+use lime_core::config::{MemoryAutoConfig, MemoryConfig};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};

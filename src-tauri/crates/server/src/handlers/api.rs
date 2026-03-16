@@ -35,14 +35,14 @@ use crate::middleware::request_dedup::{
 use crate::middleware::response_cache::{CachedHttpResponse, ResponseCacheStore};
 use crate::{record_request_telemetry, record_token_usage, AppState};
 use aster::context::MODEL_CONTEXT_WINDOWS;
-use proxycast_core::errors::GatewayErrorCode;
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
-use proxycast_core::models::openai::{ChatCompletionRequest, ContentPart, MessageContent};
-use proxycast_core::ProviderType;
-use proxycast_processor::RequestContext;
-use proxycast_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
-use proxycast_providers::streaming::StreamFormat as StreamingFormat;
-use proxycast_server_utils::{
+use lime_core::errors::GatewayErrorCode;
+use lime_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::models::openai::{ChatCompletionRequest, ContentPart, MessageContent};
+use lime_core::ProviderType;
+use lime_processor::RequestContext;
+use lime_providers::converter::anthropic_to_openai::convert_anthropic_to_openai;
+use lime_providers::streaming::StreamFormat as StreamingFormat;
+use lime_server_utils::{
     build_anthropic_response, build_anthropic_stream_response, build_error_response_with_meta,
     build_gateway_error_json, message_content_len, parse_cw_response, safe_truncate,
 };
@@ -58,7 +58,7 @@ async fn select_credential_for_request(
     explicit_provider_id: Option<&str>,
     log_prefix: &str,
     _include_error_code: bool,
-) -> Result<Option<proxycast_core::models::provider_pool_model::ProviderCredential>, Response> {
+) -> Result<Option<lime_core::models::provider_pool_model::ProviderCredential>, Response> {
     let db = match &state.db {
         Some(db) => db,
         None => {
@@ -464,10 +464,9 @@ fn headers_to_string_map(headers: &axum::http::HeaderMap) -> HashMap<String, Str
 
 fn set_request_id_header(response: &mut Response, request_id: &str) {
     if let Ok(value) = header::HeaderValue::from_str(request_id) {
-        response.headers_mut().insert(
-            header::HeaderName::from_static("x-proxycast-request-id"),
-            value,
-        );
+        response
+            .headers_mut()
+            .insert(header::HeaderName::from_static("x-lime-request-id"), value);
     }
 }
 
@@ -486,20 +485,20 @@ fn attach_route_debug_headers(
 ) -> Response {
     if let Ok(value) = header::HeaderValue::from_str(requested_provider) {
         response.headers_mut().insert(
-            header::HeaderName::from_static("x-proxycast-requested-provider"),
+            header::HeaderName::from_static("x-lime-requested-provider"),
             value,
         );
     }
     if let Ok(value) = header::HeaderValue::from_str(effective_provider) {
         response.headers_mut().insert(
-            header::HeaderName::from_static("x-proxycast-effective-provider"),
+            header::HeaderName::from_static("x-lime-effective-provider"),
             value,
         );
     }
     if let Ok(value) = header::HeaderValue::from_str(model) {
         response
             .headers_mut()
-            .insert(header::HeaderName::from_static("x-proxycast-model"), value);
+            .insert(header::HeaderName::from_static("x-lime-model"), value);
     }
     response
 }
@@ -516,8 +515,8 @@ fn build_cached_response(response: CachedHttpResponse) -> Response {
             resp.headers_mut().insert(name, val);
         }
     }
-    set_static_diag_header(&mut resp, "x-proxycast-cache", "hit");
-    set_static_diag_header(&mut resp, "x-proxycast-source", "response-cache");
+    set_static_diag_header(&mut resp, "x-lime-cache", "hit");
+    set_static_diag_header(&mut resp, "x-lime-source", "response-cache");
     resp
 }
 
@@ -571,8 +570,8 @@ async fn begin_request_dedup(
         RequestDedupCheck::Completed { status, body } => {
             let mut response = replay_response(status, body);
             set_request_id_header(&mut response, request_id);
-            set_static_diag_header(&mut response, "x-proxycast-dedup", "replay");
-            set_static_diag_header(&mut response, "x-proxycast-source", "request-dedup");
+            set_static_diag_header(&mut response, "x-lime-dedup", "replay");
+            set_static_diag_header(&mut response, "x-lime-source", "request-dedup");
             Err(response)
         }
         RequestDedupCheck::InProgress { notify } => {
@@ -580,8 +579,8 @@ async fn begin_request_dedup(
                 Some(replay) => {
                     let mut response = replay_response(replay.status, replay.body);
                     set_request_id_header(&mut response, request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-dedup", "wait-replay");
-                    set_static_diag_header(&mut response, "x-proxycast-source", "request-dedup");
+                    set_static_diag_header(&mut response, "x-lime-dedup", "wait-replay");
+                    set_static_diag_header(&mut response, "x-lime-source", "request-dedup");
                     Err(response)
                 }
                 None => {
@@ -599,7 +598,7 @@ async fn begin_request_dedup(
                         Some(GatewayErrorCode::RequestConflict),
                     );
                     set_request_id_header(&mut response, request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-dedup", "wait-timeout");
+                    set_static_diag_header(&mut response, "x-lime-dedup", "wait-timeout");
                     Err(response)
                 }
             }
@@ -658,13 +657,13 @@ async fn finalize_replayable_response(
         dedup_guard.remove();
         cache_guard.skip();
         if guard.is_enabled() {
-            set_static_diag_header(&mut response, "x-proxycast-idempotency", "removed-on-error");
+            set_static_diag_header(&mut response, "x-lime-idempotency", "removed-on-error");
         }
         if dedup_guard.is_enabled() {
-            set_static_diag_header(&mut response, "x-proxycast-dedup", "removed-on-error");
+            set_static_diag_header(&mut response, "x-lime-dedup", "removed-on-error");
         }
         if cache_guard.is_enabled() {
-            set_static_diag_header(&mut response, "x-proxycast-cache", "skip-on-error");
+            set_static_diag_header(&mut response, "x-lime-cache", "skip-on-error");
         }
         return response;
     }
@@ -684,16 +683,16 @@ async fn finalize_replayable_response(
             let mut response = Response::from_parts(parts, Body::from(bytes));
             set_request_id_header(&mut response, request_id);
             if guard.is_enabled() {
-                set_static_diag_header(&mut response, "x-proxycast-idempotency", "new");
+                set_static_diag_header(&mut response, "x-lime-idempotency", "new");
             }
             if dedup_guard.is_enabled() {
-                set_static_diag_header(&mut response, "x-proxycast-dedup", "new");
+                set_static_diag_header(&mut response, "x-lime-dedup", "new");
             }
             if cache_guard.is_enabled() {
                 if cache_guard.should_cache_status(status) {
-                    set_static_diag_header(&mut response, "x-proxycast-cache", "store");
+                    set_static_diag_header(&mut response, "x-lime-cache", "store");
                 } else {
-                    set_static_diag_header(&mut response, "x-proxycast-cache", "skip-status");
+                    set_static_diag_header(&mut response, "x-lime-cache", "skip-status");
                 }
             }
             response
@@ -715,7 +714,7 @@ async fn finalize_replayable_response(
                 Some(GatewayErrorCode::InternalError),
             );
             set_request_id_header(&mut response, request_id);
-            set_static_diag_header(&mut response, "x-proxycast-source", "replay-capture-error");
+            set_static_diag_header(&mut response, "x-lime-source", "replay-capture-error");
             response
         }
     }
@@ -1009,14 +1008,14 @@ mod tests {
     fn openai_requires_vision_should_detect_image_part() {
         let request = ChatCompletionRequest {
             model: "gpt-4o".to_string(),
-            messages: vec![proxycast_core::models::openai::ChatMessage {
+            messages: vec![lime_core::models::openai::ChatMessage {
                 role: "user".to_string(),
                 content: Some(MessageContent::Parts(vec![
                     ContentPart::Text {
                         text: "请看图".to_string(),
                     },
                     ContentPart::ImageUrl {
-                        image_url: proxycast_core::models::openai::ImageUrl {
+                        image_url: lime_core::models::openai::ImageUrl {
                             url: "https://example.com/img.png".to_string(),
                             detail: None,
                         },
@@ -1042,7 +1041,7 @@ mod tests {
     fn anthropic_requires_vision_should_detect_image_block() {
         let request = AnthropicMessagesRequest {
             model: "claude-sonnet-4-5-20250929".to_string(),
-            messages: vec![proxycast_core::models::anthropic::AnthropicMessage {
+            messages: vec![lime_core::models::anthropic::AnthropicMessage {
                 role: "user".to_string(),
                 content: serde_json::json!([
                     { "type": "text", "text": "看看这张图" },
@@ -1473,7 +1472,7 @@ async fn resolve_openai_credential_with_capability_fallback(
 ) -> Result<
     (
         String,
-        Option<proxycast_core::models::provider_pool_model::ProviderCredential>,
+        Option<lime_core::models::provider_pool_model::ProviderCredential>,
     ),
     Response,
 > {
@@ -1617,7 +1616,7 @@ async fn resolve_anthropic_credential_with_capability_fallback(
 ) -> Result<
     (
         String,
-        Option<proxycast_core::models::provider_pool_model::ProviderCredential>,
+        Option<lime_core::models::provider_pool_model::ProviderCredential>,
     ),
     Response,
 > {
@@ -1847,15 +1846,15 @@ pub async fn chat_completions(
                         Some(GatewayErrorCode::RequestConflict),
                     );
                     set_request_id_header(&mut response, &ctx.request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-idempotency", "in-progress");
+                    set_static_diag_header(&mut response, "x-lime-idempotency", "in-progress");
                     return response;
                 }
                 crate::middleware::idempotency::IdempotencyCheck::Completed { status, body } => {
                     let status_code = StatusCode::from_u16(status).unwrap_or(StatusCode::OK);
                     let mut response = (status_code, body).into_response();
                     set_request_id_header(&mut response, &ctx.request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-idempotency", "replay");
-                    set_static_diag_header(&mut response, "x-proxycast-source", "idempotency");
+                    set_static_diag_header(&mut response, "x-lime-idempotency", "replay");
+                    set_static_diag_header(&mut response, "x-lime-source", "idempotency");
                     return response;
                 }
                 crate::middleware::idempotency::IdempotencyCheck::New => {}
@@ -2121,9 +2120,9 @@ pub async fn chat_completions(
         let is_success = response.status().is_success();
         let _status_code = response.status().as_u16();
         let status = if is_success {
-            proxycast_infra::telemetry::RequestStatus::Success
+            lime_infra::telemetry::RequestStatus::Success
         } else {
-            proxycast_infra::telemetry::RequestStatus::Failed
+            lime_infra::telemetry::RequestStatus::Failed
         };
         record_request_telemetry(&state, &ctx, status, None);
 
@@ -2298,7 +2297,7 @@ pub async fn chat_completions(
                         record_request_telemetry(
                             &state,
                             &ctx,
-                            proxycast_infra::telemetry::RequestStatus::Success,
+                            lime_infra::telemetry::RequestStatus::Success,
                             None,
                         );
                         // 记录 Token 使用量
@@ -2330,7 +2329,7 @@ pub async fn chat_completions(
                         record_request_telemetry(
                             &state,
                             &ctx,
-                            proxycast_infra::telemetry::RequestStatus::Failed,
+                            lime_infra::telemetry::RequestStatus::Failed,
                             Some(e.to_string()),
                         );
                         // 标记 Flow 失败
@@ -2572,15 +2571,15 @@ pub async fn anthropic_messages(
                         Some(GatewayErrorCode::RequestConflict),
                     );
                     set_request_id_header(&mut response, &ctx.request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-idempotency", "in-progress");
+                    set_static_diag_header(&mut response, "x-lime-idempotency", "in-progress");
                     return response;
                 }
                 crate::middleware::idempotency::IdempotencyCheck::Completed { status, body } => {
                     let status_code = StatusCode::from_u16(status).unwrap_or(StatusCode::OK);
                     let mut response = (status_code, body).into_response();
                     set_request_id_header(&mut response, &ctx.request_id);
-                    set_static_diag_header(&mut response, "x-proxycast-idempotency", "replay");
-                    set_static_diag_header(&mut response, "x-proxycast-source", "idempotency");
+                    set_static_diag_header(&mut response, "x-lime-idempotency", "replay");
+                    set_static_diag_header(&mut response, "x-lime-source", "idempotency");
                     return response;
                 }
                 crate::middleware::idempotency::IdempotencyCheck::New => {}
@@ -2864,9 +2863,9 @@ pub async fn anthropic_messages(
         // 记录请求统计
         let is_success = response.status().is_success();
         let status = if is_success {
-            proxycast_infra::telemetry::RequestStatus::Success
+            lime_infra::telemetry::RequestStatus::Success
         } else {
-            proxycast_infra::telemetry::RequestStatus::Failed
+            lime_infra::telemetry::RequestStatus::Failed
         };
         record_request_telemetry(&state, &ctx, status, None);
 
@@ -3336,9 +3335,9 @@ fn get_target_stream_format(path: &str) -> StreamingFormat {
 /// 当前所有 Provider 都返回 false，因为 StreamingProvider trait 尚未实现。
 /// 一旦任务 6 完成，此函数将根据凭证类型返回适当的值。
 fn should_use_true_streaming(
-    credential: &proxycast_core::models::provider_pool_model::ProviderCredential,
+    credential: &lime_core::models::provider_pool_model::ProviderCredential,
 ) -> bool {
-    use proxycast_core::models::provider_pool_model::CredentialData;
+    use lime_core::models::provider_pool_model::CredentialData;
 
     // TODO: 当 StreamingProvider trait 实现后，根据凭证类型返回 true
     // 目前所有 Provider 都使用伪流式模式
@@ -3438,11 +3437,11 @@ fn convert_openai_to_anthropic(request: &ChatCompletionRequest) -> serde_json::V
             // 提取 system prompt
             if let Some(content) = &msg.content {
                 system_prompt = Some(match content {
-                    proxycast_core::models::openai::MessageContent::Text(s) => s.clone(),
-                    proxycast_core::models::openai::MessageContent::Parts(parts) => parts
+                    lime_core::models::openai::MessageContent::Text(s) => s.clone(),
+                    lime_core::models::openai::MessageContent::Parts(parts) => parts
                         .iter()
                         .filter_map(|p| {
-                            if let proxycast_core::models::openai::ContentPart::Text { text } = p {
+                            if let lime_core::models::openai::ContentPart::Text { text } = p {
                                 Some(text.clone())
                             } else {
                                 None
@@ -3456,11 +3455,11 @@ fn convert_openai_to_anthropic(request: &ChatCompletionRequest) -> serde_json::V
             // 转换其他消息
             let content = match &msg.content {
                 Some(c) => match c {
-                    proxycast_core::models::openai::MessageContent::Text(s) => s.clone(),
-                    proxycast_core::models::openai::MessageContent::Parts(parts) => parts
+                    lime_core::models::openai::MessageContent::Text(s) => s.clone(),
+                    lime_core::models::openai::MessageContent::Parts(parts) => parts
                         .iter()
                         .filter_map(|p| {
-                            if let proxycast_core::models::openai::ContentPart::Text { text } = p {
+                            if let lime_core::models::openai::ContentPart::Text { text } = p {
                                 Some(text.clone())
                             } else {
                                 None

@@ -43,7 +43,7 @@ use crate::mcp::{
     McpResourceDefinition, McpServerConfig, McpServerInfo, McpToolDefinition, McpToolResult,
 };
 use crate::models::mcp_model::McpServer;
-use proxycast_services::mcp_service::McpService;
+use lime_services::mcp_service::McpService;
 use tauri::State;
 use tracing::{debug, error, info};
 
@@ -144,7 +144,7 @@ pub async fn mcp_list_servers_with_status(
             config,
             is_running,
             server_info,
-            enabled_proxycast: server.enabled_proxycast,
+            enabled_lime: server.enabled_lime,
             enabled_claude: server.enabled_claude,
             enabled_codex: server.enabled_codex,
             enabled_gemini: server.enabled_gemini,

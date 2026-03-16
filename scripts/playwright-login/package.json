@@ -1,7 +1,7 @@
 {
   "name": "playwright-login",
   "version": "1.0.0",
-  "description": "Playwright sidecar script for ProxyCast fingerprint browser login",
+  "description": "Playwright sidecar script for Lime fingerprint browser login",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -18,6 +18,6 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "author": "ProxyCast",
+  "author": "Lime",
   "license": "MIT"
 }

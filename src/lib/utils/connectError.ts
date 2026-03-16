@@ -1,6 +1,6 @@
 /**
  * @file Connect 错误处理工具函数
- * @description 提供 ProxyCast Connect 功能的错误提示 Toast 通知工具函数
+ * @description 提供 Lime Connect 功能的错误提示 Toast 通知工具函数
  * @module lib/utils/connectError
  *
  * _Requirements: 7.1, 7.2, 7.3, 7.4_

@@ -4,7 +4,7 @@ use crate::services::browser_environment_service::{
     list_browser_environment_presets, restore_browser_environment_preset,
     save_browser_environment_preset, SaveBrowserEnvironmentPresetInput,
 };
-use proxycast_core::database::dao::browser_environment_preset::BrowserEnvironmentPresetRecord;
+use lime_core::database::dao::browser_environment_preset::BrowserEnvironmentPresetRecord;
 use serde::Deserialize;
 use tauri::State;
 

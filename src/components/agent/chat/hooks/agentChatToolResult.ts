@@ -1,8 +1,8 @@
 import type { ToolResultImage } from "@/lib/api/agentStream";
 import type { MessageImage } from "../types";
 import {
-  PROXYCAST_TOOL_METADATA_BEGIN,
-  PROXYCAST_TOOL_METADATA_END,
+  LIME_TOOL_METADATA_BEGIN,
+  LIME_TOOL_METADATA_END,
 } from "./agentChatCoreUtils";
 
 export const resolveHistoryUserDataText = (
@@ -196,21 +196,21 @@ export const parseToolResultMetadataRecord = (
   return Object.fromEntries(Object.entries(value));
 };
 
-export const extractProxycastToolMetadataBlock = (
+export const extractLimeToolMetadataBlock = (
   text?: string,
 ): { text: string; metadata?: Record<string, unknown> } => {
   if (!text) {
     return { text: "" };
   }
 
-  const beginIndex = text.lastIndexOf(PROXYCAST_TOOL_METADATA_BEGIN);
-  const endIndex = text.lastIndexOf(PROXYCAST_TOOL_METADATA_END);
+  const beginIndex = text.lastIndexOf(LIME_TOOL_METADATA_BEGIN);
+  const endIndex = text.lastIndexOf(LIME_TOOL_METADATA_END);
   if (beginIndex < 0 || endIndex < beginIndex) {
     return { text };
   }
 
   const metadataRaw = text
-    .slice(beginIndex + PROXYCAST_TOOL_METADATA_BEGIN.length, endIndex)
+    .slice(beginIndex + LIME_TOOL_METADATA_BEGIN.length, endIndex)
     .trim();
   const parsedMetadata = (() => {
     if (!metadataRaw) return undefined;
@@ -229,11 +229,11 @@ export const extractProxycastToolMetadataBlock = (
   };
 };
 
-export const parseProxycastExecutionSummary = (
+export const parseLimeExecutionSummary = (
   text?: string,
 ): Record<string, unknown> | undefined => {
   if (!text) return undefined;
-  const marker = "[ProxyCast 执行摘要]";
+  const marker = "[Lime 执行摘要]";
   const markerIndex = text.lastIndexOf(marker);
   if (markerIndex < 0) return undefined;
 
@@ -272,7 +272,7 @@ export const normalizeToolResultMetadata = (
   const direct = parseToolResultMetadataRecord(value);
   const fromBlock = fallbackTexts.reduce<Record<string, unknown> | undefined>(
     (merged, text) => {
-      const metadata = extractProxycastToolMetadataBlock(text).metadata;
+      const metadata = extractLimeToolMetadataBlock(text).metadata;
       if (!metadata) return merged;
       return {
         ...(merged || {}),
@@ -283,7 +283,7 @@ export const normalizeToolResultMetadata = (
   );
   const fromSummary = fallbackTexts.reduce<Record<string, unknown> | undefined>(
     (merged, text) => {
-      const metadata = parseProxycastExecutionSummary(text);
+      const metadata = parseLimeExecutionSummary(text);
       if (!metadata) return merged;
       return {
         ...(merged || {}),
@@ -314,8 +314,8 @@ export const normalizeIncomingToolResult = <
 ): T | undefined => {
   if (!result) return undefined;
 
-  const normalizedOutput = extractProxycastToolMetadataBlock(result.output);
-  const normalizedError = extractProxycastToolMetadataBlock(result.error);
+  const normalizedOutput = extractLimeToolMetadataBlock(result.output);
+  const normalizedError = extractLimeToolMetadataBlock(result.error);
 
   return {
     ...result,

@@ -2,7 +2,7 @@
 //!
 //! 统一 provider_id 候选映射和鉴权请求头构建，避免各 handler 规则漂移。
 
-use proxycast_core::database::dao::api_key_provider::{ApiProviderType, ProviderProtocolFamily};
+use lime_core::database::dao::api_key_provider::{ApiProviderType, ProviderProtocolFamily};
 
 /// 收集 API Key Provider ID 候选列表（按优先级）
 ///
@@ -80,7 +80,7 @@ pub(crate) fn build_api_key_headers(
 #[cfg(test)]
 mod tests {
     use super::{build_api_key_headers, collect_api_key_provider_ids};
-    use proxycast_core::database::dao::api_key_provider::ApiProviderType;
+    use lime_core::database::dao::api_key_provider::ApiProviderType;
 
     #[test]
     fn test_collect_api_key_provider_ids_keeps_specific_before_family_fallback() {

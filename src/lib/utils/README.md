@@ -30,7 +30,7 @@
 
 ### Connect 错误处理 (`connectError.ts`)
 
-ProxyCast Connect 功能的错误提示 Toast 通知：
+Lime Connect 功能的错误提示 Toast 通知：
 - `showDeepLinkError` - Deep Link 解析错误提示
 - `showRegistryLoadError` - Registry 加载失败提示（已回退到缓存）
 - `showRegistryNoCacheError` - Registry 不可用错误（无缓存）

@@ -1,6 +1,6 @@
 //! 凭证池桥接模块
 //!
-//! 将 ProxyCast 凭证池与 Aster Provider 系统连接
+//! 将 Lime 凭证池与 Aster Provider 系统连接
 //! 支持从凭证池自动选择凭证并配置 Aster Provider
 //!
 //! ## 功能
@@ -12,14 +12,14 @@
 
 use aster::model::ModelConfig;
 use aster::providers::base::Provider;
-use proxycast_core::database::dao::api_key_provider::ApiProviderType;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::provider_pool_model::{
+use lime_core::database::dao::api_key_provider::ApiProviderType;
+use lime_core::database::DbConnection;
+use lime_core::models::provider_pool_model::{
     CredentialData, PoolProviderType, ProviderCredential,
 };
-use proxycast_core::models::provider_type::is_custom_provider_id;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_core::models::provider_type::is_custom_provider_id;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::provider_pool_service::ProviderPoolService;
 use std::sync::Arc;
 
 /// 凭证桥接错误
@@ -70,7 +70,7 @@ pub struct AsterProviderConfig {
 
 /// 凭证池桥接器
 ///
-/// 负责从 ProxyCast 凭证池选择凭证并转换为 Aster Provider 配置
+/// 负责从 Lime 凭证池选择凭证并转换为 Aster Provider 配置
 pub struct CredentialBridge {
     pool_service: ProviderPoolService,
     api_key_service: ApiKeyProviderService,
@@ -164,7 +164,7 @@ impl CredentialBridge {
         }
     }
 
-    /// 将 ProxyCast 凭证转换为 Aster Provider 配置
+    /// 将 Lime 凭证转换为 Aster Provider 配置
     async fn credential_to_config(
         &self,
         credential: &ProviderCredential,
@@ -291,7 +291,7 @@ impl CredentialBridge {
         _db: &DbConnection,
         _uuid: &str,
     ) -> Result<String, CredentialBridgeError> {
-        use proxycast_providers::providers::KiroProvider;
+        use lime_providers::providers::KiroProvider;
 
         let mut provider = KiroProvider::new();
         provider
@@ -342,7 +342,7 @@ impl CredentialBridge {
 
     /// 获取 Codex OAuth Token
     async fn get_codex_token(&self, creds_path: &str) -> Result<String, CredentialBridgeError> {
-        use proxycast_providers::providers::CodexProvider;
+        use lime_providers::providers::CodexProvider;
 
         let mut provider = CodexProvider::new();
         provider
@@ -541,7 +541,7 @@ fn set_provider_env_vars(config: &AsterProviderConfig) {
 
 /// Provider 类型映射
 ///
-/// 将 ProxyCast PoolProviderType 映射到 Aster Provider 名称
+/// 将 Lime PoolProviderType 映射到 Aster Provider 名称
 pub fn map_pool_type_to_aster(pool_type: &PoolProviderType) -> &'static str {
     match pool_type {
         PoolProviderType::Kiro => "bedrock",

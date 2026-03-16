@@ -245,7 +245,7 @@ pub fn open_input_with_text(app: AppHandle, text: String) -> Result<(), String> 
 /// _需求: 5.1_
 #[tauri::command]
 pub async fn read_image_as_base64(path: String) -> Result<String, String> {
-    proxycast_services::screenshot_image_service::read_image_as_base64(&path).await
+    lime_services::screenshot_image_service::read_image_as_base64(&path).await
 }
 
 /// 截图对话消息结构

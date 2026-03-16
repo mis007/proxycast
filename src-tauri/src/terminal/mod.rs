@@ -1,13 +1,13 @@
 //! 终端模块
 //!
-//! 实际实现位于 `proxycast-terminal` crate。
+//! 实际实现位于 `lime-terminal` crate。
 //! 本模块提供 `TauriEmitter` newtype 桥接 Tauri 与终端 crate。
 
 use std::path::PathBuf;
 
 use tauri::Emitter;
 
-use proxycast_terminal::emitter::TerminalEventEmit;
+use lime_terminal::emitter::TerminalEventEmit;
 
 /// Tauri AppHandle 的 newtype 包装
 ///
@@ -23,7 +23,6 @@ impl TerminalEventEmit for TauriEmitter {
     }
 
     fn app_data_dir(&self) -> Result<PathBuf, String> {
-        proxycast_core::app_paths::preferred_data_dir()
-            .map_err(|e| format!("获取应用数据目录失败: {e}"))
+        lime_core::app_paths::preferred_data_dir().map_err(|e| format!("获取应用数据目录失败: {e}"))
     }
 }

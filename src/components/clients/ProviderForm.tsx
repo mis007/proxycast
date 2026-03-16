@@ -138,8 +138,8 @@ const presets: Record<AppType, ProviderPreset[]> = {
     },
     // 本地代理
     {
-      id: "proxycast",
-      name: "ProxyCast",
+      id: "lime",
+      name: "Lime",
       category: "proxy",
       iconColor: "#3b82f6",
       defaultBaseUrl: "http://127.0.0.1:8999",
@@ -186,12 +186,12 @@ model = "gpt-4o"
     },
     // 本地代理
     {
-      id: "proxycast",
-      name: "ProxyCast",
+      id: "lime",
+      name: "Lime",
       category: "proxy",
       iconColor: "#3b82f6",
       defaultCodexAuth: {
-        api_key: "proxycast",
+        api_key: "lime",
         api_base_url: "http://127.0.0.1:8999/v1",
       },
     },
@@ -222,12 +222,12 @@ model = "gpt-4o"
     },
     // 本地代理
     {
-      id: "proxycast",
-      name: "ProxyCast",
+      id: "lime",
+      name: "Lime",
       category: "proxy",
       iconColor: "#3b82f6",
       defaultGeminiEnv: {
-        GEMINI_API_KEY: "proxycast",
+        GEMINI_API_KEY: "lime",
         GOOGLE_GEMINI_BASE_URL: "http://127.0.0.1:8999",
         GEMINI_MODEL: "gemini-2.0-flash",
       },
@@ -247,7 +247,7 @@ model = "gpt-4o"
       iconColor: "#8b5cf6",
     },
   ],
-  proxycast: [],
+  lime: [],
 };
 
 const categoryLabels: Record<ProviderCategory, string> = {
@@ -555,8 +555,8 @@ export function ProviderForm({
       setName(preset.name);
       setIconColor(preset.iconColor || "#6366f1");
 
-      // ProxyCast 预设：自动从设置中读取 API Key 和端口
-      if (preset.id === "proxycast") {
+      // Lime 预设：自动从设置中读取 API Key 和端口
+      if (preset.id === "lime") {
         try {
           const config = await getConfig();
           const proxyApiKey = config.server.api_key || "";
@@ -587,7 +587,7 @@ export function ProviderForm({
           }
           return;
         } catch (e) {
-          console.error("Failed to load ProxyCast config:", e);
+          console.error("Failed to load Lime config:", e);
         }
       }
 
@@ -674,7 +674,7 @@ export function ProviderForm({
       return;
     }
 
-    // OAuth 类型凭证：使用 ProxyCast 代理
+    // OAuth 类型凭证：使用 Lime 代理
     setIconColor("#3b82f6");
     try {
       const config = await getConfig();

@@ -410,8 +410,7 @@ export function WorkbenchMainContent({
               (selectedContentId && contentCreationModes[selectedContentId]) || undefined
             }
             lockTheme={true}
-            hideHistoryToggle={true}
-            hideTopBar={true}
+            topBarChrome="workspace-compact"
             showChatPanel={showChatPanel}
             hideInlineStepProgress={true}
             onWorkflowProgressChange={onWorkflowProgressChange}

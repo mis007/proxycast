@@ -69,9 +69,9 @@ const mockBrowserProfiles: MockBrowserProfileRecord[] = [
     site_scope: "通用",
     launch_url: "https://www.google.com/",
     transport_kind: "managed_cdp",
-    profile_dir: "/tmp/proxycast/chrome_profiles/general_browser_assist",
+    profile_dir: "/tmp/lime/chrome_profiles/general_browser_assist",
     managed_profile_dir:
-      "/tmp/proxycast/chrome_profiles/general_browser_assist",
+      "/tmp/lime/chrome_profiles/general_browser_assist",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     last_used_at: null,
@@ -193,7 +193,7 @@ function buildMockBrowserSessionLaunchResponse(request: any) {
       browser_source: "system",
       browser_path:
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      profile_dir: `/tmp/proxycast/chrome_profiles/${profileKey}`,
+      profile_dir: `/tmp/lime/chrome_profiles/${profileKey}`,
       remote_debugging_port: 13001,
       pid: 12345,
       devtools_http_url: "http://127.0.0.1:13001/json/version",
@@ -309,7 +309,7 @@ const mockAutomationJobs: AutomationJobRecord[] = [
       success: false,
       message: "写入本地文件失败: permission denied",
       channel: "local_file",
-      target: "/tmp/proxycast/browser-output.json",
+      target: "/tmp/lime/browser-output.json",
       output_kind: "json",
       output_schema: "json",
       output_format: "json",
@@ -658,7 +658,7 @@ const defaultMocks: Record<string, any> = {
   get_windows_startup_diagnostics: () => ({
     platform: "mock-web",
     app_data_dir: null,
-    legacy_proxycast_dir: null,
+    legacy_lime_dir: null,
     db_path: null,
     webview2_version: null,
     current_exe: null,
@@ -683,9 +683,9 @@ const defaultMocks: Record<string, any> = {
   openclaw_get_environment_status: () => ({
     node: {
       status: "ok",
-      version: "22.0.0",
+      version: "22.12.0",
       path: "/opt/homebrew/bin/node",
-      message: "Node.js 已就绪：22.0.0",
+      message: "Node.js 已就绪：22.12.0",
       autoInstallSupported: true,
     },
     git: {
@@ -716,7 +716,7 @@ const defaultMocks: Record<string, any> = {
   }),
   openclaw_check_node_version: () => ({
     status: "ok",
-    version: "22.0.0",
+    version: "22.12.0",
     path: "/opt/homebrew/bin/node",
   }),
   openclaw_check_git_available: () => ({
@@ -959,8 +959,8 @@ const defaultMocks: Record<string, any> = {
     },
   }),
   get_log_storage_diagnostics: () => ({
-    log_directory: "/tmp/proxycast/logs",
-    current_log_path: "/tmp/proxycast/logs/proxycast.log",
+    log_directory: "/tmp/lime/logs",
+    current_log_path: "/tmp/lime/logs/lime.log",
     current_log_exists: true,
     current_log_size_bytes: 1024,
     in_memory_log_count: 0,
@@ -1078,7 +1078,7 @@ const defaultMocks: Record<string, any> = {
       const nextManagedProfileDir =
         nextTransportKind === "existing_session"
           ? null
-          : `/tmp/proxycast/chrome_profiles/${existing.profile_key}`;
+          : `/tmp/lime/chrome_profiles/${existing.profile_key}`;
       const next = {
         ...existing,
         name: request.name ?? existing.name,
@@ -1097,7 +1097,7 @@ const defaultMocks: Record<string, any> = {
     const managedProfileDir =
       transportKind === "existing_session"
         ? null
-        : `/tmp/proxycast/chrome_profiles/${profileKey}`;
+        : `/tmp/lime/chrome_profiles/${profileKey}`;
     const created = {
       id: request.id ?? `browser-profile-${Date.now()}`,
       profile_key: profileKey,
@@ -1185,7 +1185,7 @@ const defaultMocks: Record<string, any> = {
     browser_source: "system",
     browser_path:
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    profile_dir: "/tmp/proxycast/chrome_profiles/search_google",
+    profile_dir: "/tmp/lime/chrome_profiles/search_google",
     remote_debugging_port: 13001,
     pid: 12345,
     devtools_http_url: "http://127.0.0.1:13001/json/version",
@@ -1195,9 +1195,9 @@ const defaultMocks: Record<string, any> = {
     host: "127.0.0.1",
     port: 8999,
     observer_ws_url:
-      "ws://127.0.0.1:8999/proxycast-chrome-observer/Proxycast_Key=proxy_cast",
+      "ws://127.0.0.1:8999/lime-chrome-observer/Lime_Key=proxy_cast",
     control_ws_url:
-      "ws://127.0.0.1:8999/proxycast-chrome-control/Proxycast_Key=proxy_cast",
+      "ws://127.0.0.1:8999/lime-chrome-control/Lime_Key=proxy_cast",
     bridge_key: "proxy_cast",
   }),
   get_chrome_bridge_status: () => ({
@@ -1227,20 +1227,20 @@ const defaultMocks: Record<string, any> = {
     },
   }),
   get_browser_backend_policy: () => ({
-    priority: ["aster_compat", "proxycast_extension_bridge", "cdp_direct"],
+    priority: ["aster_compat", "lime_extension_bridge", "cdp_direct"],
     auto_fallback: true,
   }),
   set_browser_backend_policy: (args: any) => ({
     priority: args?.policy?.priority ?? [
       "aster_compat",
-      "proxycast_extension_bridge",
+      "lime_extension_bridge",
       "cdp_direct",
     ],
     auto_fallback: args?.policy?.auto_fallback ?? true,
   }),
   get_browser_backends_status: () => ({
     policy: {
-      priority: ["aster_compat", "proxycast_extension_bridge", "cdp_direct"],
+      priority: ["aster_compat", "lime_extension_bridge", "cdp_direct"],
       auto_fallback: true,
     },
     bridge_observer_count: 1,
@@ -1261,7 +1261,7 @@ const defaultMocks: Record<string, any> = {
         ],
       },
       {
-        backend: "proxycast_extension_bridge",
+        backend: "lime_extension_bridge",
         available: true,
         capabilities: [
           "open_url",
@@ -1575,7 +1575,7 @@ const defaultMocks: Record<string, any> = {
   get_skill_repos: () => [],
   add_skill_repo: () => ({ success: true }),
   remove_skill_repo: () => ({ success: true }),
-  get_installed_proxycast_skills: () => [],
+  get_installed_lime_skills: () => [],
   inspect_local_skill_for_app: () => ({
     content: "# Mock Skill",
     metadata: {},
@@ -2034,7 +2034,7 @@ const defaultMocks: Record<string, any> = {
   get_logs: () => [],
   get_persisted_logs_tail: () => [],
   export_support_bundle: () => ({
-    bundle_path: "mock://ProxyCast-Support.zip",
+    bundle_path: "mock://Lime-Support.zip",
     output_directory: "mock://",
     generated_at: new Date().toISOString(),
     platform: "mock-web",
@@ -2051,13 +2051,13 @@ const defaultMocks: Record<string, any> = {
     body: "",
     time_ms: 0,
     response_headers: {
-      "x-proxycast-request-id": "mock-request-id",
-      "x-proxycast-cache": "store",
-      "x-proxycast-dedup": "new",
-      "x-proxycast-idempotency": "new",
-      "x-proxycast-requested-provider": "openai",
-      "x-proxycast-effective-provider": "openai",
-      "x-proxycast-model": "gpt-4o-mini",
+      "x-lime-request-id": "mock-request-id",
+      "x-lime-cache": "store",
+      "x-lime-dedup": "new",
+      "x-lime-idempotency": "new",
+      "x-lime-requested-provider": "openai",
+      "x-lime-effective-provider": "openai",
+      "x-lime-model": "gpt-4o-mini",
     },
   }),
 
@@ -2412,7 +2412,7 @@ const defaultMocks: Record<string, any> = {
       id: "workspace-default",
       name: "默认工作区",
       workspace_type: "general",
-      root_path: "/tmp/proxycast/workspaces/default",
+      root_path: "/tmp/lime/workspaces/default",
       is_default: true,
       is_favorite: true,
       is_archived: false,

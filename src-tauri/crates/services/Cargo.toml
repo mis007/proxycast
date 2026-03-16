@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-services"
+name = "lime-services"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,8 +11,8 @@ local-whisper = ["voice-core/local-whisper"]
 
 [dependencies]
 # 项目内 crate
-proxycast-core.workspace = true
-proxycast-providers.workspace = true
+lime-core.workspace = true
+lime-providers.workspace = true
 voice-core.workspace = true
 
 # 序列化

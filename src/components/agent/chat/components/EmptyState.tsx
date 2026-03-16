@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import styled, { keyframes, css } from "styled-components";
 import {
   Lightbulb,
   ImageIcon,
@@ -33,6 +32,16 @@ import {
 import { EmptyStateComposerPanel } from "./EmptyStateComposerPanel";
 import { EmptyStateHero } from "./EmptyStateHero";
 import { EmptyStateQuickActions } from "./EmptyStateQuickActions";
+import {
+  EMPTY_STATE_BACKGROUND_ORB_LEFT_CLASSNAME,
+  EMPTY_STATE_BACKGROUND_ORB_RIGHT_CLASSNAME,
+  EMPTY_STATE_CONTENT_WRAPPER_CLASSNAME,
+  EMPTY_STATE_PAGE_CONTAINER_CLASSNAME,
+  EMPTY_STATE_SECONDARY_ACTION_BUTTON_CLASSNAME,
+  EMPTY_STATE_THEME_TABS_CONTAINER_CLASSNAME,
+  getEmptyStateThemeTabClassName,
+  getEmptyStateThemeTabIconClassName,
+} from "./emptyStateSurfaceTokens";
 import { useActiveSkill } from "./Inputbar/hooks/useActiveSkill";
 import type { Character } from "@/lib/api/memory";
 import type { Skill } from "@/lib/api/skills";
@@ -46,145 +55,6 @@ import capabilityAgentTeamsPlaceholder from "@/assets/claw-home/capability-agent
 import capabilityBrowserAssistPlaceholder from "@/assets/claw-home/capability-browser-assist-placeholder.svg";
 
 const SOCIAL_ARTICLE_SKILL_KEY = "social_post_with_cover";
-
-// --- Animations ---
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-// --- Styled Components ---
-
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  flex: 1;
-  padding: clamp(8px, 1.2vw, 14px) 14px 20px;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background) / 0.72) 0%,
-    hsl(var(--background) / 0.92) 16%,
-    hsl(var(--muted) / 0.24) 100%
-  );
-  overflow-y: auto;
-  position: relative;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: -18%;
-    left: 8%;
-    width: 640px;
-    height: 640px;
-    background: radial-gradient(
-      circle,
-      hsl(var(--primary) / 0.055) 0%,
-      transparent 70%
-    );
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  &::after {
-    content: "";
-    position: absolute;
-    right: -12%;
-    top: 14%;
-    width: 520px;
-    height: 520px;
-    background: radial-gradient(
-      circle,
-      hsl(199 89% 72% / 0.06) 0%,
-      transparent 72%
-    );
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-  }
-`;
-
-const ContentWrapper = styled.div`
-  max-width: 1120px;
-  width: 100%;
-  margin: 0 auto;
-  padding-top: 2px;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  animation: ${fadeIn} 0.5s ease-out;
-`;
-
-// --- Custom Tabs ---
-const TabsContainer = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  gap: 6px;
-  padding: 5px;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background) / 0.8) 0%,
-    hsl(var(--muted) / 0.24) 100%
-  );
-  backdrop-filter: blur(10px);
-  border-radius: 18px;
-  border: 1px solid hsl(var(--border) / 0.58);
-  box-shadow: 0 8px 20px -18px rgba(0, 0, 0, 0.12);
-  overflow-x: auto;
-  overflow-y: hidden;
-  width: min(100%, 780px);
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-
-  @media (min-width: 768px) {
-    justify-content: center;
-  }
-`;
-
-const TabItem = styled.button<{ $active?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-  white-space: nowrap;
-  flex: 0 0 auto;
-
-  ${(props) =>
-    props.$active
-      ? css`
-          background-color: hsl(var(--background) / 0.94);
-          border-color: hsl(var(--border) / 0.72);
-          color: hsl(var(--foreground));
-          box-shadow: 0 10px 20px -18px rgba(0, 0, 0, 0.2);
-        `
-      : css`
-          color: hsl(var(--muted-foreground));
-          &:hover {
-            background-color: hsl(var(--background) / 0.72);
-            border-color: hsl(var(--border) / 0.5);
-            color: hsl(var(--foreground));
-          }
-        `}
-`;
 
 interface EmptyStateProps {
   input: string;
@@ -310,62 +180,52 @@ const THEME_WORKBENCH_COPY: Record<
   {
     title: string;
     description: string;
-    outputLabel: string;
   }
 > = {
   general: {
     title: "Claw 工作台",
     description:
       "围绕一个目标持续对话、检索网页、补充素材，并把结果沉淀到右侧画布，而不是只发一条一次性提问。",
-    outputLabel: "方案 / 摘要 / TODO",
   },
   "social-media": {
     title: "社媒内容工作台",
     description:
       "把选题、平台适配、正文生成和后续改写放在同一条会话里，减少来回切页和重复输入。",
-    outputLabel: "标题 / 结构 / 成稿",
   },
   poster: {
     title: "视觉海报工作台",
     description:
       "在同一个创作面板里统一管理构图要求、风格偏好和素材补充，适合持续迭代视觉方向。",
-    outputLabel: "画面描述 / 风格指令",
   },
   video: {
     title: "短视频脚本工作台",
     description:
       "围绕一个视频目标持续生成钩子、分镜、口播和封面文案，让脚本迭代留在上下文里。",
-    outputLabel: "钩子 / 分镜 / 口播",
   },
   music: {
     title: "音乐创作工作台",
     description:
       "将主题、情绪、旋律方向与歌词草案组织在同一个空间里，更适合反复推敲表达。",
-    outputLabel: "歌词 / 情绪 / 节奏",
   },
   novel: {
     title: "小说创作工作台",
     description:
       "让世界观、人物设定、章节推进和重写请求持续留在一个会话内，适合长线创作。",
-    outputLabel: "设定 / 章节 / 重写",
   },
   document: {
     title: "办公文档工作台",
     description:
       "把会议纪要、汇报提纲、邮件草稿与正式文稿组织在一起，便于后续继续补充和润色。",
-    outputLabel: "纪要 / 提纲 / 邮件",
   },
   knowledge: {
     title: "知识探索工作台",
     description:
       "把搜索、阅读、提炼、总结和观点整理放在一个持续上下文中，降低研究过程中的信息丢失。",
-    outputLabel: "检索 / 摘要 / 结论",
   },
   planning: {
     title: "规划拆解工作台",
     description:
       "围绕目标持续拆分计划、整理约束和产出行动清单，让方案迭代更像项目推进而不是单轮问答。",
-    outputLabel: "路线 / 风险 / 清单",
   },
 };
 
@@ -729,26 +589,26 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   };
 
   const themeTabs = showThemeTabs ? (
-    <TabsContainer>
+    <div className={EMPTY_STATE_THEME_TABS_CONTAINER_CLASSNAME}>
       {categories.map((cat) => (
-        <TabItem
+        <button
           key={cat.id}
-          $active={activeTheme === cat.id}
+          type="button"
+          className={getEmptyStateThemeTabClassName(activeTheme === cat.id)}
+          aria-pressed={activeTheme === cat.id}
           onClick={() => handleThemeChange(cat.id)}
         >
           <span
-            className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
-              activeTheme === cat.id
-                ? "border-slate-200 bg-white text-slate-700"
-                : "border-transparent bg-transparent text-slate-400"
-            }`}
+            className={getEmptyStateThemeTabIconClassName(
+              activeTheme === cat.id,
+            )}
           >
             {cat.icon}
           </span>
           {cat.label}
-        </TabItem>
+        </button>
       ))}
-    </TabsContainer>
+    </div>
   ) : null;
 
   const workspaceBadges = useMemo(() => {
@@ -900,7 +760,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           variant="outline"
           onClick={() => void onLaunchBrowserAssist()}
           disabled={browserAssistLoading}
-          className="h-8 w-full rounded-full border-slate-200/80 bg-white/88 text-xs text-slate-700 shadow-none transition-colors hover:border-slate-300 hover:bg-white"
+          className={EMPTY_STATE_SECONDARY_ACTION_BUTTON_CLASSNAME}
         >
           <Globe className="mr-2 h-4 w-4" />
           {browserAssistLoading ? "启动中..." : "打开浏览器协助"}
@@ -1129,8 +989,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   );
 
   return (
-    <Container>
-      <ContentWrapper>
+    <div className={EMPTY_STATE_PAGE_CONTAINER_CLASSNAME}>
+      <div className={EMPTY_STATE_BACKGROUND_ORB_LEFT_CLASSNAME} />
+      <div className={EMPTY_STATE_BACKGROUND_ORB_RIGHT_CLASSNAME} />
+      <div className={EMPTY_STATE_CONTENT_WRAPPER_CLASSNAME}>
         <EmptyStateHero
           eyebrow="CLAW WORKSPACE"
           title={workbenchCopy.title}
@@ -1142,7 +1004,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           supportingSlot={quickActionsPanel}
           themeTabs={themeTabs}
         />
-      </ContentWrapper>
-    </Container>
+      </div>
+    </div>
   );
 };

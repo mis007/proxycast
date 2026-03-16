@@ -1,6 +1,6 @@
 //! 网关统一错误模型
 //!
-//! 为 ProxyCast 网关层提供稳定的错误语义，便于客户端统一处理。
+//! 为 Lime 网关层提供稳定的错误语义，便于客户端统一处理。
 
 use serde::{Deserialize, Serialize};
 

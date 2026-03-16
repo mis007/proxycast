@@ -412,7 +412,7 @@ mod tests {
             plugin_type: PluginType::Script,
             config_schema: None,
             hooks: vec![],
-            min_proxycast_version: None,
+            min_lime_version: None,
             binary: None,
             ui: None,
         }
@@ -958,7 +958,7 @@ mod property_tests {
                 plugin_type: PluginType::Script,
                 config_schema: None,
                 hooks: vec![],
-                min_proxycast_version: None,
+                min_lime_version: None,
                 binary: None,
                 ui: None,
             };

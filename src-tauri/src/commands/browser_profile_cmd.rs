@@ -7,8 +7,8 @@ use crate::services::browser_profile_service::{
     archive_browser_profile, list_browser_profiles, restore_browser_profile, save_browser_profile,
     SaveBrowserProfileInput,
 };
-use proxycast_browser_runtime::BrowserStreamMode;
-use proxycast_core::database::dao::browser_profile::{
+use lime_browser_runtime::BrowserStreamMode;
+use lime_core::database::dao::browser_profile::{
     BrowserProfileRecord, BrowserProfileTransportKind,
 };
 use serde::Deserialize;

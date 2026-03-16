@@ -6,8 +6,8 @@ use super::{
     LogRotationConfig, RequestLog, RequestLogger, RequestStatus, StatsAggregator, TimeRange,
 };
 use chrono::{Duration, Utc};
+use lime_core::ProviderType;
 use proptest::prelude::*;
-use proxycast_core::ProviderType;
 use std::collections::HashSet;
 
 /// 生成随机的 ProviderType

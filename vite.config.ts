@@ -20,10 +20,12 @@ if (!process.env.VITE_APP_VERSION && cargoWorkspaceVersion) {
 const tauriMockDir = path.resolve(__dirname, "./src/lib/tauri-mock");
 
 export default defineConfig(({ mode }) => {
+  const browserBridgeFlag =
+    process.env.LIME_BROWSER_BRIDGE ?? process.env.PROXYCAST_BROWSER_BRIDGE;
   // 检查是否在 Tauri 环境中运行（通过环境变量判断）
   const isTauri =
     process.env.TAURI_ENV_PLATFORM !== undefined &&
-    process.env.PROXYCAST_BROWSER_BRIDGE !== "1";
+    browserBridgeFlag !== "1";
   // 避免 Tauri/非 Tauri 共享同一份 optimize deps 缓存导致 chunk 丢失
   const cacheDir = isTauri ? "node_modules/.vite-tauri" : "node_modules/.vite-web";
   

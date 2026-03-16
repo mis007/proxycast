@@ -19,7 +19,7 @@ pub struct SessionFileStorage {
 impl SessionFileStorage {
     /// 创建新的存储服务
     ///
-    /// 默认使用应用数据目录下的 `proxycast/sessions`，并兼容旧 Home 历史目录
+    /// 默认使用应用数据目录下的 `lime/sessions`，并兼容旧 Home 历史目录
     pub fn new() -> Result<Self, String> {
         let base_dir = Self::get_default_base_dir()?;
         fs::create_dir_all(&base_dir).map_err(|e| format!("创建会话存储目录失败: {e}"))?;

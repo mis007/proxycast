@@ -15,7 +15,7 @@ use tauri::State;
 
 use crate::database::DbConnection;
 use crate::models::project_model::{CreateTemplateRequest, Template, TemplateUpdate};
-use proxycast_services::template_service::TemplateService;
+use lime_services::template_service::TemplateService;
 
 // ============================================================================
 // Tauri 命令

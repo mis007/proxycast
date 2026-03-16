@@ -3,7 +3,7 @@
 //! 定义请求日志、统计数据等核心类型
 
 use chrono::{DateTime, Utc};
-use proxycast_core::ProviderType;
+use lime_core::ProviderType;
 use serde::{Deserialize, Serialize};
 
 /// 请求状态

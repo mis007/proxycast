@@ -9,8 +9,8 @@ use crate::models::provider_pool_model::{
     PoolProviderType, ProviderCredential, ProviderPoolOverview, UpdateCredentialRequest,
 };
 use chrono::Utc;
-use proxycast_credential::CredentialSyncService;
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_credential::CredentialSyncService;
+use lime_services::provider_pool_service::ProviderPoolService;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -36,7 +36,7 @@ fn expand_tilde(path: &str) -> String {
 fn get_credentials_dir() -> Result<PathBuf, String> {
     let app_data_dir = dirs::data_dir()
         .ok_or_else(|| "无法获取应用数据目录".to_string())?
-        .join("proxycast")
+        .join("lime")
         .join("credentials");
 
     // 确保目录存在
@@ -1102,9 +1102,7 @@ pub async fn test_user_credentials() -> Result<String, String> {
     // 测试用户上传的凭证文件路径
     let user_creds_path = dirs::home_dir()
         .ok_or("无法获取用户主目录".to_string())?
-        .join(
-            "Library/Application Support/proxycast/credentials/kiro_d8da9d58_1765757992_kiro.json",
-        );
+        .join("Library/Application Support/lime/credentials/kiro_d8da9d58_1765757992_kiro.json");
 
     // P0 安全修复：不输出完整路径，仅显示文件是否存在
     result.push_str("📂 检查用户凭证文件...\n");
@@ -1993,7 +1991,7 @@ pub async fn start_kiro_builder_id_login(
     let client = reqwest::Client::new();
 
     let reg_body = serde_json::json!({
-        "clientName": "ProxyCast Kiro Manager",
+        "clientName": "Lime Kiro Manager",
         "clientType": "public",
         "scopes": scopes,
         "grantTypes": ["urn:ietf:params:oauth:grant-type:device_code", "refresh_token"],
@@ -2891,7 +2889,7 @@ pub async fn install_playwright(app: tauri::AppHandle) -> Result<PlaywrightStatu
         // 生产模式：应用数据目录
         dirs::data_dir()
             .unwrap_or_default()
-            .join("proxycast")
+            .join("lime")
             .join("scripts")
             .join("playwright-login"),
         // 当前工作目录
@@ -3210,7 +3208,7 @@ fn get_playwright_script_path() -> PathBuf {
     // 生产模式下使用打包的资源
     if let Some(data_dir) = dirs::data_dir() {
         let prod_path = data_dir
-            .join("proxycast")
+            .join("lime")
             .join("scripts")
             .join("playwright-login")
             .join("index.js");
@@ -3852,7 +3850,7 @@ pub async fn get_credential_health(
     db: State<'_, DbConnection>,
     pool_service: State<'_, ProviderPoolServiceState>,
     uuid: String,
-) -> Result<Option<proxycast_services::provider_pool_service::CredentialHealthInfo>, String> {
+) -> Result<Option<lime_services::provider_pool_service::CredentialHealthInfo>, String> {
     pool_service.0.get_credential_health(&db, &uuid)
 }
 
@@ -3862,6 +3860,6 @@ pub async fn get_credential_health(
 pub async fn get_all_credential_health(
     db: State<'_, DbConnection>,
     pool_service: State<'_, ProviderPoolServiceState>,
-) -> Result<Vec<proxycast_services::provider_pool_service::CredentialHealthInfo>, String> {
+) -> Result<Vec<lime_services::provider_pool_service::CredentialHealthInfo>, String> {
     pool_service.0.get_all_credential_health(&db)
 }

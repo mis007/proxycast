@@ -66,7 +66,7 @@ const PROFILE_TRANSPORT_OPTIONS: Array<{
     value: "managed_cdp",
     label: "托管浏览器",
     description:
-      "由 ProxyCast 启动并管理独立 Chrome 资料，兼容当前实时会话链路。",
+      "由 Lime 启动并管理独立 Chrome 资料，兼容当前实时会话链路。",
   },
   {
     value: "existing_session",
@@ -424,7 +424,7 @@ export function BrowserProfileManager(props: BrowserProfileManagerProps) {
         <span className="ml-1">
           {bridgeConnectionCount > 0
             ? `已检测到 ${bridgeConnectionCount} 个当前 Chrome 连接，可直接用于发文、填表和已登录页面操作。`
-            : "请先在当前 Chrome 安装并连接 Proxycast Browser Bridge；如需立即使用代理、时区、语言、UA 或视口配置，请改用托管浏览器模式。"}
+            : "请先在当前 Chrome 安装并连接 Lime Browser Bridge；如需立即使用代理、时区、语言、UA 或视口配置，请改用托管浏览器模式。"}
         </span>
       </div>
 
@@ -512,7 +512,7 @@ export function BrowserProfileManager(props: BrowserProfileManagerProps) {
               (option) => option.value === form.transport_kind,
             )?.description ?? ""}
             {form.transport_kind === "existing_session"
-              ? " 当前版本先通过 Proxycast Browser Bridge 扩展接入可见页面，适合发文、填表和切换标签页。"
+              ? " 当前版本先通过 Lime Browser Bridge 扩展接入可见页面，适合发文、填表和切换标签页。"
               : ""}
           </div>
           {form.transport_kind === "existing_session" &&

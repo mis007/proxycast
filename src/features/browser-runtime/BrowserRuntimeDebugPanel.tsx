@@ -487,7 +487,7 @@ export function BrowserRuntimeDebugPanel(props: BrowserRuntimeDebugPanelProps) {
       <div className={`space-y-2 overflow-auto text-xs ${maxHeightClass}`}>
         {!attachObserver ? (
           <div className="text-muted-foreground">
-            未检测到当前 Chrome 的桥接 observer，请先连接 Proxycast Browser
+            未检测到当前 Chrome 的桥接 observer，请先连接 Lime Browser
             Bridge。
           </div>
         ) : attachTabs.length === 0 ? (

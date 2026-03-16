@@ -3,7 +3,7 @@
 //! 将设置页中的网络搜索引擎偏好转换为统一提示词，
 //! 并注入到系统提示词中，确保所有对话入口行为一致。
 
-use proxycast_core::config::{Config, SearchEngine, WebSearchProvider};
+use lime_core::config::{Config, SearchEngine, WebSearchProvider};
 
 const WEB_SEARCH_PROMPT_MARKER: &str = "【网络搜索偏好】";
 

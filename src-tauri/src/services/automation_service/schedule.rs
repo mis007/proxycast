@@ -3,7 +3,7 @@
 //! 支持 `every`、`cron`、`at` 三种调度类型。
 
 use chrono::{DateTime, Utc};
-use proxycast_core::config::TaskSchedule;
+use lime_core::config::TaskSchedule;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]

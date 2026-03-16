@@ -602,7 +602,7 @@ function GatewayTunnelPanel({
             onChange={(event) =>
               patchCloudflare({ tunnel_name: event.target.value || undefined })
             }
-            placeholder="proxycast-gateway"
+            placeholder="lime-gateway"
             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           />
         </label>

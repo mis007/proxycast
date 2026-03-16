@@ -54,7 +54,7 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/\bsk-[A-Za-z0-9]{12,}\b/g, "sk-***"],
 ];
 
-const FRONTEND_CRASH_BUFFER_KEY = "proxycast_frontend_crash_buffer_v1";
+const FRONTEND_CRASH_BUFFER_KEY = "lime_frontend_crash_buffer_v1";
 const FRONTEND_CRASH_BUFFER_LIMIT = 80;
 
 const DEFAULT_CRASH_REPORTING_CONFIG: ResolvedCrashReportingConfig = {

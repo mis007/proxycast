@@ -1,5 +1,5 @@
 /**
- * @file ProxyCast Plugin UI 类型定义
+ * @file Lime Plugin UI 类型定义
  * @description 基于 A2UI 设计理念的声明式插件 UI 系统类型
  * @module lib/plugin-ui/types
  */

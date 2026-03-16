@@ -19,18 +19,18 @@ use crate::config::{GlobalConfigManager, GlobalConfigManagerState};
 use crate::database;
 use crate::plugin;
 use crate::telemetry;
-use proxycast_core::config::{Config, ConfigManager};
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::content_creator::{ProgressStore, WorkflowService};
-use proxycast_services::context_memory_service::{ContextMemoryConfig, ContextMemoryService};
-use proxycast_services::provider_pool_service::ProviderPoolService;
-use proxycast_services::skill_service::SkillService;
-use proxycast_services::token_cache_service::TokenCacheService;
-use proxycast_services::tool_hooks_service::ToolHooksService;
+use lime_core::config::{Config, ConfigManager};
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::content_creator::{ProgressStore, WorkflowService};
+use lime_services::context_memory_service::{ContextMemoryConfig, ContextMemoryService};
+use lime_services::provider_pool_service::ProviderPoolService;
+use lime_services::skill_service::SkillService;
+use lime_services::token_cache_service::TokenCacheService;
+use lime_services::tool_hooks_service::ToolHooksService;
 
 use super::types::{AppState, LogState, TokenCacheServiceState};
 use crate::logger;
-use proxycast_server as server;
+use lime_server as server;
 
 /// 初始化核心应用状态
 pub fn init_core_state(config: Config) -> (AppState, LogState) {
@@ -89,7 +89,7 @@ pub fn init_service_states() -> ServiceStates {
     let token_cache_service_state = TokenCacheServiceState(Arc::new(token_cache_service));
 
     // Initialize MachineIdService
-    let machine_id_service = proxycast_services::machine_id_service::MachineIdService::new()
+    let machine_id_service = lime_services::machine_id_service::MachineIdService::new()
         .expect("Failed to initialize MachineIdService");
     let machine_id_service_state: MachineIdState = Arc::new(RwLock::new(machine_id_service));
 
@@ -107,7 +107,7 @@ pub fn init_service_states() -> ServiceStates {
     let orchestrator_state = OrchestratorState::new();
 
     // Initialize ContextMemoryService
-    let app_config = proxycast_core::config::load_config().unwrap_or_default();
+    let app_config = lime_core::config::load_config().unwrap_or_default();
     let context_memory_config = build_context_memory_config(&app_config);
     let context_memory_service = ContextMemoryService::new(context_memory_config)
         .expect("Failed to initialize ContextMemoryService");
@@ -168,9 +168,9 @@ fn init_plugin_installer() -> PluginInstallerState {
     let db_path = database::get_db_path().expect("Failed to get database path for PluginInstaller");
     let plugins_dir = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("plugins");
-    let temp_dir = std::env::temp_dir().join("proxycast_plugin_install");
+    let temp_dir = std::env::temp_dir().join("lime_plugin_install");
 
     // 创建目录（如果不存在）
     if let Err(e) = std::fs::create_dir_all(&plugins_dir) {
@@ -188,8 +188,8 @@ fn init_plugin_installer() -> PluginInstallerState {
         Err(e) => {
             tracing::error!("[启动] 插件安装器初始化失败: {}", e);
             // 创建一个默认的安装器（使用临时目录）
-            let fallback_plugins_dir = std::env::temp_dir().join("proxycast_plugins_fallback");
-            let fallback_temp_dir = std::env::temp_dir().join("proxycast_plugin_install_fallback");
+            let fallback_plugins_dir = std::env::temp_dir().join("lime_plugins_fallback");
+            let fallback_temp_dir = std::env::temp_dir().join("lime_plugin_install_fallback");
             let _ = std::fs::create_dir_all(&fallback_plugins_dir);
             let _ = std::fs::create_dir_all(&fallback_temp_dir);
             let installer = plugin::installer::PluginInstaller::from_paths(

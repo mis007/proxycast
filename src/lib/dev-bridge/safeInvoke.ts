@@ -36,9 +36,9 @@ export interface InvokeTraceBufferEntry {
   args_preview?: Record<string, unknown>;
 }
 
-const INVOKE_ERROR_BUFFER_KEY = "proxycast_invoke_error_buffer_v1";
+const INVOKE_ERROR_BUFFER_KEY = "lime_invoke_error_buffer_v1";
 const INVOKE_ERROR_BUFFER_LIMIT = 120;
-const INVOKE_TRACE_BUFFER_KEY = "proxycast_invoke_trace_buffer_v1";
+const INVOKE_TRACE_BUFFER_KEY = "lime_invoke_trace_buffer_v1";
 const INVOKE_TRACE_BUFFER_LIMIT = 240;
 const INVOKE_ERROR_TEXT_LIMIT = 800;
 

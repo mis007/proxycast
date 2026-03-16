@@ -2,8 +2,8 @@ use super::{apply_terminal_job_state, build_browser_session_run_metadata, set_ac
 use crate::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
 use crate::database::DbConnection;
 use chrono::Utc;
-use proxycast_browser_runtime::{BrowserSessionLifecycleState, CdpSessionState};
-use proxycast_core::database::dao::automation_job::{AutomationJob, AutomationJobDao};
+use lime_browser_runtime::{BrowserSessionLifecycleState, CdpSessionState};
+use lime_core::database::dao::automation_job::{AutomationJob, AutomationJobDao};
 use rusqlite::Connection;
 
 enum BrowserSessionSyncDisposition {
@@ -205,9 +205,9 @@ fn finish_browser_session_run(
 mod tests {
     use super::*;
     use crate::database::schema::create_tables;
-    use proxycast_browser_runtime::{BrowserControlMode, BrowserTransportKind};
-    use proxycast_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
-    use proxycast_core::database::dao::agent_run::AgentRun;
+    use lime_browser_runtime::{BrowserControlMode, BrowserTransportKind};
+    use lime_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
+    use lime_core::database::dao::agent_run::AgentRun;
     use rusqlite::Connection;
     use serde_json::json;
     use std::sync::{Arc, Mutex};

@@ -2,7 +2,7 @@
 
 ## 集成状态 ✅
 
-ProxyCast 已完整集成 aster-rust 框架，包括凭证池桥接。
+Lime 已完整集成 aster-rust 框架，包括凭证池桥接。
 
 **后端模块** (`src-tauri/src/agent/`):
 
@@ -49,7 +49,7 @@ ProxyCast 已完整集成 aster-rust 框架，包括凭证池桥接。
 │         │                │                                      │
 │         ▼                ▼                                      │
 │  ┌─────────────────────────────────────┐                        │
-│  │     ProxyCast 凭证池                 │                        │
+│  │     Lime 凭证池                 │                        │
 │  │  - ProviderPoolService              │                        │
 │  │  - ApiKeyProviderService            │                        │
 │  └─────────────────────────────────────┘                        │
@@ -69,7 +69,7 @@ ProxyCast 已完整集成 aster-rust 框架，包括凭证池桥接。
 
 ### 支持的凭证类型映射
 
-| ProxyCast 凭证类型         | Aster Provider |
+| Lime 凭证类型         | Aster Provider |
 | -------------------------- | -------------- |
 | OpenAIKey                  | openai         |
 | ClaudeKey / AnthropicKey   | anthropic      |

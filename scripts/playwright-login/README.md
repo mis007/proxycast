@@ -1,6 +1,6 @@
 # Playwright Login Sidecar
 
-ProxyCast 的 Playwright 指纹浏览器登录 Sidecar 脚本。
+Lime 的 Playwright 指纹浏览器登录 Sidecar 脚本。
 
 ## 文件索引
 

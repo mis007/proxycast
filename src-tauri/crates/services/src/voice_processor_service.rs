@@ -2,7 +2,7 @@
 //!
 //! 提供语音识别文本的 Prompt 套用与 LLM 润色能力。
 
-use proxycast_core::config::VoiceInstruction;
+use lime_core::config::VoiceInstruction;
 
 /// 处理文本（应用指令模板）
 pub fn process_text(text: &str, instruction: &VoiceInstruction) -> String {
@@ -32,7 +32,7 @@ async fn call_local_llm(
     model: Option<&str>,
     instruction_id: &str,
 ) -> Result<String, String> {
-    use proxycast_core::config::load_config;
+    use lime_core::config::load_config;
 
     let config = load_config().map_err(|e| e.to_string())?;
     let base_url = format!("http://{}:{}", config.server.host, config.server.port);

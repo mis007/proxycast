@@ -1,6 +1,6 @@
 # Workspace 模块
 
-Workspace 是 ProxyCast 应用层的概念，用于组织和管理 AI Agent 的工作上下文。
+Workspace 是 Lime 应用层的概念，用于组织和管理 AI Agent 的工作上下文。
 
 ## 概述
 

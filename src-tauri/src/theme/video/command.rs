@@ -6,8 +6,8 @@ use tauri::State;
 
 use crate::commands::api_key_provider_cmd::ApiKeyProviderServiceState;
 use crate::database::DbConnection;
-use proxycast_core::database::dao::video_generation_task_dao::VideoGenerationTask;
-use proxycast_services::video_generation_service::{
+use lime_core::database::dao::video_generation_task_dao::VideoGenerationTask;
+use lime_services::video_generation_service::{
     CreateVideoGenerationRequest, VideoGenerationService,
 };
 

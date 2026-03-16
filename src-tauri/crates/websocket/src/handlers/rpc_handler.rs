@@ -4,9 +4,9 @@
 
 use super::super::{protocol::*, WsError};
 use chrono::{DateTime, Timelike, Utc};
-use proxycast_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
-use proxycast_core::database::dao::chat::{ChatDao, ChatMessage, ChatMode, ChatSession};
-use proxycast_scheduler::{
+use lime_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
+use lime_core::database::dao::chat::{ChatDao, ChatMessage, ChatMode, ChatSession};
+use lime_scheduler::{
     AgentExecutor, AgentScheduler, ScheduledTask, SchedulerDao, TaskExecutor, TaskFilter,
     DEFAULT_TASK_COOLDOWN_SECS, DEFAULT_TASK_FAILURE_THRESHOLD,
 };
@@ -28,11 +28,11 @@ const DEFAULT_FAILED_24H_ALERT_THRESHOLD: usize = 5;
 #[derive(Clone)]
 pub struct RpcHandlerState {
     /// 数据库连接
-    pub db: Arc<RwLock<Option<proxycast_core::database::DbConnection>>>,
+    pub db: Arc<RwLock<Option<lime_core::database::DbConnection>>>,
     /// Agent 调度器（可选）
-    pub scheduler: Arc<RwLock<Option<proxycast_agent::ProxyCastScheduler>>>,
+    pub scheduler: Arc<RwLock<Option<lime_agent::LimeScheduler>>>,
     /// 日志存储
-    pub logs: Arc<RwLock<proxycast_core::LogStore>>,
+    pub logs: Arc<RwLock<lime_core::LogStore>>,
     /// 活跃运行任务（支持 agent.stop）
     pub active_runs: Arc<RwLock<HashMap<String, tokio::task::JoinHandle<()>>>>,
 }
@@ -40,9 +40,9 @@ pub struct RpcHandlerState {
 impl RpcHandlerState {
     /// 创建新的 RPC 处理器状态
     pub fn new(
-        db: Option<proxycast_core::database::DbConnection>,
-        scheduler: Option<proxycast_agent::ProxyCastScheduler>,
-        logs: Arc<RwLock<proxycast_core::LogStore>>,
+        db: Option<lime_core::database::DbConnection>,
+        scheduler: Option<lime_agent::LimeScheduler>,
+        logs: Arc<RwLock<lime_core::LogStore>>,
     ) -> Self {
         Self {
             db: Arc::new(RwLock::new(db)),
@@ -360,7 +360,7 @@ impl RpcHandler {
             .require_db()
             .await
             .map_err(|e| RpcError::internal_error(e.message))?;
-        let conn = proxycast_core::database::lock_db(&db)
+        let conn = lime_core::database::lock_db(&db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         let raw_sessions = ChatDao::list_sessions(&conn, Some(ChatMode::Agent))
             .map_err(|e| RpcError::internal_error(format!("load sessions failed: {e}")))?;
@@ -398,7 +398,7 @@ impl RpcHandler {
             .require_db()
             .await
             .map_err(|e| RpcError::internal_error(e.message))?;
-        let conn = proxycast_core::database::lock_db(&db)
+        let conn = lime_core::database::lock_db(&db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         let detail = ChatDao::get_session_detail(&conn, &params.session_id, None)
             .map_err(|e| RpcError::internal_error(format!("load session detail failed: {e}")))?;
@@ -429,7 +429,7 @@ impl RpcHandler {
             .map_err(|e| RpcError::internal_error(e.message))?;
         AgentScheduler::init_tables(&db)
             .map_err(|e| RpcError::internal_error(format!("init cron tables failed: {e}")))?;
-        let conn = proxycast_core::database::lock_db(&db)
+        let conn = lime_core::database::lock_db(&db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         let raw_tasks = SchedulerDao::list_tasks(
             &conn,
@@ -443,9 +443,9 @@ impl RpcHandler {
         let tasks: Vec<CronTaskInfo> = raw_tasks
             .into_iter()
             .map(|item| {
-                let enabled = item.status != proxycast_scheduler::TaskStatus::Cancelled
-                    && !item.is_in_cooldown();
-                let next_run = if item.status == proxycast_scheduler::TaskStatus::Pending {
+                let enabled =
+                    item.status != lime_scheduler::TaskStatus::Cancelled && !item.is_in_cooldown();
+                let next_run = if item.status == lime_scheduler::TaskStatus::Pending {
                     Some(item.scheduled_at.clone())
                 } else {
                     None
@@ -484,7 +484,7 @@ impl RpcHandler {
             .map_err(|e| RpcError::internal_error(format!("init cron tables failed: {e}")))?;
         let execution_id = Uuid::new_v4().to_string();
         let task = {
-            let conn = proxycast_core::database::lock_db(&db)
+            let conn = lime_core::database::lock_db(&db)
                 .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
             SchedulerDao::get_task(&conn, &params.task_id)
                 .map_err(|e| RpcError::internal_error(format!("load task failed: {e}")))?
@@ -623,7 +623,7 @@ impl RpcHandler {
             .map_err(|e| RpcError::internal_error(e.message))?;
         AgentScheduler::init_tables(&db)
             .map_err(|e| RpcError::internal_error(format!("init cron tables failed: {e}")))?;
-        let conn = proxycast_core::database::lock_db(&db)
+        let conn = lime_core::database::lock_db(&db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         let tasks = SchedulerDao::list_tasks(&conn, &TaskFilter::default())
             .map_err(|e| RpcError::internal_error(format!("load cron tasks failed: {e}")))?;
@@ -640,18 +640,18 @@ impl RpcHandler {
 
         for task in &tasks {
             match task.status {
-                proxycast_scheduler::TaskStatus::Pending => pending_tasks += 1,
-                proxycast_scheduler::TaskStatus::Running => running_tasks += 1,
-                proxycast_scheduler::TaskStatus::Completed => completed_tasks += 1,
-                proxycast_scheduler::TaskStatus::Failed => failed_tasks += 1,
-                proxycast_scheduler::TaskStatus::Cancelled => cancelled_tasks += 1,
+                lime_scheduler::TaskStatus::Pending => pending_tasks += 1,
+                lime_scheduler::TaskStatus::Running => running_tasks += 1,
+                lime_scheduler::TaskStatus::Completed => completed_tasks += 1,
+                lime_scheduler::TaskStatus::Failed => failed_tasks += 1,
+                lime_scheduler::TaskStatus::Cancelled => cancelled_tasks += 1,
             }
 
             if task.is_in_cooldown() {
                 cooldown_tasks += 1;
             }
 
-            if task.status == proxycast_scheduler::TaskStatus::Running {
+            if task.status == lime_scheduler::TaskStatus::Running {
                 if let Some(started_at) = task.started_at.as_deref().and_then(parse_rfc3339_utc) {
                     if started_at < stale_deadline {
                         stale_running_tasks += 1;
@@ -698,7 +698,7 @@ impl RpcHandler {
             .filter(|task| {
                 task.is_in_cooldown()
                     || task.consecutive_failures > 0
-                    || task.status == proxycast_scheduler::TaskStatus::Failed
+                    || task.status == lime_scheduler::TaskStatus::Failed
             })
             .map(|task| CronRiskTaskInfo {
                 task_id: task.id.clone(),
@@ -751,7 +751,7 @@ impl RpcHandler {
         Ok(serde_json::to_value(result).map_err(|e| RpcError::internal_error(e.to_string()))?)
     }
 
-    async fn require_db(&self) -> Result<proxycast_core::database::DbConnection, RpcError> {
+    async fn require_db(&self) -> Result<lime_core::database::DbConnection, RpcError> {
         self.state
             .db
             .read()
@@ -762,7 +762,7 @@ impl RpcHandler {
 
     fn create_run_record(
         &self,
-        db: &proxycast_core::database::DbConnection,
+        db: &lime_core::database::DbConnection,
         run_id: &str,
         source: &str,
         source_ref: Option<String>,
@@ -785,7 +785,7 @@ impl RpcHandler {
             created_at: now.clone(),
             updated_at: now,
         };
-        let conn = proxycast_core::database::lock_db(db)
+        let conn = lime_core::database::lock_db(db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         AgentRunDao::create_run(&conn, &run)
             .map_err(|e| RpcError::internal_error(format!("create run failed: {e}")))
@@ -793,10 +793,10 @@ impl RpcHandler {
 
     fn get_run_by_id(
         &self,
-        db: &proxycast_core::database::DbConnection,
+        db: &lime_core::database::DbConnection,
         run_id: &str,
     ) -> Result<Option<AgentRun>, RpcError> {
-        let conn = proxycast_core::database::lock_db(db)
+        let conn = lime_core::database::lock_db(db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         AgentRunDao::get_run(&conn, run_id)
             .map_err(|e| RpcError::internal_error(format!("query run failed: {e}")))
@@ -804,14 +804,14 @@ impl RpcHandler {
 
     fn ensure_session_and_append_user_message(
         &self,
-        db: &proxycast_core::database::DbConnection,
+        db: &lime_core::database::DbConnection,
         session_id: &str,
         message: &str,
         model: Option<&str>,
         system_prompt: Option<&str>,
     ) -> Result<(), RpcError> {
         let now = Utc::now().to_rfc3339();
-        let conn = proxycast_core::database::lock_db(db)
+        let conn = lime_core::database::lock_db(db)
             .map_err(|e| RpcError::internal_error(format!("DB lock failed: {e}")))?;
         let exists = ChatDao::session_exists(&conn, session_id)
             .map_err(|e| RpcError::internal_error(format!("check session failed: {e}")))?;
@@ -866,12 +866,12 @@ pub fn serialize_rpc_response(resp: &GatewayRpcResponse) -> Result<String, WsErr
 }
 
 fn append_assistant_message(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     session_id: &str,
     content: &str,
 ) -> Result<(), String> {
     let now = Utc::now().to_rfc3339();
-    let conn = proxycast_core::database::lock_db(db)?;
+    let conn = lime_core::database::lock_db(db)?;
     let assistant_message = ChatMessage {
         id: 0,
         session_id: session_id.to_string(),
@@ -973,7 +973,7 @@ fn resolve_provider_and_model(model: &str) -> (String, String) {
 }
 
 fn finalize_run(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     run_id: &str,
     started_ms: i64,
     status: AgentRunStatus,
@@ -984,7 +984,7 @@ fn finalize_run(
     let finished_at = Utc::now();
     let duration_ms = finished_at.timestamp_millis().saturating_sub(started_ms);
     let finished_at_str = finished_at.to_rfc3339();
-    if let Ok(conn) = proxycast_core::database::lock_db(db) {
+    if let Ok(conn) = lime_core::database::lock_db(db) {
         let _ = AgentRunDao::finish_run(
             &conn,
             run_id,
@@ -999,14 +999,14 @@ fn finalize_run(
 }
 
 fn finish_run_with_status(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     run_id: &str,
     status: AgentRunStatus,
     error_code: Option<&str>,
     error_message: Option<&str>,
     metadata: Option<serde_json::Value>,
 ) {
-    if let Ok(conn) = proxycast_core::database::lock_db(db) {
+    if let Ok(conn) = lime_core::database::lock_db(db) {
         let now = Utc::now().to_rfc3339();
         let _ = AgentRunDao::finish_run(
             &conn,
@@ -1022,7 +1022,7 @@ fn finish_run_with_status(
 }
 
 fn mark_task_running(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     task: &mut ScheduledTask,
 ) -> Result<(), String> {
     if task.is_in_cooldown() {
@@ -1033,28 +1033,28 @@ fn mark_task_running(
         return Err(format!("task is in cooldown until {until}"));
     }
     task.mark_running();
-    let conn = proxycast_core::database::lock_db(db)?;
+    let conn = lime_core::database::lock_db(db)?;
     SchedulerDao::update_task(&conn, task).map_err(|e| format!("update task running failed: {e}"))
 }
 
 fn mark_task_completed(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     task: &mut ScheduledTask,
     result: serde_json::Value,
 ) -> Result<(), String> {
     task.mark_completed(Some(result));
-    let conn = proxycast_core::database::lock_db(db)?;
+    let conn = lime_core::database::lock_db(db)?;
     SchedulerDao::update_task(&conn, task).map_err(|e| format!("update task completed failed: {e}"))
 }
 
 fn mark_task_failed(
-    db: &proxycast_core::database::DbConnection,
+    db: &lime_core::database::DbConnection,
     task: &mut ScheduledTask,
     error: String,
 ) -> Result<(), String> {
     task.mark_failed(error);
     task.apply_failure_governance(DEFAULT_TASK_FAILURE_THRESHOLD, DEFAULT_TASK_COOLDOWN_SECS);
-    let conn = proxycast_core::database::lock_db(db)?;
+    let conn = lime_core::database::lock_db(db)?;
     SchedulerDao::update_task(&conn, task).map_err(|e| format!("update task failed failed: {e}"))
 }
 
@@ -1164,8 +1164,8 @@ fn build_cron_health_alerts(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::database::{self, schema};
-    use proxycast_scheduler::SchedulerDao;
+    use lime_core::database::{self, schema};
+    use lime_scheduler::SchedulerDao;
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
 
@@ -1208,7 +1208,7 @@ mod tests {
         let state = RpcHandlerState::new(
             Some(db),
             None,
-            Arc::new(RwLock::new(proxycast_core::LogStore::new())),
+            Arc::new(RwLock::new(lime_core::LogStore::new())),
         );
         RpcHandler::new(state)
     }

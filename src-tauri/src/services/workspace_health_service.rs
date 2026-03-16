@@ -1,5 +1,5 @@
 use crate::workspace::{Workspace, WorkspaceManager, WorkspaceUpdate};
-use proxycast_core::app_paths;
+use lime_core::app_paths;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]

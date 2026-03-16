@@ -13,9 +13,9 @@
 
 use rusqlite::Connection;
 
-use proxycast_core::database::dao::template_dao::TemplateDao;
-use proxycast_core::errors::project_error::TemplateError;
-use proxycast_core::models::project_model::{CreateTemplateRequest, Template, TemplateUpdate};
+use lime_core::database::dao::template_dao::TemplateDao;
+use lime_core::errors::project_error::TemplateError;
+use lime_core::models::project_model::{CreateTemplateRequest, Template, TemplateUpdate};
 
 // ============================================================================
 // 排版模板服务
@@ -211,7 +211,7 @@ impl TemplateService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::database::schema::create_tables;
+    use lime_core::database::schema::create_tables;
 
     /// 创建测试数据库连接
     fn setup_test_db() -> Connection {

@@ -32,21 +32,21 @@ use crate::services::automation_service::{AutomationService, AutomationServiceSt
 use crate::skills::ensure_default_local_skills;
 use crate::telemetry;
 use crate::voice::recording_service::{create_recording_service_state, RecordingServiceState};
-use proxycast_core::config::{Config, ConfigManager};
-use proxycast_scheduler::AgentScheduler;
-use proxycast_server as server;
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::aster_session_store::ProxyCastSessionStore;
-use proxycast_services::context_memory_service::{ContextMemoryConfig, ContextMemoryService};
-use proxycast_services::provider_pool_service::ProviderPoolService;
-use proxycast_services::skill_service::SkillService;
-use proxycast_services::token_cache_service::TokenCacheService;
-use proxycast_services::tool_hooks_service::ToolHooksService;
-use proxycast_services::update_check_service::UpdateCheckServiceState;
+use lime_core::config::{Config, ConfigManager};
+use lime_scheduler::AgentScheduler;
+use lime_server as server;
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::aster_session_store::LimeSessionStore;
+use lime_services::context_memory_service::{ContextMemoryConfig, ContextMemoryService};
+use lime_services::provider_pool_service::ProviderPoolService;
+use lime_services::skill_service::SkillService;
+use lime_services::token_cache_service::TokenCacheService;
+use lime_services::tool_hooks_service::ToolHooksService;
+use lime_services::update_check_service::UpdateCheckServiceState;
 
 use super::types::{AppState, LogState, TokenCacheServiceState};
 
-pub use proxycast_core::app_bootstrap::{load_and_validate_config, ConfigError};
+pub use lime_core::app_bootstrap::{load_and_validate_config, ConfigError};
 
 /// 应用状态集合
 pub struct AppStates {
@@ -79,8 +79,8 @@ pub struct AppStates {
     pub recording_service: RecordingServiceState,
     pub mcp_manager: McpManagerState,
     pub automation_service: AutomationServiceState,
-    pub workflow_service: Arc<RwLock<proxycast_services::content_creator::WorkflowService>>,
-    pub progress_store: Arc<RwLock<proxycast_services::content_creator::ProgressStore>>,
+    pub workflow_service: Arc<RwLock<lime_services::content_creator::WorkflowService>>,
+    pub progress_store: Arc<RwLock<lime_services::content_creator::ProgressStore>>,
     // 用于 setup hook 的共享实例
     pub shared_stats: Arc<parking_lot::RwLock<telemetry::StatsAggregator>>,
     pub shared_tokens: Arc<parking_lot::RwLock<telemetry::TokenTracker>>,
@@ -97,7 +97,11 @@ type TelemetryInit = (
 /// 初始化所有应用状态
 pub fn init_states(config: &Config) -> Result<AppStates, String> {
     // 将 Tool Calling 运行时开关与当前配置同步，避免依赖手工环境变量。
-    proxycast_core::tool_calling::apply_tool_calling_runtime_config(config);
+    lime_core::tool_calling::apply_tool_calling_runtime_config(config);
+
+    // 首次升级到 Lime 后，启动即自动迁移旧 ProxyCast 存储根的数据。
+    lime_core::app_paths::migrate_legacy_install_data()
+        .map_err(|e| format!("启动期历史数据迁移失败: {e}"))?;
 
     // 核心状态
     let state: AppState = Arc::new(RwLock::new(server::ServerState::new(config.clone())));
@@ -135,6 +139,20 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
     let provider_pool_service_state = ProviderPoolServiceState(Arc::new(provider_pool_service));
 
     let api_key_provider_service = ApiKeyProviderService::new();
+    match api_key_provider_service.migrate_legacy_api_key_encryption(&db) {
+        Ok(0) => {
+            tracing::info!("[Bootstrap] API Key 加密格式无需迁移");
+        }
+        Ok(count) => {
+            tracing::info!("[Bootstrap] 已自动迁移 {} 条旧版 API Key 加密数据", count);
+        }
+        Err(error) => {
+            tracing::warn!(
+                "[Bootstrap] API Key 加密迁移失败，继续使用兼容读取: {}",
+                error
+            );
+        }
+    }
     let api_key_provider_service_state =
         ApiKeyProviderServiceState(Arc::new(api_key_provider_service));
 
@@ -143,7 +161,7 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
     let token_cache_service = TokenCacheService::new();
     let token_cache_service_state = TokenCacheServiceState(Arc::new(token_cache_service));
 
-    let machine_id_service = proxycast_services::machine_id_service::MachineIdService::new()
+    let machine_id_service = lime_services::machine_id_service::MachineIdService::new()
         .map_err(|e| format!("MachineIdService 初始化失败: {e}"))?;
     let machine_id_service_state: MachineIdState = Arc::new(RwLock::new(machine_id_service));
 
@@ -163,8 +181,8 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
     let (telemetry_state, shared_stats, shared_tokens, shared_logger) = init_telemetry(config)?;
 
     // 其他状态
-    // 设置 Aster 全局 session store（使用 ProxyCast 数据库）
-    let session_store = Arc::new(ProxyCastSessionStore::new(db.clone()));
+    // 设置 Aster 全局 session store（使用 Lime 数据库）
+    let session_store = Arc::new(LimeSessionStore::new(db.clone()));
 
     // 使用 tokio runtime 来设置全局 store
     // 使用 Builder 模式以获得更好的跨平台兼容性
@@ -182,7 +200,7 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
         // 使用 Builder 模式获得更多控制，提高 Windows 兼容性
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2) // 限制线程数，避免 Windows 资源问题
-            .thread_name("proxycast-runtime")
+            .thread_name("lime-runtime")
             .enable_io()
             .enable_time()
             .build()
@@ -286,12 +304,12 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
         AutomationServiceState(Arc::new(RwLock::new(automation_service)));
 
     // 初始化工作流服务
-    let workflow_service = proxycast_services::content_creator::WorkflowService::new();
+    let workflow_service = lime_services::content_creator::WorkflowService::new();
     let workflow_service_state = Arc::new(RwLock::new(workflow_service));
 
     // 初始化进度存储
     let db_path = database::get_db_path().map_err(|e| format!("获取数据库路径失败: {e}"))?;
-    let progress_store = proxycast_services::content_creator::ProgressStore::new(db_path)
+    let progress_store = lime_services::content_creator::ProgressStore::new(db_path)
         .map_err(|e| format!("ProgressStore 初始化失败: {e}"))?;
     let progress_store_state = Arc::new(RwLock::new(progress_store));
 
@@ -357,9 +375,9 @@ fn init_plugin_installer() -> Result<PluginInstallerState, String> {
     let db_path = database::get_db_path().map_err(|e| format!("获取数据库路径失败: {e}"))?;
     let plugins_dir = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("plugins");
-    let temp_dir = std::env::temp_dir().join("proxycast_plugin_install");
+    let temp_dir = std::env::temp_dir().join("lime_plugin_install");
 
     let _ = std::fs::create_dir_all(&plugins_dir);
     let _ = std::fs::create_dir_all(&temp_dir);
@@ -376,8 +394,8 @@ fn init_plugin_installer() -> Result<PluginInstallerState, String> {
         Err(e) => {
             tracing::error!("[启动] 插件安装器初始化失败: {}", e);
             // 使用临时目录作为后备
-            let fallback_plugins_dir = std::env::temp_dir().join("proxycast_plugins_fallback");
-            let fallback_temp_dir = std::env::temp_dir().join("proxycast_plugin_install_fallback");
+            let fallback_plugins_dir = std::env::temp_dir().join("lime_plugins_fallback");
+            let fallback_temp_dir = std::env::temp_dir().join("lime_plugin_install_fallback");
             let _ = std::fs::create_dir_all(&fallback_plugins_dir);
             let _ = std::fs::create_dir_all(&fallback_temp_dir);
             let installer = plugin::installer::PluginInstaller::from_paths(

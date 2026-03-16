@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import styled from "styled-components";
 import {
   ChevronRight,
   FileText,
@@ -9,6 +8,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Skill } from "@/lib/api/skills";
 
 type SkillGroupKey = "text" | "visual" | "audio" | "video" | "resource";
@@ -34,280 +34,70 @@ interface ThemeWorkbenchWorkspaceSummary {
   runState: ThemeWorkbenchRunState;
 }
 
-const PanelContainer = styled.aside`
-  width: 320px;
-  min-width: 320px;
-  height: 100%;
-  border-left: 1px solid hsl(var(--border));
-  background: hsl(var(--muted) / 0.14);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-`;
+const PANEL_CLASSNAME =
+  "flex h-full w-[320px] min-w-[320px] flex-col overflow-hidden border-l border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.94)_0%,rgba(241,245,249,0.82)_100%)]";
 
-const PanelHeader = styled.div`
-  padding: 14px 14px 12px;
-  border-bottom: 1px solid hsl(var(--border) / 0.75);
-  background: hsl(var(--background) / 0.92);
-  backdrop-filter: blur(12px);
-`;
+const HEADER_CLASSNAME =
+  "border-b border-slate-200/80 bg-white/88 px-4 py-3 backdrop-blur-sm";
 
-const PanelHeaderTop = styled.div`
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-`;
+const SECTION_CLASSNAME = "border-b border-slate-200/80 px-4 py-3";
 
-const PanelCollapseButton = styled.button`
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--background));
-  color: hsl(var(--muted-foreground));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
+const SCROLL_SECTION_CLASSNAME =
+  "flex-1 min-h-0 overflow-y-auto px-4 py-3 [scrollbar-gutter:stable]";
 
-  &:hover {
-    color: hsl(var(--foreground));
-    border-color: hsl(var(--primary) / 0.35);
-    background: hsl(var(--accent) / 0.45);
-  }
-`;
+const SECTION_TITLE_CLASSNAME =
+  "mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500";
 
-const PanelEyebrow = styled.div`
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-`;
+const CARD_CLASSNAME =
+  "rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.92)_100%)] p-3 shadow-sm shadow-slate-950/5";
 
-const PanelTitle = styled.div`
-  margin-top: 4px;
-  font-size: 16px;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-`;
+const METRIC_CARD_CLASSNAME =
+  "rounded-[16px] border border-slate-200/80 bg-white/94 p-3";
 
-const PanelDescription = styled.div`
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: hsl(var(--muted-foreground));
-`;
+const ACTION_CARD_CLASSNAME =
+  "rounded-[18px] border p-3 shadow-sm shadow-slate-950/5 transition-colors";
 
-const Section = styled.section`
-  padding: 12px 14px;
-  border-bottom: 1px solid hsl(var(--border) / 0.72);
-`;
+const ACTION_BUTTON_CLASSNAME =
+  "mt-3 inline-flex h-9 w-full items-center justify-center rounded-full border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
-const ScrollSection = styled(Section)`
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-`;
-
-const SectionTitle = styled.div`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 8px;
-`;
-
-const GateCard = styled.div`
-  border: 1px solid hsl(var(--border));
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background)) 0%,
-    hsl(var(--muted) / 0.36) 100%
+function getGateStatusClassName(status: CurrentGate["status"]) {
+  return cn(
+    "ml-auto inline-flex min-h-6 items-center rounded-full border px-2.5 text-[10px] font-semibold",
+    status === "waiting" &&
+      "border-amber-200 bg-amber-50/90 text-amber-700",
+    status === "running" && "border-sky-200 bg-sky-50/90 text-sky-700",
+    status === "idle" && "border-slate-200 bg-slate-100/90 text-slate-600",
+    status === "done" &&
+      "border-emerald-200 bg-emerald-50/90 text-emerald-700",
   );
-  padding: 12px;
-`;
+}
 
-const GateHead = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
+function getActionCardClassName(featured = false) {
+  return cn(
+    ACTION_CARD_CLASSNAME,
+    featured
+      ? "border-emerald-200/90 bg-[linear-gradient(180deg,rgba(236,253,245,0.92)_0%,rgba(255,255,255,0.98)_100%)]"
+      : "border-slate-200/80 bg-white/92 hover:border-slate-300 hover:bg-white",
+  );
+}
 
-const GateTitle = styled.div`
-  font-size: 14px;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-`;
+function getActionIconClassName(featured = false) {
+  return cn(
+    "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border",
+    featured
+      ? "border-emerald-200 bg-emerald-100/90 text-emerald-700"
+      : "border-slate-200 bg-slate-100/90 text-slate-600",
+  );
+}
 
-const GateStatus = styled.span<{ $status: "running" | "waiting" | "idle" | "done" }>`
-  margin-left: auto;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  background: ${(props) =>
-    props.$status === "waiting"
-      ? "hsl(38 96% 90%)"
-      : props.$status === "running"
-        ? "hsl(var(--primary) / 0.16)"
-        : props.$status === "idle"
-          ? "hsl(var(--muted) / 0.7)"
-          : "hsl(142 76% 90%)"};
-  color: ${(props) =>
-    props.$status === "waiting"
-      ? "hsl(30 90% 35%)"
-      : props.$status === "running"
-        ? "hsl(var(--primary))"
-        : props.$status === "idle"
-          ? "hsl(var(--muted-foreground))"
-          : "hsl(142 76% 30%)"};
-`;
-
-const GateDesc = styled.div`
-  margin-top: 8px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-  line-height: 1.45;
-`;
-
-const MetricGrid = styled.div`
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-`;
-
-const MetricCard = styled.div`
-  border: 1px solid hsl(var(--border));
-  border-radius: 12px;
-  background: hsl(var(--background));
-  padding: 10px;
-`;
-
-const MetricValue = styled.div`
-  font-size: 16px;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-  line-height: 1.2;
-  word-break: break-word;
-`;
-
-const MetricLabel = styled.div`
-  margin-top: 4px;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-`;
-
-const HintText = styled.div`
-  margin-top: 8px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: hsl(var(--muted-foreground));
-`;
-
-const ActionList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const ActionCard = styled.div<{ $featured?: boolean }>`
-  border: 1px solid
-    ${(props) =>
-      props.$featured ? "hsl(var(--primary) / 0.35)" : "hsl(var(--border))"};
-  border-radius: 14px;
-  background: ${(props) =>
-    props.$featured ? "hsl(var(--primary) / 0.06)" : "hsl(var(--background))"};
-  padding: 12px;
-`;
-
-const ActionHead = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-`;
-
-const ActionIconWrap = styled.div<{ $featured?: boolean }>`
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: ${(props) =>
-    props.$featured ? "hsl(var(--primary) / 0.14)" : "hsl(var(--muted) / 0.8)"};
-  color: ${(props) =>
-    props.$featured ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"};
-  flex-shrink: 0;
-`;
-
-const ActionMeta = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const ActionName = styled.div`
-  font-size: 13px;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-  line-height: 1.35;
-`;
-
-const ActionDescription = styled.div`
-  margin-top: 4px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-  line-height: 1.45;
-`;
-
-const ActionTag = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8px;
-  padding: 0 8px;
-  height: 22px;
-  border-radius: 999px;
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  font-size: 10px;
-  font-weight: 600;
-`;
-
-const ActionButton = styled.button`
-  margin-top: 10px;
-  width: 100%;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    border-color: hsl(var(--primary) / 0.4);
-    background: hsl(var(--primary) / 0.08);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const GroupTitle = styled.div`
-  margin: 14px 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-`;
+function getActionButtonClassName(featured = false) {
+  return cn(
+    ACTION_BUTTON_CLASSNAME,
+    featured
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100/80"
+      : "border-slate-200/80 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900",
+  );
+}
 
 function resolveSkillGroup(skill: Skill): SkillGroupKey {
   const feature = `${skill.key} ${skill.name} ${skill.description}`.toLowerCase();
@@ -399,7 +189,10 @@ function pickRecommendedSkills(skills: Skill[], gateKey: string): Skill[] {
     publish_confirm: ["typesetting", "cover", "social_post_with_cover"],
   };
 
-  const preferredTags = tagsByGate[gateKey] || ["social_post_with_cover", "research"];
+  const preferredTags = tagsByGate[gateKey] || [
+    "social_post_with_cover",
+    "research",
+  ];
   const selected: Skill[] = [];
 
   preferredTags.forEach((tag) => {
@@ -483,13 +276,10 @@ export function ThemeWorkbenchSkillsPanel({
     [],
   );
 
-  const availableSkills = useMemo(
-    () => {
-      const installed = skills.filter((skill) => skill.installed);
-      return installed.length > 0 ? installed : fallbackSkills;
-    },
-    [fallbackSkills, skills],
-  );
+  const availableSkills = useMemo(() => {
+    const installed = skills.filter((skill) => skill.installed);
+    return installed.length > 0 ? installed : fallbackSkills;
+  }, [fallbackSkills, skills]);
 
   const recommendedSkills = useMemo(
     () => pickRecommendedSkills(availableSkills, currentGate.key),
@@ -497,7 +287,9 @@ export function ThemeWorkbenchSkillsPanel({
   );
 
   const groupedSkills = useMemo<SkillGroup[]>(() => {
-    const recommendedSkillKeys = new Set(recommendedSkills.map((skill) => skill.key));
+    const recommendedSkillKeys = new Set(
+      recommendedSkills.map((skill) => skill.key),
+    );
     const buckets: Record<SkillGroupKey, Skill[]> = {
       text: [],
       visual: [],
@@ -523,138 +315,182 @@ export function ThemeWorkbenchSkillsPanel({
   }, [availableSkills, recommendedSkills]);
 
   return (
-    <PanelContainer>
-      <PanelHeader>
-        <PanelHeaderTop>
-          <div>
-            <PanelEyebrow>Theme Workbench</PanelEyebrow>
-            <PanelTitle>操作面板</PanelTitle>
+    <aside className={PANEL_CLASSNAME}>
+      <div className={HEADER_CLASSNAME}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+              Theme Workbench
+            </div>
+            <div className="mt-1 text-base font-semibold text-slate-900">
+              操作面板
+            </div>
           </div>
           {onRequestCollapse ? (
-            <PanelCollapseButton
+            <button
               type="button"
               aria-label="折叠操作面板"
               onClick={onRequestCollapse}
+              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-500 shadow-sm shadow-slate-950/5 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
             >
               <PanelRightClose size={16} />
-            </PanelCollapseButton>
+            </button>
           ) : null}
-        </PanelHeaderTop>
-        <PanelDescription>
+        </div>
+        <div className="mt-2 text-[12px] leading-5 text-slate-500">
           右侧聚焦当前阶段推荐动作，中间主稿区保持结果优先，减少来回跳转。
-        </PanelDescription>
-      </PanelHeader>
+        </div>
+      </div>
 
-      <Section>
-        <SectionTitle>阶段摘要</SectionTitle>
-        <GateCard>
-          <GateHead>
-            <ChevronRight size={14} />
-            <GateTitle>{currentGate.title}</GateTitle>
-            <GateStatus $status={currentGate.status}>
+      <section className={SECTION_CLASSNAME}>
+        <div className={SECTION_TITLE_CLASSNAME}>阶段摘要</div>
+        <div className={CARD_CLASSNAME}>
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl border border-slate-200 bg-slate-100/90 text-slate-600">
+              <ChevronRight size={14} />
+            </div>
+            <div className="min-w-0 text-sm font-semibold text-slate-900">
+              {currentGate.title}
+            </div>
+            <span className={getGateStatusClassName(currentGate.status)}>
               {resolveGateStatusText(currentGate.status)}
-            </GateStatus>
-          </GateHead>
-          <GateDesc>{currentGate.description}</GateDesc>
+            </span>
+          </div>
+          <div className="mt-2 text-[12px] leading-5 text-slate-500">
+            {currentGate.description}
+          </div>
           {workspaceSummary ? (
-            <MetricGrid>
-              <MetricCard>
-                <MetricValue>{workspaceSummary.activeContextCount}</MetricValue>
-                <MetricLabel>启用上下文</MetricLabel>
-              </MetricCard>
-              <MetricCard>
-                <MetricValue>{workspaceSummary.searchResultCount}</MetricValue>
-                <MetricLabel>搜索结果</MetricLabel>
-              </MetricCard>
-              <MetricCard>
-                <MetricValue>{workspaceSummary.versionCount}</MetricValue>
-                <MetricLabel>版本快照</MetricLabel>
-              </MetricCard>
-              <MetricCard>
-                <MetricValue>{resolveRunStateText(workspaceSummary.runState)}</MetricValue>
-                <MetricLabel>运行状态</MetricLabel>
-              </MetricCard>
-            </MetricGrid>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className={METRIC_CARD_CLASSNAME}>
+                <div className="text-base font-semibold leading-none text-slate-900">
+                  {workspaceSummary.activeContextCount}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  启用上下文
+                </div>
+              </div>
+              <div className={METRIC_CARD_CLASSNAME}>
+                <div className="text-base font-semibold leading-none text-slate-900">
+                  {workspaceSummary.searchResultCount}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  搜索结果
+                </div>
+              </div>
+              <div className={METRIC_CARD_CLASSNAME}>
+                <div className="text-base font-semibold leading-none text-slate-900">
+                  {workspaceSummary.versionCount}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  版本快照
+                </div>
+              </div>
+              <div className={METRIC_CARD_CLASSNAME}>
+                <div className="text-base font-semibold leading-none text-slate-900">
+                  {resolveRunStateText(workspaceSummary.runState)}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  运行状态
+                </div>
+              </div>
+            </div>
           ) : null}
-          <HintText>
+          <div className="mt-3 text-[11px] leading-5 text-slate-500">
             {disabled
               ? "当前有任务执行中，建议等待本轮完成后再触发新的技能。"
               : "先看推荐动作，再按需要选择更多能力，避免重复操作。"}
-          </HintText>
-        </GateCard>
-      </Section>
+          </div>
+        </div>
+      </section>
 
-      <ScrollSection>
-        <SectionTitle>推荐动作</SectionTitle>
-        <ActionList>
+      <section className={SCROLL_SECTION_CLASSNAME}>
+        <div className={SECTION_TITLE_CLASSNAME}>推荐动作</div>
+        <div className="flex flex-col gap-3">
           {recommendedSkills.map((skill) => {
             const Icon = resolveSkillIcon(skill);
             return (
-              <ActionCard key={skill.key} $featured>
-                <ActionHead>
-                  <ActionIconWrap $featured>
+              <div key={skill.key} className={getActionCardClassName(true)}>
+                <div className="flex items-start gap-3">
+                  <div className={getActionIconClassName(true)}>
                     <Icon size={16} />
-                  </ActionIconWrap>
-                  <ActionMeta>
-                    <ActionName>{skill.name}</ActionName>
-                    <ActionDescription>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold leading-5 text-slate-900">
+                      {skill.name}
+                    </div>
+                    <div className="mt-1 text-[12px] leading-5 text-slate-500">
                       {skill.description || "使用当前能力继续推进本轮工作台任务。"}
-                    </ActionDescription>
-                    <ActionTag>推荐优先执行</ActionTag>
-                  </ActionMeta>
-                </ActionHead>
-                <ActionButton
+                    </div>
+                    <span className="mt-2 inline-flex min-h-6 items-center rounded-full border border-emerald-200 bg-emerald-50/90 px-2.5 text-[10px] font-semibold text-emerald-700">
+                      推荐优先执行
+                    </span>
+                  </div>
+                </div>
+                <button
                   type="button"
                   aria-label={`执行技能 ${skill.key}`}
                   disabled={disabled}
                   onClick={() => onTriggerSkill?.(skill)}
+                  className={getActionButtonClassName(true)}
                 >
                   {resolveSkillActionLabel(skill)}
-                </ActionButton>
-              </ActionCard>
+                </button>
+              </div>
             );
           })}
-        </ActionList>
+        </div>
 
-        <GroupTitle>可执行能力</GroupTitle>
+        <div className="mt-4 text-[12px] font-semibold text-slate-900">
+          可执行能力
+        </div>
         {groupedSkills.length === 0 ? (
-          <HintText>当前可用技能已全部展示在推荐动作中，可直接开始执行。</HintText>
+          <div className="mt-2 text-[11px] leading-5 text-slate-500">
+            当前可用技能已全部展示在推荐动作中，可直接开始执行。
+          </div>
         ) : (
-          groupedSkills.map((group) => (
-            <div key={group.key}>
-              <SectionTitle>{group.title}</SectionTitle>
-              <ActionList>
-                {group.items.map((skill) => {
-                  const Icon = resolveSkillIcon(skill);
-                  return (
-                    <ActionCard key={skill.key}>
-                      <ActionHead>
-                        <ActionIconWrap>
-                          <Icon size={16} />
-                        </ActionIconWrap>
-                        <ActionMeta>
-                          <ActionName>{skill.name}</ActionName>
-                          <ActionDescription>
-                            {skill.description || "使用当前能力继续处理工作台内容。"}
-                          </ActionDescription>
-                        </ActionMeta>
-                      </ActionHead>
-                      <ActionButton
-                        type="button"
-                        aria-label={`执行技能 ${skill.key}`}
-                        disabled={disabled}
-                        onClick={() => onTriggerSkill?.(skill)}
-                      >
-                        {resolveSkillActionLabel(skill)}
-                      </ActionButton>
-                    </ActionCard>
-                  );
-                })}
-              </ActionList>
-            </div>
-          ))
+          <div className="mt-3 space-y-4">
+            {groupedSkills.map((group) => (
+              <div key={group.key}>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-500">
+                  {group.title}
+                </div>
+                <div className="flex flex-col gap-3">
+                  {group.items.map((skill) => {
+                    const Icon = resolveSkillIcon(skill);
+                    return (
+                      <div key={skill.key} className={getActionCardClassName()}>
+                        <div className="flex items-start gap-3">
+                          <div className={getActionIconClassName()}>
+                            <Icon size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-semibold leading-5 text-slate-900">
+                              {skill.name}
+                            </div>
+                            <div className="mt-1 text-[12px] leading-5 text-slate-500">
+                              {skill.description ||
+                                "使用当前能力继续处理工作台内容。"}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`执行技能 ${skill.key}`}
+                          disabled={disabled}
+                          onClick={() => onTriggerSkill?.(skill)}
+                          className={getActionButtonClassName()}
+                        >
+                          {resolveSkillActionLabel(skill)}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </ScrollSection>
-    </PanelContainer>
+      </section>
+    </aside>
   );
 }

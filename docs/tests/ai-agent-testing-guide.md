@@ -1,4 +1,4 @@
-# ProxyCast AI Agent 测试指南
+# Lime AI Agent 测试指南
 
 > 基于 Anthropic 评估理论与实践经验的 AI Agent 测试策略
 
@@ -789,4 +789,4 @@ async fn test_with_transcript() {
 
 ---
 
-*本文档定义了 ProxyCast AI Agent 功能的测试策略，随着开发进展会持续更新。*
+*本文档定义了 Lime AI Agent 功能的测试策略，随着开发进展会持续更新。*

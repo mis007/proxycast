@@ -1,6 +1,6 @@
-# ProxyCast 插件目录
+# Lime 插件目录
 
-此目录包含 ProxyCast 的官方插件源代码。
+此目录包含 Lime 的官方插件源代码。
 
 ## 目录结构
 
@@ -27,7 +27,7 @@ plugins/
   "plugin_type": "binary",
   "entry": "plugin-name",
   "hooks": [],
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
   "binary": {
     "binary_name": "plugin-name",
     "github_owner": "owner",

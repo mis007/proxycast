@@ -3,7 +3,7 @@
  * @description 测试 Provider Display 的完整性
  * @module components/connect/ConnectConfirmDialog.test
  *
- * **Feature: proxycast-connect, Property 7: Provider Display Completeness**
+ * **Feature: lime-connect, Property 7: Provider Display Completeness**
  * **Validates: Requirements 6.1, 6.3**
  */
 
@@ -135,7 +135,7 @@ describe("Provider Display 属性测试", () => {
    * - logo URL
    * - 描述
    *
-   * **Feature: proxycast-connect, Property 7: Provider Display Completeness**
+   * **Feature: lime-connect, Property 7: Provider Display Completeness**
    * **Validates: Requirements 6.1, 6.3**
    */
   describe("Property 7: Provider Display Completeness", () => {

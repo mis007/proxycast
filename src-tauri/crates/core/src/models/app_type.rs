@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AppType {
-    ProxyCast,
+    Lime,
     Claude,
     Codex,
     Gemini,
@@ -12,7 +12,7 @@ pub enum AppType {
 impl AppType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            AppType::ProxyCast => "proxycast",
+            AppType::Lime => "lime",
             AppType::Claude => "claude",
             AppType::Codex => "codex",
             AppType::Gemini => "gemini",
@@ -25,7 +25,7 @@ impl std::str::FromStr for AppType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "proxycast" => Ok(AppType::ProxyCast),
+            "lime" => Ok(AppType::Lime),
             "claude" => Ok(AppType::Claude),
             "codex" => Ok(AppType::Codex),
             "gemini" => Ok(AppType::Gemini),

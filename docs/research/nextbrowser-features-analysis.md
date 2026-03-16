@@ -1,4 +1,4 @@
-# 基于 CDP 的远程浏览器实时流控与调试方案(Proxycast 落地版)
+# 基于 CDP 的远程浏览器实时流控与调试方案(Lime 落地版)
 
 > 融合 NextBrowser 特征调查 + Codex 架构设计的务实实施方案
 
@@ -10,7 +10,7 @@
 2. **画面流通道**: 基于 `Page.startScreencast` 或受控截图轮询输出低延迟页面画面,用于任务执行中的实时观察与回放
 
 ### 设计原则
-- ✅ **保持现有架构**: 不改动后端优先级模型(aster_compat、proxycast_extension_bridge、cdp_direct 并存)
+- ✅ **保持现有架构**: 不改动后端优先级模型(aster_compat、lime_extension_bridge、cdp_direct 并存)
 - ✅ **渐进式增强**: 只升级 cdp_direct 从"HTTP 探测初版"到"有状态 CDP 会话后端"
 - ✅ **KISS/YAGNI**: 不引入第四套浏览器控制通道,避免过度设计
 - ✅ **跨平台兼容**: macOS 与 Windows 都可运行,平台差异仅体现在 Chrome 启动和端口探测
@@ -31,7 +31,7 @@
 - 双向交互(观看 + 控制)
 - WebSocket 持久连接
 
-**Proxycast 实现优先级:** 🔥 高优先级
+**Lime 实现优先级:** 🔥 高优先级
 
 ---
 
@@ -53,7 +53,7 @@
 - WebSocket debugger URL: `wss://...`
 - 支持多标签页调试
 
-**Proxycast 实现优先级:** 🔥 高优先级
+**Lime 实现优先级:** 🔥 高优先级
 
 ---
 
@@ -69,7 +69,7 @@
 - 地理定位: 国家/地区/城市/ISP
 - 用于绕过地理限制和反爬虫检测
 
-**Proxycast 实现优先级:** 🔥 高优先级
+**Lime 实现优先级:** 🔥 高优先级
 
 ---
 
@@ -86,7 +86,7 @@
 - Geolocation API 覆盖
 - User-Agent 和设备特征模拟
 
-**Proxycast 实现优先级:** 🟡 中优先级
+**Lime 实现优先级:** 🟡 中优先级
 
 ---
 
@@ -108,7 +108,7 @@
 - 用户级别隔离
 - 支持会话刷新
 
-**Proxycast 实现优先级:** 🔥 高优先级
+**Lime 实现优先级:** 🔥 高优先级
 
 ---
 
@@ -118,7 +118,7 @@
 - 会话过期时自动重新认证
 - 支持双因素认证
 
-**Proxycast 实现优先级:** 🟡 中优先级
+**Lime 实现优先级:** 🟡 中优先级
 
 ---
 
@@ -133,7 +133,7 @@
   - FunCAPTCHA
   - 等等
 
-**Proxycast 实现优先级:** 🟢 低优先级 (可集成第三方服务)
+**Lime 实现优先级:** 🟢 低优先级 (可集成第三方服务)
 
 ---
 
@@ -142,7 +142,7 @@
 - 一次性任务: 指定日期和时间运行
 - 循环任务: 每小时/每天/每周/自定义 cron 表达式
 
-**Proxycast 实现优先级:** 🟡 中优先级
+**Lime 实现优先级:** 🟡 中优先级
 
 ---
 
@@ -152,7 +152,7 @@
 - OAuth 认证
 - 自动续期连接
 
-**Proxycast 实现优先级:** 🟢 低优先级
+**Lime 实现优先级:** 🟢 低优先级
 
 ---
 
@@ -166,7 +166,7 @@
   - JSON
   - 超链接
 
-**Proxycast 实现优先级:** 🟡 中优先级
+**Lime 实现优先级:** 🟡 中优先级
 
 ---
 
@@ -1100,7 +1100,7 @@ describe('BrowserDebugPanel', () => {
 
 #### 场景 1: 基础会话建立
 ```bash
-# 1. 启动 Proxycast
+# 1. 启动 Lime
 npm run tauri:dev
 
 # 2. 打开调试面板
@@ -1242,7 +1242,7 @@ npm run tauri:dev
 **解决方案**:
 1. **独立用户数据目录**
    ```rust
-   let user_data_dir = format!("/tmp/proxycast/profile_{}", profile_key);
+   let user_data_dir = format!("/tmp/lime/profile_{}", profile_key);
    let chrome_args = vec![
        format!("--user-data-dir={}", user_data_dir),
        "--no-first-run",
@@ -1349,7 +1349,7 @@ npm run tauri:dev
 3. **用户级别隔离**
    ```rust
    // 每个用户使用独立的加密密钥
-   let user_salt = format!("proxycast_user_{}", user_id);
+   let user_salt = format!("lime_user_{}", user_id);
    let encryption_key = derive_encryption_key(&user_password, user_salt.as_bytes());
    ```
 
@@ -1483,7 +1483,7 @@ npm run tauri:dev
 
 ---
 
-## 七、与现有 Proxycast 架构的集成
+## 七、与现有 Lime 架构的集成
 
 ### 7.1 复用现有模块
 
@@ -1494,7 +1494,7 @@ npm run tauri:dev
 - ✅ DevBridge - 前端与 Tauri 通信,复用事件推送机制
 
 **集成策略**:
-1. **不改动现有优先级**: aster_compat、proxycast_extension_bridge、cdp_direct 继续并存
+1. **不改动现有优先级**: aster_compat、lime_extension_bridge、cdp_direct 继续并存
 2. **只增强 cdp_direct**: 从 HTTP 探测升级为有状态 WebSocket 会话
 3. **保持接口兼容**: `browser_execute_action` 保持现有签名,补充 `session_id`/`target_id` 返回值
 
@@ -1587,7 +1587,7 @@ NextBrowser 的核心价值在于:
 3. **远程调试** - CDP Debugger 提供专业调试能力
 
 ### 实施策略
-Proxycast 已经具备了 CDP 基础设施,采用**渐进式增强**策略:
+Lime 已经具备了 CDP 基础设施,采用**渐进式增强**策略:
 1. **Phase 1 (2-3 周)**: 核心 CDP 会话 - 建立稳定的 WebSocket 连接和统一事件模型
 2. **Phase 2 (1-2 周)**: 画面流通道 - 实现 screencast + screenshot fallback
 3. **Phase 3 (1-2 周)**: Profiles 持久化 - 实现 Cookies 加密存储
@@ -1613,7 +1613,7 @@ Proxycast 已经具备了 CDP 基础设施,采用**渐进式增强**策略:
 
 ## 九、基于当前代码库的差距复盘（截至 2026-03-15）
 
-> 本节用于校正文档前文的“规划态”描述，按当前仓库真实实现判断 Proxycast 已做到什么、还缺什么，以及后续应如何按基础设施优先推进。
+> 本节用于校正文档前文的“规划态”描述，按当前仓库真实实现判断 Lime 已做到什么、还缺什么，以及后续应如何按基础设施优先推进。
 
 ### 9.1 当前已经具备的能力底座
 
@@ -1982,7 +1982,7 @@ Proxycast 已经具备了 CDP 基础设施,采用**渐进式增强**策略:
 - `webhook` 当前会输出并透传：
   - payload 字段 `delivery_attempt_id`
   - 请求头 `Idempotency-Key`
-  - 请求头 `X-Proxycast-Delivery-Attempt-Id`
+  - 请求头 `X-Lime-Delivery-Attempt-Id`
 - `google_sheets` 当前会在每一行前置：
   - `delivery_attempt_id`
   - `run_id`
@@ -2057,7 +2057,7 @@ Proxycast 已经具备了 CDP 基础设施,采用**渐进式增强**策略:
 
 ### 9.7 结论
 
-从代码现状看，Proxycast 并不是“还没有浏览器底座”，而是已经跨过了最难的第一步：
+从代码现状看，Lime 并不是“还没有浏览器底座”，而是已经跨过了最难的第一步：
 - 已有实时画面
 - 已有 CDP 会话
 - 已有人工接管

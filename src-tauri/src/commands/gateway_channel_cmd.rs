@@ -6,17 +6,17 @@ use crate::app::LogState;
 use crate::config::GlobalConfigManagerState;
 use crate::database::DbConnection;
 use crate::services::web_search_runtime_service::apply_web_search_runtime_env;
-use proxycast_gateway::discord::{
+use lime_gateway::discord::{
     probe_gateway_account as probe_discord_gateway_account, start_gateway as start_discord_gateway,
     status_gateway as status_discord_gateway, stop_gateway as stop_discord_gateway,
     DiscordGatewayState, DiscordProbeResult,
 };
-use proxycast_gateway::feishu::{
+use lime_gateway::feishu::{
     probe_gateway_account as probe_feishu_gateway_account, start_gateway as start_feishu_gateway,
     status_gateway as status_feishu_gateway, stop_gateway as stop_feishu_gateway,
     FeishuGatewayState, FeishuProbeResult,
 };
-use proxycast_gateway::telegram::{
+use lime_gateway::telegram::{
     probe_gateway_account as probe_telegram_gateway_account,
     start_gateway as start_telegram_gateway, status_gateway as status_telegram_gateway,
     stop_gateway as stop_telegram_gateway, TelegramGatewayState, TelegramProbeResult,

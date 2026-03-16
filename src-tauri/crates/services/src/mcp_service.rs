@@ -1,8 +1,8 @@
 use crate::mcp_sync;
-use proxycast_core::database::dao::mcp::McpDao;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::mcp_model::ConfigValidationError;
-use proxycast_core::models::{AppType, McpServer};
+use lime_core::database::dao::mcp::McpDao;
+use lime_core::database::DbConnection;
+use lime_core::models::mcp_model::ConfigValidationError;
+use lime_core::models::{AppType, McpServer};
 
 pub struct McpService;
 

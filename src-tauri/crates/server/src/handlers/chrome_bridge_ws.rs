@@ -25,14 +25,14 @@ pub struct ObserverQuery {
 pub async fn chrome_observer_ws_upgrade(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    Path(proxycast_key): Path<String>,
+    Path(lime_key): Path<String>,
     Query(query): Query<ObserverQuery>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if proxycast_key != state.api_key {
+    if lime_key != state.api_key {
         return axum::http::Response::builder()
             .status(401)
-            .body(axum::body::Body::from("Invalid Proxycast_Key"))
+            .body(axum::body::Body::from("Invalid Lime_Key"))
             .unwrap()
             .into_response();
     }
@@ -50,13 +50,13 @@ pub async fn chrome_observer_ws_upgrade(
 pub async fn chrome_control_ws_upgrade(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    Path(proxycast_key): Path<String>,
+    Path(lime_key): Path<String>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if proxycast_key != state.api_key {
+    if lime_key != state.api_key {
         return axum::http::Response::builder()
             .status(401)
-            .body(axum::body::Body::from("Invalid Proxycast_Key"))
+            .body(axum::body::Body::from("Invalid Lime_Key"))
             .unwrap()
             .into_response();
     }

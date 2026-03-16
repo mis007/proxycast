@@ -8,8 +8,8 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::models::codewhisperer::*;
-use proxycast_core::models::openai::*;
+use lime_core::models::codewhisperer::*;
+use lime_core::models::openai::*;
 use std::collections::HashMap;
 use uuid::Uuid;
 

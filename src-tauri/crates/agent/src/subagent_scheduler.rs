@@ -1,6 +1,6 @@
 //! SubAgent 调度器集成
 //!
-//! 将 aster-rust 的 SubAgent 调度器与 ProxyCast 凭证池集成。
+//! 将 aster-rust 的 SubAgent 调度器与 Lime 凭证池集成。
 //! 纯逻辑位于此 crate，事件发送通过注入回调实现。
 
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::credential_bridge::{create_aster_provider, AsterProviderConfig, CredentialBridge};
-use proxycast_core::database::DbConnection;
+use lime_core::database::DbConnection;
 
 /// 调度器事件发射器
 pub type SchedulerEventEmitter = Arc<dyn Fn(&serde_json::Value) + Send + Sync>;
@@ -126,14 +126,14 @@ impl std::fmt::Display for SubAgentRole {
 }
 
 // ---------------------------------------------------------------------------
-// ProxyCastSubAgentExecutor
+// LimeSubAgentExecutor
 // ---------------------------------------------------------------------------
 
-/// ProxyCast SubAgent 执行器
+/// Lime SubAgent 执行器
 ///
 /// 实现 aster-rust 的 SubAgentExecutor trait，
-/// 集成 ProxyCast 凭证池进行 LLM 调用。
-pub struct ProxyCastSubAgentExecutor {
+/// 集成 Lime 凭证池进行 LLM 调用。
+pub struct LimeSubAgentExecutor {
     /// 凭证桥接器
     credential_bridge: CredentialBridge,
     /// 数据库连接
@@ -146,7 +146,7 @@ pub struct ProxyCastSubAgentExecutor {
     role: SubAgentRole,
 }
 
-impl ProxyCastSubAgentExecutor {
+impl LimeSubAgentExecutor {
     /// 创建新的执行器
     pub fn new(db: DbConnection) -> Self {
         Self {
@@ -208,7 +208,7 @@ impl ProxyCastSubAgentExecutor {
 }
 
 #[async_trait::async_trait]
-impl SubAgentExecutor for ProxyCastSubAgentExecutor {
+impl SubAgentExecutor for LimeSubAgentExecutor {
     async fn execute_task(
         &self,
         task: &SubAgentTask,
@@ -276,20 +276,20 @@ impl SubAgentExecutor for ProxyCastSubAgentExecutor {
 }
 
 // ---------------------------------------------------------------------------
-// ProxyCastScheduler
+// LimeScheduler
 // ---------------------------------------------------------------------------
 
-/// ProxyCast SubAgent 调度器
-pub struct ProxyCastScheduler {
+/// Lime SubAgent 调度器
+pub struct LimeScheduler {
     /// 内部调度器
-    scheduler: Arc<RwLock<Option<SubAgentScheduler<ProxyCastSubAgentExecutor>>>>,
+    scheduler: Arc<RwLock<Option<SubAgentScheduler<LimeSubAgentExecutor>>>>,
     /// 数据库连接
     db: DbConnection,
     /// 默认角色
     default_role: SubAgentRole,
 }
 
-impl ProxyCastScheduler {
+impl LimeScheduler {
     /// 创建新的调度器
     pub fn new(db: DbConnection) -> Self {
         Self {
@@ -316,7 +316,7 @@ impl ProxyCastScheduler {
         config: Option<SchedulerConfig>,
         event_emitter: Option<SchedulerEventEmitter>,
     ) {
-        let executor = ProxyCastSubAgentExecutor::new(self.db.clone()).with_role(self.default_role);
+        let executor = LimeSubAgentExecutor::new(self.db.clone()).with_role(self.default_role);
         let config = config.unwrap_or_default();
 
         let scheduler = if let Some(emitter) = event_emitter {
@@ -332,7 +332,7 @@ impl ProxyCastScheduler {
 
         *self.scheduler.write().await = Some(scheduler);
         info!(
-            "ProxyCast SubAgent 调度器初始化完成 (默认角色: {})",
+            "Lime SubAgent 调度器初始化完成 (默认角色: {})",
             self.default_role
         );
     }

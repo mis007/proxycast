@@ -4,8 +4,8 @@
 
 use super::types::{ModelStats, ProviderStats, RequestLog, RequestStatus, StatsSummary, TimeRange};
 use chrono::{Duration, Utc};
+use lime_core::ProviderType;
 use parking_lot::RwLock;
-use proxycast_core::ProviderType;
 use std::collections::{HashMap, VecDeque};
 
 /// 统计聚合器

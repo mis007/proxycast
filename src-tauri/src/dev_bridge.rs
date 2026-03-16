@@ -27,9 +27,9 @@ use tower_http::cors::CorsLayer;
 #[cfg(debug_assertions)]
 use crate::{app, database::DbConnection};
 #[cfg(debug_assertions)]
-use proxycast_infra::telemetry::StatsAggregator;
+use lime_infra::telemetry::StatsAggregator;
 #[cfg(debug_assertions)]
-use proxycast_services::{
+use lime_services::{
     api_key_provider_service::ApiKeyProviderService, model_registry_service::ModelRegistryService,
     provider_pool_service::ProviderPoolService, skill_service::SkillService,
 };

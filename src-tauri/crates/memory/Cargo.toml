@@ -1,12 +1,12 @@
 [package]
-name = "proxycast-memory"
+name = "lime-memory"
 version = "0.1.0"
 edition = "2021"
 authors = ["you"]
 
 [dependencies]
 # 项目内依赖
-proxycast-embedding = { path = "../embedding" }
+lime-embedding = { path = "../embedding" }
 
 # 序列化
 serde.workspace = true

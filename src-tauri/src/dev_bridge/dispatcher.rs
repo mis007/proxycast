@@ -149,7 +149,7 @@ pub async fn handle_command(
 mod tests {
     use super::*;
     use crate::commands::content_cmd::{ContentDetail, ContentListItem};
-    use proxycast_core::{config::Config, database::schema::create_tables};
+    use lime_core::{config::Config, database::schema::create_tables};
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
@@ -166,26 +166,22 @@ mod tests {
 
         DevBridgeState {
             app_handle: None,
-            server: Arc::new(RwLock::new(proxycast_server::ServerState::new(
-                config.clone(),
-            ))),
+            server: Arc::new(RwLock::new(lime_server::ServerState::new(config.clone()))),
             logs: Arc::new(RwLock::new(crate::logger::create_log_store_from_config(
                 &config.logging,
             ))),
             db: Some(make_test_db()),
             pool_service: Arc::new(
-                proxycast_services::provider_pool_service::ProviderPoolService::new(),
+                lime_services::provider_pool_service::ProviderPoolService::new(),
             ),
             api_key_provider_service: Arc::new(
-                proxycast_services::api_key_provider_service::ApiKeyProviderService::new(),
+                lime_services::api_key_provider_service::ApiKeyProviderService::new(),
             ),
             connect_state: Arc::new(RwLock::new(None)),
             model_registry: Arc::new(RwLock::new(None)),
-            skill_service: Arc::new(
-                proxycast_services::skill_service::SkillService::new().unwrap(),
-            ),
+            skill_service: Arc::new(lime_services::skill_service::SkillService::new().unwrap()),
             shared_stats: Arc::new(parking_lot::RwLock::new(
-                proxycast_infra::telemetry::StatsAggregator::default(),
+                lime_infra::telemetry::StatsAggregator::default(),
             )),
         }
     }

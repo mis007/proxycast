@@ -1,5 +1,5 @@
 use crate::dev_bridge::DevBridgeState;
-use proxycast_server_utils::load_model_registry_provider_ids_from_resources;
+use lime_server_utils::load_model_registry_provider_ids_from_resources;
 use serde_json::Value as JsonValue;
 
 type DynError = Box<dyn std::error::Error>;

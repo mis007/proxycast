@@ -60,6 +60,16 @@ pub(super) async fn try_handle(
             service.clear_progress_logs();
             serde_json::to_value(service.perform_update(&app_handle).await?)?
         }
+        "openclaw_set_preferred_runtime" => {
+            let (_app_handle, service) = openclaw_context(state)?;
+            let args = args_or_default(args);
+            let runtime_id = args
+                .get("runtimeId")
+                .and_then(|value| value.as_str())
+                .map(str::to_string);
+            let service = service.lock().await;
+            serde_json::to_value(service.set_preferred_runtime(runtime_id.as_deref()).await?)?
+        }
         "openclaw_start_gateway" => {
             let (app_handle, service) = openclaw_context(state)?;
             let port = args

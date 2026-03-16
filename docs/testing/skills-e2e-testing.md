@@ -4,26 +4,26 @@
 
 ## 架构说明
 
-ProxyCast 的 Skills 集成基于 aster-rust 框架的 `SkillTool`：
+Lime 的 Skills 集成基于 aster-rust 框架的 `SkillTool`：
 
 ```
 用户消息 → AI Agent → SkillTool → global_registry → 执行 Skill
                                         ↑
                                         |
-                    load_proxycast_skills() 加载 ~/.proxycast/skills/
+                    load_lime_skills() 加载 ~/.lime/skills/
 ```
 
 关键组件：
-- `AsterAgentState::load_proxycast_skills()` - 启动时加载 Skills
-- `AsterAgentState::reload_proxycast_skills()` - 安装/卸载后刷新
+- `AsterAgentState::load_lime_skills()` - 启动时加载 Skills
+- `AsterAgentState::reload_lime_skills()` - 安装/卸载后刷新
 - `aster::skills::global_registry()` - 全局 Skill 注册表
 - `aster::skills::SkillTool` - AI 调用 Skills 的工具
 
 ## 前置条件
 
-1. ProxyCast 应用已构建并可运行
+1. Lime 应用已构建并可运行
 2. 至少配置了一个可用的 AI Provider（如 OpenAI API Key）
-3. 终端可以访问 `~/.proxycast/skills/` 目录
+3. 终端可以访问 `~/.lime/skills/` 目录
 
 ## 测试场景
 
@@ -35,8 +35,8 @@ ProxyCast 的 Skills 集成基于 aster-rust 框架的 `SkillTool`：
 
 1. 创建测试 Skill：
 ```bash
-mkdir -p ~/.proxycast/skills/test-greeting
-cat > ~/.proxycast/skills/test-greeting/SKILL.md << 'EOF'
+mkdir -p ~/.lime/skills/test-greeting
+cat > ~/.lime/skills/test-greeting/SKILL.md << 'EOF'
 ---
 name: test-greeting
 description: 一个简单的问候技能，用于测试 Skills 集成
@@ -46,21 +46,21 @@ description: 一个简单的问候技能，用于测试 Skills 集成
 
 当用户请求问候时，使用以下格式回复：
 
-"你好！我是 ProxyCast 助手，很高兴为你服务！"
+"你好！我是 Lime 助手，很高兴为你服务！"
 
 请始终使用中文回复。
 EOF
 ```
 
-2. 启动 ProxyCast 应用：
+2. 启动 Lime 应用：
 ```bash
-cd proxycast && npm run tauri dev
+cd lime && npm run tauri dev
 ```
 
 3. 打开开发者工具（Cmd+Option+I），查看控制台日志
 
 4. **预期结果**：
-   - 日志中应显示 `[AsterAgent] 成功加载 1 个 ProxyCast Skills 到 global_registry`
+   - 日志中应显示 `[AsterAgent] 成功加载 1 个 Lime Skills 到 global_registry`
    - 日志中应显示 `[AsterAgent] 已注册 Skill: user:test-greeting`
 
 ### 场景 2：AI 自动调用 Skill
@@ -71,7 +71,7 @@ cd proxycast && npm run tauri dev
 
 1. 确保测试 Skill 已创建（见场景 1）
 
-2. 在 ProxyCast 聊天界面发送消息：
+2. 在 Lime 聊天界面发送消息：
    ```
    请用问候技能跟我打个招呼
    ```
@@ -79,7 +79,7 @@ cd proxycast && npm run tauri dev
 3. **预期结果**：
    - AI 应该识别到 `test-greeting` Skill
    - AI 应该调用 Skill 并返回问候语
-   - 响应中应包含 "你好！我是 ProxyCast 助手"
+   - 响应中应包含 "你好！我是 Lime 助手"
 
 ### 场景 3：通过斜杠命令调用 Skill
 
@@ -102,10 +102,10 @@ cd proxycast && npm run tauri dev
 
 **步骤**：
 
-1. 在 ProxyCast 运行时，创建新 Skill：
+1. 在 Lime 运行时，创建新 Skill：
 ```bash
-mkdir -p ~/.proxycast/skills/test-calculator
-cat > ~/.proxycast/skills/test-calculator/SKILL.md << 'EOF'
+mkdir -p ~/.lime/skills/test-calculator
+cat > ~/.lime/skills/test-calculator/SKILL.md << 'EOF'
 ---
 name: test-calculator
 description: 一个简单的计算器技能
@@ -119,7 +119,7 @@ description: 一个简单的计算器技能
 EOF
 ```
 
-2. 在 ProxyCast Skills 页面点击刷新（或重新进入页面）
+2. 在 Lime Skills 页面点击刷新（或重新进入页面）
 
 3. 发送消息：
    ```
@@ -138,10 +138,10 @@ EOF
 
 1. 删除测试 Skill：
 ```bash
-rm -rf ~/.proxycast/skills/test-greeting
+rm -rf ~/.lime/skills/test-greeting
 ```
 
-2. 在 ProxyCast Skills 页面点击刷新
+2. 在 Lime Skills 页面点击刷新
 
 3. 发送消息：
    ```
@@ -157,15 +157,15 @@ rm -rf ~/.proxycast/skills/test-greeting
 测试完成后，清理测试 Skills：
 
 ```bash
-rm -rf ~/.proxycast/skills/test-greeting
-rm -rf ~/.proxycast/skills/test-calculator
+rm -rf ~/.lime/skills/test-greeting
+rm -rf ~/.lime/skills/test-calculator
 ```
 
 ## 常见问题排查
 
 ### Skills 没有被加载
 
-1. 检查目录是否存在：`ls -la ~/.proxycast/skills/`
+1. 检查目录是否存在：`ls -la ~/.lime/skills/`
 2. 检查 SKILL.md 文件格式是否正确
 3. 查看应用日志中是否有错误信息
 
@@ -177,7 +177,7 @@ rm -rf ~/.proxycast/skills/test-calculator
 
 ### 动态刷新不生效
 
-1. 确认调用了 `reload_proxycast_skills()`
+1. 确认调用了 `reload_lime_skills()`
 2. 检查日志中是否有刷新相关的输出
 3. 尝试重启应用
 
@@ -192,7 +192,7 @@ test('AI should auto-invoke skill based on intent', async ({ page }) => {
   await createTestSkill('test-greeting');
   
   // 2. 启动应用
-  await launchProxyCast();
+  await launchLime();
   
   // 3. 发送消息
   await page.fill('[data-testid="chat-input"]', '请用问候技能跟我打招呼');
@@ -200,6 +200,6 @@ test('AI should auto-invoke skill based on intent', async ({ page }) => {
   
   // 4. 验证响应
   await expect(page.locator('[data-testid="chat-message"]'))
-    .toContainText('你好！我是 ProxyCast 助手');
+    .toContainText('你好！我是 Lime 助手');
 });
 ```

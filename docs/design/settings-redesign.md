@@ -1,6 +1,6 @@
-# ProxyCast 设置页面重构设计
+# Lime 设置页面重构设计
 
-> 参考 LobeHub 的设置架构，为 ProxyCast 设计现代化的设置界面
+> 参考 LobeHub 的设置架构，为 Lime 设计现代化的设置界面
 
 ## 一、设计目标
 
@@ -548,7 +548,7 @@ export function SettingHeader({ title, extra }: SettingHeaderProps) {
 
 ## 八、与 LobeHub 的对应关系
 
-| LobeHub 设置项 | ProxyCast 对应 | 备注 |
+| LobeHub 设置项 | Lime 对应 | 备注 |
 |---------------|---------------|------|
 | Profile | account/profile | 用户资料 |
 | Stats | account/stats | 使用统计 |
@@ -568,7 +568,7 @@ export function SettingHeader({ title, extra }: SettingHeaderProps) {
 ## 九、UI 设计参考
 
 ### 颜色方案
-- 使用 ProxyCast 现有的 CSS 变量（`hsl(var(--xxx))`）
+- 使用 Lime 现有的 CSS 变量（`hsl(var(--xxx))`）
 - 侧边栏背景：`--card`
 - 激活项背景：`--accent`
 - 分组标题：`--muted-foreground`

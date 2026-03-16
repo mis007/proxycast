@@ -7,7 +7,7 @@
 export type AgentBackend = "aster";
 
 // 默认使用 Aster 后端
-const STORAGE_KEY = "proxycast_agent_backend";
+const STORAGE_KEY = "lime_agent_backend";
 
 /**
  * 获取当前 Agent 后端

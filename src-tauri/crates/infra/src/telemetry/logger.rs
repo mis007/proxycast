@@ -4,8 +4,8 @@
 
 use super::types::{ModelStats, ProviderStats, RequestLog, RequestStatus, StatsSummary, TimeRange};
 use chrono::{DateTime, Duration, Utc};
+use lime_core::ProviderType;
 use parking_lot::RwLock;
-use proxycast_core::ProviderType;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::fs::{self, File, OpenOptions};
@@ -100,7 +100,7 @@ pub struct RequestLogger {
 impl RequestLogger {
     /// 创建新的日志记录器
     pub fn new(config: LogRotationConfig) -> Result<Self, LoggerError> {
-        let log_dir = proxycast_core::app_paths::resolve_request_logs_dir()
+        let log_dir = lime_core::app_paths::resolve_request_logs_dir()
             .map_err(LoggerError::DirectoryCreation)?;
 
         let logger = Self {

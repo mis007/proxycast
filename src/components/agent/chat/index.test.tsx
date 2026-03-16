@@ -711,7 +711,7 @@ function mockBrowserAssistCompletedSession() {
             toolCalls: [
               {
                 id: "tool-browser-open",
-                name: "mcp__proxycast-browser__browser_navigate",
+                name: "mcp__lime-browser__browser_navigate",
                 arguments: JSON.stringify({
                   url: "https://www.rokid.com",
                   profile_key: "general_browser_assist",
@@ -1453,7 +1453,7 @@ describe("AgentChatPage 通用工作台", () => {
     });
     await flushEffects(10);
 
-    expect(mockSkillsGetAll).toHaveBeenCalledWith("proxycast");
+    expect(mockSkillsGetAll).toHaveBeenCalledWith("lime");
 
     clickButton(container, "toggle-harness");
     await flushEffects();
@@ -1594,7 +1594,7 @@ describe("AgentChatPage 通用工作台", () => {
               toolCalls: [
                 {
                   id: "tool-browser-pending",
-                  name: "mcp__proxycast-browser__browser_navigate",
+                  name: "mcp__lime-browser__browser_navigate",
                   arguments: JSON.stringify({
                     url: "https://accounts.example.com",
                     profile_key: "general_browser_assist",

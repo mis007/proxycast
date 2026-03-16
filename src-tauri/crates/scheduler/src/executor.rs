@@ -4,15 +4,15 @@
 
 use super::types::ScheduledTask;
 use async_trait::async_trait;
-use proxycast_agent::credential_bridge::CredentialBridge;
+use lime_agent::credential_bridge::CredentialBridge;
 #[cfg(test)]
-use proxycast_agent::request_tool_policy::REQUEST_TOOL_POLICY_MARKER;
-use proxycast_agent::request_tool_policy::{
+use lime_agent::request_tool_policy::REQUEST_TOOL_POLICY_MARKER;
+use lime_agent::request_tool_policy::{
     merge_system_prompt_with_request_tool_policy, resolve_request_tool_policy,
     stream_reply_with_policy,
 };
-use proxycast_agent::{AsterAgentState, SessionConfigBuilder};
-use proxycast_core::database::DbConnection;
+use lime_agent::{AsterAgentState, SessionConfigBuilder};
+use lime_core::database::DbConnection;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -160,7 +160,7 @@ impl AgentExecutor {
         &self,
         task: &ScheduledTask,
         db: &DbConnection,
-        _aster_config: &proxycast_agent::credential_bridge::AsterProviderConfig,
+        _aster_config: &lime_agent::credential_bridge::AsterProviderConfig,
     ) -> Result<serde_json::Value, String> {
         // 从任务参数中提取对话内容
         let prompt = task
@@ -179,7 +179,7 @@ impl AgentExecutor {
             &request_tool_policy,
         );
         // 对齐主对话入口：执行前刷新一次 Skills 注册，避免运行期安装/更新后不可见。
-        AsterAgentState::reload_proxycast_skills();
+        AsterAgentState::reload_lime_skills();
         tracing::info!(
             "[AgentExecutor] agent_chat 会话策略: session={} web_search={} system_prompt={}",
             session_id,
@@ -227,7 +227,7 @@ impl AgentExecutor {
             None,
             &request_tool_policy,
             |event| match event {
-                proxycast_agent::TauriAgentEvent::ToolStart {
+                lime_agent::TauriAgentEvent::ToolStart {
                     tool_name, tool_id, ..
                 } => {
                     tracing::info!(
@@ -236,7 +236,7 @@ impl AgentExecutor {
                         tool_id
                     );
                 }
-                proxycast_agent::TauriAgentEvent::ToolEnd { tool_id, result } => {
+                lime_agent::TauriAgentEvent::ToolEnd { tool_id, result } => {
                     tracing::info!(
                         "[AgentExecutor] 工具调用结束: tool_id={} success={}",
                         tool_id,
@@ -275,7 +275,7 @@ impl AgentExecutor {
         &self,
         task: &ScheduledTask,
         _db: &DbConnection,
-        _aster_config: &proxycast_agent::credential_bridge::AsterProviderConfig,
+        _aster_config: &lime_agent::credential_bridge::AsterProviderConfig,
     ) -> Result<serde_json::Value, String> {
         let report_type = task
             .params

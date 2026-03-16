@@ -19,7 +19,7 @@ fn mask_api_key_for_display(key: &str) -> String {
 
 fn api_key_provider_with_keys_to_display(
     provider_with_keys: &crate::database::dao::api_key_provider::ProviderWithKeys,
-    service: &proxycast_services::api_key_provider_service::ApiKeyProviderService,
+    service: &lime_services::api_key_provider_service::ApiKeyProviderService,
 ) -> crate::commands::api_key_provider_cmd::ProviderWithKeysDisplay {
     let api_keys = provider_with_keys
         .api_keys

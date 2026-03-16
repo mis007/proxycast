@@ -19,7 +19,7 @@ interface PersistedState {
 }
 
 /** 存储键名 */
-const STORAGE_KEY = "proxycast_content_creator_state";
+const STORAGE_KEY = "lime_content_creator_state";
 
 /** 工作流过期时间 (24小时) */
 const WORKFLOW_EXPIRY_MS = 24 * 60 * 60 * 1000;

@@ -114,7 +114,7 @@ pub fn run() {
     let shared_tokens_clone = shared_tokens.clone();
     let shared_logger_clone = shared_logger.clone();
     let update_check_service_clone = update_check_service_state.0.clone();
-    let gateway_tunnel_state = proxycast_gateway::tunnel::GatewayTunnelState::default();
+    let gateway_tunnel_state = lime_gateway::tunnel::GatewayTunnelState::default();
     let gateway_tunnel_state_for_setup = gateway_tunnel_state.clone();
     let global_config_manager_for_setup = global_config_manager_state.clone();
     let tunnel_logs_clone = logs.clone();
@@ -181,9 +181,9 @@ pub fn run() {
         .manage(automation_service_state)
         .manage(workflow_service)
         .manage(progress_store)
-        .manage(proxycast_gateway::telegram::TelegramGatewayState::default())
-        .manage(proxycast_gateway::discord::DiscordGatewayState::default())
-        .manage(proxycast_gateway::feishu::FeishuGatewayState::default())
+        .manage(lime_gateway::telegram::TelegramGatewayState::default())
+        .manage(lime_gateway::discord::DiscordGatewayState::default())
+        .manage(lime_gateway::feishu::FeishuGatewayState::default())
         .manage(gateway_tunnel_state)
         .manage(crate::services::openclaw_service::OpenClawServiceState::default())
         .manage(commands::telegram_remote_cmd::TelegramRemoteState::default())
@@ -270,7 +270,7 @@ pub fn run() {
             // 设置 MCP Manager 的事件发射器（用于发送 mcp:* 事件）
             if let Some(mcp_manager) = app.try_state::<crate::mcp::McpManagerState>() {
                 let app_handle = app.handle().clone();
-                let emitter = proxycast_core::DynEmitter::new(
+                let emitter = lime_core::DynEmitter::new(
                     crate::app::TauriEventEmitter(app_handle),
                 );
                 tauri::async_runtime::block_on(async {
@@ -285,7 +285,7 @@ pub fn run() {
                 app.try_state::<crate::commands::plugin_cmd::PluginManagerState>()
             {
                 let app_handle = app.handle().clone();
-                let emitter = proxycast_core::DynEmitter::new(
+                let emitter = lime_core::DynEmitter::new(
                     crate::app::TauriEventEmitter(app_handle),
                 );
                 tauri::async_runtime::block_on(async {
@@ -446,7 +446,7 @@ pub fn run() {
                     // 获取应用数据目录
                     let app_data_dir = dirs::data_dir()
                         .unwrap_or_else(|| std::path::PathBuf::from("."))
-                        .join("proxycast");
+                        .join("lime");
 
                     // 初始化 Connect 状态
                     match crate::commands::connect_cmd::init_connect_state(app_data_dir).await {
@@ -504,7 +504,7 @@ pub fn run() {
 
                 tauri::async_runtime::spawn(async move {
                     // 创建 ModelRegistryService
-                    let mut service = proxycast_services::model_registry_service::ModelRegistryService::new(db_clone);
+                    let mut service = lime_services::model_registry_service::ModelRegistryService::new(db_clone);
                     // 设置资源目录路径
                     service.set_resource_dir(resource_dir);
 
@@ -530,7 +530,7 @@ pub fn run() {
             // 初始化终端会话管理器
             {
                 let app_handle = app.handle().clone();
-                let terminal_manager = proxycast_terminal::TerminalSessionManager::new(crate::terminal::TauriEmitter(app_handle.clone()));
+                let terminal_manager = lime_terminal::TerminalSessionManager::new(crate::terminal::TauriEmitter(app_handle.clone()));
                 if let Some(state) = app_handle.try_state::<crate::commands::terminal_cmd::TerminalManagerState>() {
                     let mut guard = state.inner().0.blocking_write();
                     *guard = Some(terminal_manager);
@@ -552,7 +552,7 @@ pub fn run() {
                             // 尝试解析为 JSON 数组（Tauri deep-link 插件返回的格式）
                             if let Ok(url_list) = serde_json::from_str::<Vec<String>>(&urls) {
                                 for url in url_list {
-                                    if url.starts_with("proxycast://connect") {
+                                    if url.starts_with("lime://connect") {
                                         // 调用 handle_deep_link 命令
                                         if let Some(state) = app_handle_clone
                                             .try_state::<crate::commands::connect_cmd::ConnectStateWrapper>()
@@ -591,7 +591,7 @@ pub fn run() {
                                         }
                                     }
                                 }
-                            } else if urls.starts_with("proxycast://connect") {
+                            } else if urls.starts_with("lime://connect") {
                                 // 直接处理单个 URL
                                 if let Some(state) = app_handle_clone
                                     .try_state::<crate::commands::connect_cmd::ConnectStateWrapper>()
@@ -881,7 +881,7 @@ pub fn run() {
 
                         let mode = config.gateway.tunnel.mode.trim().to_ascii_lowercase();
                         if mode == "managed" {
-                            match proxycast_gateway::tunnel::status_tunnel_with_config(
+                            match lime_gateway::tunnel::status_tunnel_with_config(
                                 &tunnel_state,
                                 Some(config.clone()),
                             )
@@ -898,7 +898,7 @@ pub fn run() {
                                                 ),
                                             );
                                         }
-                                    } else if proxycast_gateway::tunnel::is_manual_stop_error(
+                                    } else if lime_gateway::tunnel::is_manual_stop_error(
                                         status.last_error.as_deref(),
                                     ) {
                                         if round.is_multiple_of(6) {
@@ -915,7 +915,7 @@ pub fn run() {
                                                 status.last_exit, status.last_error
                                             ),
                                         );
-                                        if let Err(e) = proxycast_gateway::tunnel::start_tunnel(
+                                        if let Err(e) = lime_gateway::tunnel::start_tunnel(
                                             &tunnel_state,
                                             logs.clone(),
                                             config.clone(),
@@ -936,7 +936,7 @@ pub fn run() {
                                 }
                             }
                         } else if mode == "external" && round.is_multiple_of(6) {
-                            match proxycast_gateway::tunnel::status_tunnel_with_config(
+                            match lime_gateway::tunnel::status_tunnel_with_config(
                                 &tunnel_state,
                                 Some(config),
                             )
@@ -1065,11 +1065,13 @@ pub fn run() {
             commands::openclaw_cmd::openclaw_get_git_download_url,
             commands::openclaw_cmd::openclaw_get_command_preview,
             commands::openclaw_cmd::openclaw_get_progress_logs,
+            commands::openclaw_cmd::openclaw_list_runtime_candidates,
             commands::openclaw_cmd::openclaw_install,
             commands::openclaw_cmd::openclaw_install_dependency,
             commands::openclaw_cmd::openclaw_check_update,
             commands::openclaw_cmd::openclaw_uninstall,
             commands::openclaw_cmd::openclaw_perform_update,
+            commands::openclaw_cmd::openclaw_set_preferred_runtime,
             commands::openclaw_cmd::openclaw_cleanup_temp_artifacts,
             commands::openclaw_cmd::openclaw_start_gateway,
             commands::openclaw_cmd::openclaw_stop_gateway,
@@ -1139,7 +1141,7 @@ pub fn run() {
             commands::skill_cmd::add_skill_repo,
             commands::skill_cmd::remove_skill_repo,
             commands::skill_cmd::refresh_skill_cache,
-            commands::skill_cmd::get_installed_proxycast_skills,
+            commands::skill_cmd::get_installed_lime_skills,
             commands::skill_cmd::inspect_local_skill_for_app,
             commands::skill_cmd::create_skill_scaffold_for_app,
             commands::skill_cmd::import_local_skill_for_app,

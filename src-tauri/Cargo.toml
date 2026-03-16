@@ -3,33 +3,33 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.88.0"
+version = "0.89.0"
 edition = "2021"
 authors = ["coso"]
-repository = "https://github.com/aiclientproxy/proxycast"
-homepage = "https://github.com/aiclientproxy/proxycast"
+repository = "https://github.com/aiclientproxy/lime"
+homepage = "https://github.com/aiclientproxy/lime"
 
 [workspace.dependencies]
 # 项目内 crate 依赖
-proxycast-core = { path = "crates/core" }
-proxycast-config = { path = "crates/config" }
-proxycast-infra = { path = "crates/infra" }
-proxycast-providers = { path = "crates/providers" }
-proxycast-services = { path = "crates/services" }
-proxycast-terminal = { path = "crates/terminal" }
-proxycast-credential = { path = "crates/credential" }
-proxycast-websocket = { path = "crates/websocket" }
-proxycast-processor = { path = "crates/processor" }
-proxycast-server-utils = { path = "crates/server-utils" }
-proxycast-server = { path = "crates/server" }
-proxycast-skills = { path = "crates/skills" }
-proxycast-mcp = { path = "crates/mcp" }
-proxycast-agent = { path = "crates/agent" }
-proxycast-scheduler = { path = "crates/scheduler" }
-proxycast-memory = { path = "crates/memory" }
-proxycast-embedding = { path = "crates/embedding" }
-proxycast-gateway = { path = "crates/gateway" }
-proxycast-browser-runtime = { path = "crates/browser-runtime" }
+lime-core = { path = "crates/core" }
+lime-config = { path = "crates/config" }
+lime-infra = { path = "crates/infra" }
+lime-providers = { path = "crates/providers" }
+lime-services = { path = "crates/services" }
+lime-terminal = { path = "crates/terminal" }
+lime-credential = { path = "crates/credential" }
+lime-websocket = { path = "crates/websocket" }
+lime-processor = { path = "crates/processor" }
+lime-server-utils = { path = "crates/server-utils" }
+lime-server = { path = "crates/server" }
+lime-skills = { path = "crates/skills" }
+lime-mcp = { path = "crates/mcp" }
+lime-agent = { path = "crates/agent" }
+lime-scheduler = { path = "crates/scheduler" }
+lime-memory = { path = "crates/memory" }
+lime-embedding = { path = "crates/embedding" }
+lime-gateway = { path = "crates/gateway" }
+lime-browser-runtime = { path = "crates/browser-runtime" }
 voice-core = { path = "crates/voice-core" }
 
 # 序列化
@@ -190,16 +190,16 @@ version = "0.2"
 version = "2.4"
 
 [package]
-name = "proxycast"
-version = "0.88.0"
+name = "lime"
+version = "0.89.0"
 description = "AI API Proxy Desktop App"
 authors = ["you"]
 edition = "2021"
-repository = "https://github.com/aiclientproxy/proxycast"
-homepage = "https://github.com/aiclientproxy/proxycast"
+repository = "https://github.com/aiclientproxy/lime"
+homepage = "https://github.com/aiclientproxy/lime"
 
 [lib]
-name = "proxycast_lib"
+name = "lime_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
@@ -207,25 +207,25 @@ tauri-build.workspace = true
 
 [dependencies]
 # 项目内 crate
-proxycast-core.workspace = true
-proxycast-config.workspace = true
-proxycast-infra.workspace = true
-proxycast-providers.workspace = true
-proxycast-services.workspace = true
-proxycast-terminal.workspace = true
-proxycast-credential.workspace = true
-proxycast-websocket.workspace = true
-proxycast-processor.workspace = true
-proxycast-server-utils.workspace = true
-proxycast-server.workspace = true
-proxycast-skills.workspace = true
-proxycast-mcp.workspace = true
-proxycast-gateway.workspace = true
-proxycast-agent.workspace = true
-proxycast-scheduler.workspace = true
-proxycast-memory.workspace = true
-proxycast-embedding.workspace = true
-proxycast-browser-runtime.workspace = true
+lime-core.workspace = true
+lime-config.workspace = true
+lime-infra.workspace = true
+lime-providers.workspace = true
+lime-services.workspace = true
+lime-terminal.workspace = true
+lime-credential.workspace = true
+lime-websocket.workspace = true
+lime-processor.workspace = true
+lime-server-utils.workspace = true
+lime-server.workspace = true
+lime-skills.workspace = true
+lime-mcp.workspace = true
+lime-gateway.workspace = true
+lime-agent.workspace = true
+lime-scheduler.workspace = true
+lime-memory.workspace = true
+lime-embedding.workspace = true
+lime-browser-runtime.workspace = true
 voice-core.workspace = true
 
 # Tauri

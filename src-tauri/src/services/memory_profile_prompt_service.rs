@@ -3,7 +3,7 @@
 //! 将设置页中的记忆画像（学习状态、擅长领域、解释偏好、难题偏好）
 //! 转换为可注入到系统提示词中的统一指令片段。
 
-use proxycast_core::config::Config;
+use lime_core::config::Config;
 use std::path::Path;
 
 use crate::services::memory_source_resolver_service::build_memory_sources_prompt;
@@ -141,7 +141,7 @@ pub fn merge_system_prompt_with_memory_sources(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_core::config::Config;
+    use lime_core::config::Config;
     use std::fs;
     use tempfile::TempDir;
 

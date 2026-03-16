@@ -6,13 +6,13 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use proxycast_core::database::dao::api_key_provider::ApiKeyProvider;
-use proxycast_core::database::dao::material_dao::MaterialDao;
-use proxycast_core::database::dao::video_generation_task_dao::{
+use lime_core::database::dao::api_key_provider::ApiKeyProvider;
+use lime_core::database::dao::material_dao::MaterialDao;
+use lime_core::database::dao::video_generation_task_dao::{
     CreateVideoGenerationTaskParams, UpdateVideoGenerationTaskParams, VideoGenerationTask,
     VideoGenerationTaskDao, VideoGenerationTaskStatus,
 };
-use proxycast_core::database::{lock_db, DbConnection};
+use lime_core::database::{lock_db, DbConnection};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

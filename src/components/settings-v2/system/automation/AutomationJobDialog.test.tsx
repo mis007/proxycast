@@ -36,7 +36,7 @@ beforeEach(() => {
       description: "主账号",
       site_scope: "seller.example.com",
       launch_url: "https://seller.example.com",
-      profile_dir: "/tmp/proxycast/chrome_profiles/shop_us",
+      profile_dir: "/tmp/lime/chrome_profiles/shop_us",
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
       last_used_at: null,
@@ -120,7 +120,7 @@ async function renderDialog(props: {
                 delivery: {
                   mode: "announce",
                   channel: "local_file",
-                  target: "/tmp/proxycast/browser-output.json",
+                  target: "/tmp/lime/browser-output.json",
                   best_effort: false,
                   output_schema: "json",
                   output_format: "json",
@@ -194,7 +194,7 @@ describe("AutomationJobDialog", () => {
         delivery: expect.objectContaining({
           mode: "announce",
           channel: "local_file",
-          target: "/tmp/proxycast/browser-output.json",
+          target: "/tmp/lime/browser-output.json",
           best_effort: false,
           output_schema: "json",
           output_format: "json",
@@ -212,7 +212,7 @@ describe("AutomationJobDialog", () => {
           mode: "announce",
           channel: "google_sheets",
           target:
-            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/proxycast/service-account.json;include_header=true",
+            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/lime/service-account.json;include_header=true",
           best_effort: true,
           output_schema: "table",
           output_format: "json",
@@ -237,7 +237,7 @@ describe("AutomationJobDialog", () => {
           mode: "announce",
           channel: "google_sheets",
           target:
-            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/proxycast/service-account.json;include_header=true",
+            "spreadsheet_id=sheet-1;sheet=巡检结果;credentials_file=C:/lime/service-account.json;include_header=true",
           best_effort: true,
           output_schema: "table",
           output_format: "json",

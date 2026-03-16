@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::DynEmitter;
+use lime_core::DynEmitter;
 use rmcp::{
     model::{
         ClientCapabilities, ClientInfo, Implementation, LoggingMessageNotification,
@@ -38,14 +38,14 @@ pub struct McpLogMessagePayload {
     pub data: serde_json::Value,
 }
 
-/// ProxyCast MCP 客户端处理器
-pub struct ProxyCastMcpClient {
+/// Lime MCP 客户端处理器
+pub struct LimeMcpClient {
     emitter: Option<DynEmitter>,
     server_name: String,
     notification_handlers: Arc<Mutex<Vec<mpsc::Sender<ServerNotification>>>>,
 }
 
-impl ProxyCastMcpClient {
+impl LimeMcpClient {
     pub fn new(server_name: String, emitter: Option<DynEmitter>) -> Self {
         Self {
             emitter,
@@ -81,17 +81,17 @@ impl ProxyCastMcpClient {
     }
 }
 
-impl ClientHandler for ProxyCastMcpClient {
+impl ClientHandler for LimeMcpClient {
     fn get_info(&self) -> ClientInfo {
         ClientInfo {
             protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ClientCapabilities::builder().enable_sampling().build(),
             client_info: Implementation {
-                name: "proxycast".to_string(),
+                name: "lime".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 icons: None,
-                title: Some("ProxyCast MCP Client".to_string()),
-                website_url: Some("https://github.com/aiclientproxy/proxycast".to_string()),
+                title: Some("Lime MCP Client".to_string()),
+                website_url: Some("https://github.com/aiclientproxy/lime".to_string()),
             },
         }
     }
@@ -182,9 +182,8 @@ pub struct McpClientWrapper {
     pub config: super::types::McpServerConfig,
     pub process: Option<tokio::process::Child>,
     pub server_info: Option<super::types::McpServerCapabilities>,
-    pub client_handler: Arc<ProxyCastMcpClient>,
-    pub running_service:
-        Option<rmcp::service::RunningService<rmcp::RoleClient, ProxyCastMcpClient>>,
+    pub client_handler: Arc<LimeMcpClient>,
+    pub running_service: Option<rmcp::service::RunningService<rmcp::RoleClient, LimeMcpClient>>,
 }
 
 impl McpClientWrapper {
@@ -193,7 +192,7 @@ impl McpClientWrapper {
         config: super::types::McpServerConfig,
         emitter: Option<DynEmitter>,
     ) -> Self {
-        let client_handler = Arc::new(ProxyCastMcpClient::new(server_name.clone(), emitter));
+        let client_handler = Arc::new(LimeMcpClient::new(server_name.clone(), emitter));
 
         Self {
             server_name,
@@ -205,7 +204,7 @@ impl McpClientWrapper {
         }
     }
 
-    pub fn handler(&self) -> Arc<ProxyCastMcpClient> {
+    pub fn handler(&self) -> Arc<LimeMcpClient> {
         self.client_handler.clone()
     }
 
@@ -219,14 +218,14 @@ impl McpClientWrapper {
 
     pub fn set_running_service(
         &mut self,
-        service: rmcp::service::RunningService<rmcp::RoleClient, ProxyCastMcpClient>,
+        service: rmcp::service::RunningService<rmcp::RoleClient, LimeMcpClient>,
     ) {
         self.running_service = Some(service);
     }
 
     pub fn running_service(
         &self,
-    ) -> Option<&rmcp::service::RunningService<rmcp::RoleClient, ProxyCastMcpClient>> {
+    ) -> Option<&rmcp::service::RunningService<rmcp::RoleClient, LimeMcpClient>> {
         self.running_service.as_ref()
     }
 
@@ -246,14 +245,11 @@ mod tests {
 
     #[test]
     fn test_client_info() {
-        let client = ProxyCastMcpClient::new("test-server".to_string(), None);
+        let client = LimeMcpClient::new("test-server".to_string(), None);
         let info = client.get_info();
 
-        assert_eq!(info.client_info.name, "proxycast");
-        assert_eq!(
-            info.client_info.title,
-            Some("ProxyCast MCP Client".to_string())
-        );
+        assert_eq!(info.client_info.name, "lime");
+        assert_eq!(info.client_info.title, Some("Lime MCP Client".to_string()));
         assert_eq!(info.protocol_version, ProtocolVersion::V_2025_03_26);
     }
 
@@ -277,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_notification_subscription() {
-        let client = ProxyCastMcpClient::new("test-server".to_string(), None);
+        let client = LimeMcpClient::new("test-server".to_string(), None);
 
         let mut rx = client.subscribe().await;
 

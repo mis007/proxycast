@@ -9,15 +9,15 @@
 
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
-use proxycast_core::config::{
+use lime_core::config::{
     Config, DiscordAccountConfig, DiscordActionsConfig, DiscordAgentComponentsConfig,
     DiscordAutoPresenceConfig, DiscordBotConfig, DiscordExecApprovalsConfig, DiscordGuildConfig,
     DiscordIntentsConfig, DiscordThreadBindingsConfig, DiscordUiConfig, DiscordVoiceConfig,
 };
-use proxycast_core::database::DbConnection;
-use proxycast_core::logger::LogStore;
-use proxycast_websocket::handlers::{RpcHandler, RpcHandlerState};
-use proxycast_websocket::protocol::{
+use lime_core::database::DbConnection;
+use lime_core::logger::LogStore;
+use lime_websocket::handlers::{RpcHandler, RpcHandlerState};
+use lime_websocket::protocol::{
     AgentRunResult, AgentStopResult, AgentWaitResult, CronHealthResult, CronListResult,
     CronRunResult, GatewayRpcRequest, GatewayRpcResponse, RpcMethod, SessionGetResult,
     SessionsListResult,
@@ -573,8 +573,8 @@ async fn run_gateway_loop(
                 "intents": resolve_intents_bitmask(&context.account.intents),
                 "properties": {
                     "os": std::env::consts::OS,
-                    "browser": "proxycast",
-                    "device": "proxycast"
+                    "browser": "lime",
+                    "device": "lime"
                 }
             }
         }),
@@ -1628,7 +1628,7 @@ fn danger_command_label(command: &DiscordCommand) -> &'static str {
 
 fn help_text() -> String {
     [
-        "🤖 ProxyCast Discord Gateway 命令",
+        "🤖 Lime Discord Gateway 命令",
         "/run <任务内容> - 启动一个 Agent 任务",
         "/new [首条消息] - 开启新对话（/reset 同义）",
         "/status <run_id> - 查看任务状态",
@@ -1891,10 +1891,7 @@ fn parse_result<T: DeserializeOwned>(value: serde_json::Value) -> Result<T, Stri
     serde_json::from_value(value).map_err(|e| format!("解析 RPC 结果失败: {e}"))
 }
 
-fn extract_rpc_error(
-    error: Option<proxycast_websocket::protocol::RpcError>,
-    fallback: &str,
-) -> String {
+fn extract_rpc_error(error: Option<lime_websocket::protocol::RpcError>, fallback: &str) -> String {
     if let Some(err) = error {
         return format!("{} (code={})", err.message, err.code);
     }

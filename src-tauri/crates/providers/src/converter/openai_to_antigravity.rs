@@ -15,7 +15,7 @@
 //! - 2025-12-28: 修复请求格式，对齐 CLIProxyAPI 实现
 
 use crate::session::{get_thought_signature, SessionManager};
-use proxycast_core::models::openai::*;
+use lime_core::models::openai::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -1061,7 +1061,7 @@ pub fn convert_antigravity_to_openai_response(
 // 图像生成 API 转换函数
 // ============================================================================
 
-use proxycast_core::models::openai::{ImageData, ImageGenerationRequest, ImageGenerationResponse};
+use lime_core::models::openai::{ImageData, ImageGenerationRequest, ImageGenerationResponse};
 
 /// 图像生成模型名称映射
 ///

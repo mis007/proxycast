@@ -26,10 +26,10 @@ pub fn get_system_providers() -> Vec<SystemProviderDef> {
         // 主流 AI (11个) - Requirements 3.1
         // =========================================================================
         SystemProviderDef {
-            id: "proxycast-hub",
-            name: "ProxyCast Hub",
+            id: "lime-hub",
+            name: "Lime Hub",
             provider_type: ApiProviderType::Openai,
-            api_host: "https://hub.proxycast.ai/v1",
+            api_host: "https://hub.lime.ai/v1",
             group: ProviderGroup::Mainstream,
             sort_order: 0,
             api_version: None,

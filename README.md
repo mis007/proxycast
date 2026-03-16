@@ -1,6 +1,6 @@
 <div align="center">
 
-# ProxyCast
+# Lime
 
 **以创作为中心的本地优先 AI Agent 交互工作台**
 
@@ -12,7 +12,7 @@
 
 ## 这是什么
 
-ProxyCast 是一个基于 Tauri 的桌面应用，面向创作者、内容团队与轻知识工作者。它把 Workspace、Agent、Skills、MCP、Claw 渠道和 Artifact 交付整合到同一个桌面环境里，让工作从输入需求直接走向可沉淀、可复用、可继续执行的结果。
+Lime 是一个基于 Tauri 的桌面应用，面向创作者、内容团队与轻知识工作者。它把 Workspace、Agent、Skills、MCP、Claw 渠道和 Artifact 交付整合到同一个桌面环境里，让工作从输入需求直接走向可沉淀、可复用、可继续执行的结果。
 
 你可以在一个地方完成：
 
@@ -34,13 +34,13 @@ ProxyCast 是一个基于 Tauri 的桌面应用，面向创作者、内容团队
 
 - Skills 封装 prompt、references、scripts、assets 和调用规则
 - Skills 既定义如何交互，也定义任务如何推进
-- 它们是 ProxyCast 中经验复用、流程复用和领域方法沉淀的核心单元
+- 它们是 Lime 中经验复用、流程复用和领域方法沉淀的核心单元
 
 ### 3. MCP 是标准能力层
 
 - 基于 MCP 接入 tools、resources、prompts 和工作边界
 - 让浏览器、文件、终端和外部服务成为 Agent 的标准化能力网络
-- 让 ProxyCast 的能力扩展建立在开放标准之上
+- 让 Lime 的能力扩展建立在开放标准之上
 
 ### 4. Claw 渠道是异步协作入口
 
@@ -101,7 +101,7 @@ ProxyCast 是一个基于 Tauri 的桌面应用，面向创作者、内容团队
 
 ## 如何工作
 
-ProxyCast 的核心工作方式是：
+Lime 的核心工作方式是：
 
 1. 在 Workspace 内组织项目、素材、记忆和风格
 2. 用 Skills 定义经验交互与流程推进
@@ -119,15 +119,15 @@ ProxyCast 的核心工作方式是：
 
 ```bash
 brew tap aiclientproxy/tap
-brew install --cask proxycast
+brew install --cask lime
 ```
 
 #### 手动下载
 
-从 [Releases](https://github.com/aiclientproxy/proxycast/releases) 下载对应平台安装包。
+从 [Releases](https://github.com/aiclientproxy/lime/releases) 下载对应平台安装包。
 
-- Windows 用户默认优先下载 `ProxyCast_*_x64-online-setup.exe`（NSIS 在线安装器，体积更小）
-- 如果处于离线、内网或受限网络环境，请改用 `ProxyCast_*_x64-offline-setup.exe`
+- Windows 用户默认优先下载 `Lime_*_x64-online-setup.exe`（NSIS 在线安装器，体积更小）
+- 如果处于离线、内网或受限网络环境，请改用 `Lime_*_x64-offline-setup.exe`
 - 如被 SmartScreen 拦截，属于未签名或签名信誉不足的 Windows 常见提示，不代表安装包必然损坏
 
 ---

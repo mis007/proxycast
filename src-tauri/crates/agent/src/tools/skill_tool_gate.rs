@@ -61,11 +61,11 @@ fn skill_tool_disabled_message() -> &'static str {
     "当前会话未启用技能自动调用。请改用显式 /skill-name 指令，或切换到需要技能编排的工作流。"
 }
 
-pub struct ProxycastSkillTool {
+pub struct LimeSkillTool {
     inner: SkillTool,
 }
 
-impl ProxycastSkillTool {
+impl LimeSkillTool {
     pub fn new() -> Self {
         Self {
             inner: SkillTool::new(),
@@ -73,14 +73,14 @@ impl ProxycastSkillTool {
     }
 }
 
-impl Default for ProxycastSkillTool {
+impl Default for LimeSkillTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastSkillTool {
+impl Tool for LimeSkillTool {
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -128,7 +128,7 @@ mod tests {
         let session_id = "skill-disabled-session";
         clear_skill_tool_session_access(session_id);
 
-        let tool = ProxycastSkillTool::new();
+        let tool = LimeSkillTool::new();
         let result = tool
             .check_permissions(
                 &serde_json::json!({ "skill": "research" }),
@@ -148,7 +148,7 @@ mod tests {
         let session_id = "skill-enabled-session";
         set_skill_tool_session_access(session_id, true);
 
-        let tool = ProxycastSkillTool::new();
+        let tool = LimeSkillTool::new();
         let result = tool
             .check_permissions(
                 &serde_json::json!({ "skill": "research" }),
@@ -166,7 +166,7 @@ mod tests {
         let session_id = "skill-execute-disabled-session";
         clear_skill_tool_session_access(session_id);
 
-        let tool = ProxycastSkillTool::new();
+        let tool = LimeSkillTool::new();
         let error = tool
             .execute(
                 serde_json::json!({ "skill": "research" }),

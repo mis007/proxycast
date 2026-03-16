@@ -152,7 +152,7 @@ beforeEach(() => {
       sources: {
         project_memory_paths: ["AGENTS.md"],
         project_rule_dirs: [".agents/rules"],
-        user_memory_path: "~/.proxycast/AGENTS.md",
+        user_memory_path: "~/.lime/AGENTS.md",
       },
     },
   });

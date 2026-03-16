@@ -19,8 +19,8 @@ use crate::services::workspace_health_service::{
 use crate::workspace::{
     Workspace, WorkspaceManager, WorkspaceSettings, WorkspaceType, WorkspaceUpdate,
 };
-use proxycast_core::app_paths;
-use proxycast_services::project_context_builder::ProjectContextBuilder;
+use lime_core::app_paths;
+use lime_services::project_context_builder::ProjectContextBuilder;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;

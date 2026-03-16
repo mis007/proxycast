@@ -44,14 +44,14 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`
-Proxycast Chrome Bridge E2E 联调脚本
+Lime Chrome Bridge E2E 联调脚本
 
 用法:
-  node scripts/chrome-bridge-e2e.mjs --key <proxycast_api_key> [选项]
+  node scripts/chrome-bridge-e2e.mjs --key <lime_api_key> [选项]
 
 选项:
   --server <ws_url>       服务地址，默认 ws://127.0.0.1:8787
-  --key <api_key>         Proxycast API Key（必填）
+  --key <api_key>         Lime API Key（必填）
   --profile <profile_key> profileKey，默认 default
   --timeout-ms <ms>       单步超时毫秒，默认 15000
   -h, --help              显示帮助
@@ -200,8 +200,8 @@ async function main() {
   const server = normalizeServer(args.server);
   const key = encodeURIComponent(args.key);
   const profile = encodeURIComponent(args.profile || "default");
-  const observerUrl = `${server}/proxycast-chrome-observer/Proxycast_Key=${key}?profileKey=${profile}`;
-  const controlUrl = `${server}/proxycast-chrome-control/Proxycast_Key=${key}`;
+  const observerUrl = `${server}/lime-chrome-observer/Lime_Key=${key}?profileKey=${profile}`;
+  const controlUrl = `${server}/lime-chrome-control/Lime_Key=${key}`;
 
   console.log("[E2E] observer:", observerUrl);
   console.log("[E2E] control :", controlUrl);

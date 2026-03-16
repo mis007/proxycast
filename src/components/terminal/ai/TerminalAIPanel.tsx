@@ -53,7 +53,7 @@ export const TerminalAIPanel: React.FC<TerminalAIPanelProps> = ({
   // 加载技能列表
   useEffect(() => {
     skillsApi
-      .getAll("proxycast")
+      .getAll("lime")
       .then(setSkills)
       .catch((err) => console.error("加载技能列表失败:", err));
   }, []);

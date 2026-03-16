@@ -422,7 +422,7 @@ export function NotificationChannelFormModal({
                 type="text"
                 value={formState.discord_username}
                 onChange={(e) => updateField("discord_username", e.target.value)}
-                placeholder="ProxyCast Bot"
+                placeholder="Lime Bot"
                 disabled={isSubmitting}
               />
               <p className="text-xs text-muted-foreground">

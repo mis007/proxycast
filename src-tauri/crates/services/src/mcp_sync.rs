@@ -1,4 +1,4 @@
-use proxycast_core::models::{AppType, McpServer};
+use lime_core::models::{AppType, McpServer};
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 
@@ -27,7 +27,7 @@ pub fn get_mcp_config_path(app_type: &AppType) -> Option<PathBuf> {
         AppType::Claude => Some(home.join(".claude").join("settings.json")),
         AppType::Codex => Some(home.join(".codex").join("config.toml")),
         AppType::Gemini => Some(home.join(".gemini").join("settings.json")),
-        AppType::ProxyCast => None,
+        AppType::Lime => None,
     }
 }
 
@@ -61,7 +61,7 @@ pub fn sync_mcp_to_app(
             AppType::Claude => s.enabled_claude,
             AppType::Codex => s.enabled_codex,
             AppType::Gemini => s.enabled_gemini,
-            AppType::ProxyCast => s.enabled_proxycast,
+            AppType::Lime => s.enabled_lime,
         })
         .collect();
 
@@ -69,7 +69,7 @@ pub fn sync_mcp_to_app(
         AppType::Claude => sync_mcp_to_claude(&enabled_servers),
         AppType::Codex => sync_mcp_to_codex(&enabled_servers),
         AppType::Gemini => sync_mcp_to_gemini(&enabled_servers),
-        AppType::ProxyCast => Ok(()),
+        AppType::Lime => Ok(()),
     }
 }
 
@@ -255,7 +255,7 @@ pub fn remove_mcp_from_app(
         AppType::Claude => remove_mcp_from_claude(server_id),
         AppType::Codex => remove_mcp_from_codex(server_id),
         AppType::Gemini => remove_mcp_from_gemini(server_id),
-        AppType::ProxyCast => Ok(()),
+        AppType::Lime => Ok(()),
     }
 }
 
@@ -361,7 +361,7 @@ pub fn remove_mcp_from_all_apps(
 
 /// Import MCP servers from Claude's ~/.claude/settings.json
 pub fn import_mcp_from_claude(
-) -> Result<Vec<proxycast_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<lime_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".claude").join("settings.json");
 
@@ -376,12 +376,12 @@ pub fn import_mcp_from_claude(
 
     if let Some(mcp_servers) = settings.get("mcpServers").and_then(|v| v.as_object()) {
         for (id, config) in mcp_servers {
-            let server = proxycast_core::models::McpServer {
+            let server = lime_core::models::McpServer {
                 id: id.clone(),
                 name: id.clone(),
                 server_config: config.clone(),
                 description: None,
-                enabled_proxycast: true,
+                enabled_lime: true,
                 enabled_claude: true,
                 enabled_codex: false,
                 enabled_gemini: false,
@@ -396,7 +396,7 @@ pub fn import_mcp_from_claude(
 
 /// Import MCP servers from Codex's config.toml
 pub fn import_mcp_from_codex(
-) -> Result<Vec<proxycast_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<lime_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".codex").join("config.toml");
 
@@ -421,12 +421,12 @@ pub fn import_mcp_from_codex(
                 if !current_env.is_empty() {
                     current_config.insert("env".to_string(), Value::Object(current_env.clone()));
                 }
-                let server = proxycast_core::models::McpServer {
+                let server = lime_core::models::McpServer {
                     id: id.clone(),
                     name: id.clone(),
                     server_config: Value::Object(current_config.clone()),
                     description: None,
-                    enabled_proxycast: true,
+                    enabled_lime: true,
                     enabled_claude: false,
                     enabled_codex: true,
                     enabled_gemini: false,
@@ -455,12 +455,12 @@ pub fn import_mcp_from_codex(
                 if !current_env.is_empty() {
                     current_config.insert("env".to_string(), Value::Object(current_env.clone()));
                 }
-                let server = proxycast_core::models::McpServer {
+                let server = lime_core::models::McpServer {
                     id: id.clone(),
                     name: id.clone(),
                     server_config: Value::Object(current_config.clone()),
                     description: None,
-                    enabled_proxycast: true,
+                    enabled_lime: true,
                     enabled_claude: false,
                     enabled_codex: true,
                     enabled_gemini: false,
@@ -503,12 +503,12 @@ pub fn import_mcp_from_codex(
         if !current_env.is_empty() {
             current_config.insert("env".to_string(), Value::Object(current_env));
         }
-        let server = proxycast_core::models::McpServer {
+        let server = lime_core::models::McpServer {
             id: id.clone(),
             name: id.clone(),
             server_config: Value::Object(current_config),
             description: None,
-            enabled_proxycast: true,
+            enabled_lime: true,
             enabled_claude: false,
             enabled_codex: true,
             enabled_gemini: false,
@@ -522,7 +522,7 @@ pub fn import_mcp_from_codex(
 
 /// Import MCP servers from Gemini's settings.json
 pub fn import_mcp_from_gemini(
-) -> Result<Vec<proxycast_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<lime_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let settings_path = home.join(".gemini").join("settings.json");
 
@@ -537,12 +537,12 @@ pub fn import_mcp_from_gemini(
 
     if let Some(mcp_servers) = settings.get("mcpServers").and_then(|v| v.as_object()) {
         for (id, config) in mcp_servers {
-            let server = proxycast_core::models::McpServer {
+            let server = lime_core::models::McpServer {
                 id: id.clone(),
                 name: id.clone(),
                 server_config: config.clone(),
                 description: None,
-                enabled_proxycast: true,
+                enabled_lime: true,
                 enabled_claude: false,
                 enabled_codex: false,
                 enabled_gemini: true,
@@ -558,12 +558,12 @@ pub fn import_mcp_from_gemini(
 /// Import MCP servers from a specific app
 pub fn import_mcp_from_app(
     app_type: &AppType,
-) -> Result<Vec<proxycast_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<lime_core::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     match app_type {
         AppType::Claude => import_mcp_from_claude(),
         AppType::Codex => import_mcp_from_codex(),
         AppType::Gemini => import_mcp_from_gemini(),
-        AppType::ProxyCast => Ok(Vec::new()),
+        AppType::Lime => Ok(Vec::new()),
     }
 }
 

@@ -23,7 +23,7 @@ impl PluginLoader {
         // 在 macOS 上两者相同，但在其他平台上可能不同
         dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("proxycast")
+            .join("lime")
             .join("plugins")
     }
 

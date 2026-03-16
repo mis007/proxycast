@@ -43,7 +43,7 @@ describe("channelsRuntime API", () => {
       .mockResolvedValueOnce({ running: true });
 
     await expect(
-      gatewayTunnelCreate({ tunnelName: "proxycast", persist: true }),
+      gatewayTunnelCreate({ tunnelName: "lime", persist: true }),
     ).resolves.toEqual(expect.objectContaining({ result: expect.any(Object) }));
     await expect(gatewayTunnelStatus()).resolves.toEqual(
       expect.objectContaining({ running: true }),

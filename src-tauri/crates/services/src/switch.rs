@@ -1,8 +1,8 @@
 use crate::live_sync;
+use lime_core::database::dao::providers::ProviderDao;
+use lime_core::database::DbConnection;
+use lime_core::models::{AppType, Provider};
 use once_cell::sync::Lazy;
-use proxycast_core::database::dao::providers::ProviderDao;
-use proxycast_core::database::DbConnection;
-use proxycast_core::models::{AppType, Provider};
 use tokio::sync::Mutex;
 
 pub struct SwitchService;
@@ -46,7 +46,7 @@ impl SwitchService {
                 .map_err(|e| e.to_string())?;
 
             if let Ok(app_type_enum) = provider.app_type.parse::<AppType>() {
-                if app_type_enum != AppType::ProxyCast {
+                if app_type_enum != AppType::Lime {
                     live_sync::sync_to_live(&app_type_enum, &provider)
                         .map_err(|e| format!("Failed to sync: {e}"))?;
                 }
@@ -72,7 +72,7 @@ impl SwitchService {
         // If this is the current provider, sync to live
         if is_current {
             if let Ok(app_type_enum) = provider.app_type.parse::<AppType>() {
-                if app_type_enum != AppType::ProxyCast {
+                if app_type_enum != AppType::Lime {
                     live_sync::sync_to_live(&app_type_enum, &provider)
                         .map_err(|e| format!("Failed to sync: {e}"))?;
                 }
@@ -120,7 +120,7 @@ impl SwitchService {
         })?;
 
         // 获取当前 provider（用于回填和回滚）
-        let current_provider = if app_type_enum != AppType::ProxyCast {
+        let current_provider = if app_type_enum != AppType::Lime {
             ProviderDao::get_current(&conn, app_type).map_err(|e| {
                 error!("获取当前 provider 失败: {}", e);
                 e.to_string()
@@ -130,7 +130,7 @@ impl SwitchService {
         };
 
         // 实施事务保护：先尝试同步，再更新数据库
-        if app_type_enum != AppType::ProxyCast {
+        if app_type_enum != AppType::Lime {
             // Step 1: Backfill - 回填当前配置
             if let Some(ref current) = current_provider {
                 if current.id != id {
@@ -176,7 +176,7 @@ impl SwitchService {
             error!("数据库更新失败: {}", db_error);
 
             // 如果数据库更新失败，尝试恢复原配置文件
-            if app_type_enum != AppType::ProxyCast {
+            if app_type_enum != AppType::Lime {
                 if let Some(ref current) = current_provider {
                     warn!("数据库更新失败，尝试恢复原配置文件");
                     if let Err(restore_error) = live_sync::sync_to_live(&app_type_enum, current) {
@@ -229,7 +229,7 @@ impl SwitchService {
             })?;
 
             // 获取当前 provider（用于回填和回滚）
-            let current_provider = if app_type_enum != AppType::ProxyCast {
+            let current_provider = if app_type_enum != AppType::Lime {
                 ProviderDao::get_current(&conn, app_type).map_err(|e| {
                     error!("获取当前 provider 失败: {}", e);
                     e.to_string()
@@ -247,7 +247,7 @@ impl SwitchService {
         };
 
         // Step 2: 执行文件 I/O（在后台线程，不持有锁）
-        if ctx.app_type_enum != AppType::ProxyCast {
+        if ctx.app_type_enum != AppType::Lime {
             let current_for_backfill = ctx.current_provider.clone();
             let app_type_for_sync = ctx.app_type_enum;
             let target_id = id.to_string();
@@ -329,7 +329,7 @@ impl SwitchService {
                 error!("数据库更新失败: {}", db_error);
 
                 // 如果数据库更新失败，尝试恢复原配置文件
-                if ctx.app_type_enum != AppType::ProxyCast {
+                if ctx.app_type_enum != AppType::Lime {
                     if let Some(ref current) = ctx.current_provider {
                         warn!("数据库更新失败，尝试恢复原配置文件");
                         let current_clone = current.clone();
@@ -366,8 +366,8 @@ impl SwitchService {
 
         let app_type_enum = app_type.parse::<AppType>().map_err(|e| e.to_string())?;
 
-        // Skip for ProxyCast
-        if app_type_enum == AppType::ProxyCast {
+        // Skip for Lime
+        if app_type_enum == AppType::Lime {
             return Ok(false);
         }
 

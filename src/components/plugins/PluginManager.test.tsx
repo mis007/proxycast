@@ -52,7 +52,7 @@ vi.mock("./PluginItemContextMenu", () => ({
 import { PluginManager } from "./PluginManager";
 
 const mountedRoots: MountedRoot[] = [];
-const runtimeFilterStorageKey = "proxycast.pluginDiagnostics.filters.v1";
+const runtimeFilterStorageKey = "lime.pluginDiagnostics.filters.v1";
 let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 let clipboardWriteTextMock: ReturnType<typeof vi.fn>;
 let originalClipboard: Clipboard | undefined;
@@ -168,7 +168,7 @@ describe("PluginManager 任务可观测", () => {
                 status: "enabled",
                 path: "/tmp/plugins/demo-plugin",
                 hooks: ["on_request"],
-                min_proxycast_version: null,
+                min_lime_version: null,
                 config_schema: null,
                 config: {
                   enabled: true,
@@ -224,11 +224,11 @@ describe("PluginManager 任务可观测", () => {
             };
           case "check_for_updates":
             return {
-              current: "0.87.0",
-              latest: "0.88.0",
+              current: "0.89.0",
+              latest: "0.89.0",
               hasUpdate: false,
               downloadUrl:
-                "https://github.com/aiclientproxy/proxycast/releases",
+                "https://github.com/aiclientproxy/lime/releases",
               error: undefined,
             };
           default:
@@ -263,10 +263,10 @@ describe("PluginManager 任务可观测", () => {
       switch (command) {
         case "check_for_updates":
           return {
-            current: "0.87.0",
-            latest: "0.88.0",
+            current: "0.88.0",
+            latest: "0.89.0",
             hasUpdate: true,
-            downloadUrl: "https://github.com/aiclientproxy/proxycast/releases",
+            downloadUrl: "https://github.com/aiclientproxy/lime/releases",
             error: undefined,
           };
         case "get_plugin_status":
@@ -297,7 +297,7 @@ describe("PluginManager 任务可观测", () => {
       container.querySelector("[data-testid='plugin-windows-update-card']"),
     ).not.toBeNull();
     expect(container.textContent).toContain("Windows 主程序更新与安装包");
-    expect(container.textContent).toContain("新版本 0.88.0");
+    expect(container.textContent).toContain("新版本 0.89.0");
 
     const aboutButton = container.querySelector(
       "[data-testid='plugin-windows-update-open-about']",
@@ -317,10 +317,10 @@ describe("PluginManager 任务可观测", () => {
       switch (command) {
         case "check_for_updates":
           return {
-            current: "0.87.0",
-            latest: "0.87.0",
-            hasUpdate: false,
-            downloadUrl: "https://github.com/aiclientproxy/proxycast/releases",
+            current: "0.88.0",
+            latest: "0.89.0",
+            hasUpdate: true,
+            downloadUrl: "https://github.com/aiclientproxy/lime/releases",
             error: undefined,
           };
         case "get_plugin_status":
@@ -339,7 +339,7 @@ describe("PluginManager 任务可观测", () => {
               status: "enabled",
               path: "/tmp/plugins/compat-plugin",
               hooks: ["on_request"],
-              min_proxycast_version: "0.88.0",
+              min_lime_version: "0.89.0",
               config_schema: null,
               config: {
                 enabled: true,
@@ -375,7 +375,7 @@ describe("PluginManager 任务可观测", () => {
       ),
     ).not.toBeNull();
     expect(container.textContent).toContain(
-      "部分已加载插件要求 ProxyCast >= 0.88.0",
+      "部分已加载插件要求 Lime >= 0.89.0",
     );
     expect(container.textContent).toContain(
       "当前已加载插件中有 1 个插件要求更高主程序版本",

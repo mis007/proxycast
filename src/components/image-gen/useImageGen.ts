@@ -22,7 +22,7 @@ import type {
 import { IMAGE_GEN_PROVIDER_IDS } from "./types";
 
 const HISTORY_KEY = "image-gen-history";
-const PROVIDER_DEBUG_KEY = "proxycast:provider-debug";
+const PROVIDER_DEBUG_KEY = "lime:provider-debug";
 
 interface GenerateImageOptions {
   imageCount?: number;

@@ -12,9 +12,11 @@ import {
 import type {
   OpenClawDependencyStatus,
   OpenClawEnvironmentStatus,
+  OpenClawRuntimeCandidate,
 } from "@/lib/api/openclaw";
 import type { DesktopPlatform } from "@/lib/crashDiagnostic";
 import { cn } from "@/lib/utils";
+import { OpenClawExecutionEnvironmentCard } from "./OpenClawExecutionEnvironmentCard";
 import {
   openClawPanelClassName,
   openClawPrimaryButtonClassName,
@@ -24,8 +26,11 @@ import {
 
 interface OpenClawInstallPageProps {
   environmentStatus: OpenClawEnvironmentStatus | null;
+  runtimeCandidates: OpenClawRuntimeCandidate[];
+  preferredRuntimeId: string | null;
   desktopPlatform: DesktopPlatform;
   busy: boolean;
+  switchingRuntime: boolean;
   installing: boolean;
   installingNode: boolean;
   installingGit: boolean;
@@ -38,6 +43,7 @@ interface OpenClawInstallPageProps {
   onOpenDocs: () => void;
   onDownloadNode: () => void;
   onDownloadGit: () => void;
+  onSelectPreferredRuntime: (runtimeId: string | null) => void;
 }
 
 function resolveStatusTone(status: OpenClawDependencyStatus["status"]): string {
@@ -166,8 +172,11 @@ function DependencyCard({
 
 export function OpenClawInstallPage({
   environmentStatus,
+  runtimeCandidates,
+  preferredRuntimeId,
   desktopPlatform,
   busy,
+  switchingRuntime,
   installing,
   installingNode,
   installingGit,
@@ -180,6 +189,7 @@ export function OpenClawInstallPage({
   onOpenDocs,
   onDownloadNode,
   onDownloadGit,
+  onSelectPreferredRuntime,
 }: OpenClawInstallPageProps) {
   const nodeReady = environmentStatus?.node.status === "ok";
   const gitReady = environmentStatus?.git.status === "ok";
@@ -325,9 +335,19 @@ export function OpenClawInstallPage({
         ) : openclawNeedsReload ? (
           <div className="mt-4 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
             已检测到 OpenClaw 包，但命令尚未生效。请先点击“重新检测”；若仍失败，请重启
-            ProxyCast 后再试。
+            Lime 后再试。
           </div>
         ) : null}
+      </section>
+
+      <section className={openClawPanelClassName}>
+        <OpenClawExecutionEnvironmentCard
+          candidates={runtimeCandidates}
+          preferredRuntimeId={preferredRuntimeId}
+          busy={busy || switchingRuntime}
+          description="安装 OpenClaw 时会固定使用这里选中的 Node/npm 运行时，避免多版本环境下装到一个运行时、升级时又跑到另一个运行时。"
+          onChange={onSelectPreferredRuntime}
+        />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-3">

@@ -1,6 +1,6 @@
 import type { CanvasImageTargetType } from "@/lib/canvasImageInsertBus";
 
-const INSERT_HISTORY_STORAGE_KEY = "proxycast:canvas-image-insert-history";
+const INSERT_HISTORY_STORAGE_KEY = "lime:canvas-image-insert-history";
 const MAX_HISTORY_SIZE = 30;
 
 export interface CanvasImageInsertHistoryEntry {

@@ -17,9 +17,9 @@ use crate::services::browser_profile_service::{
     get_browser_profile, touch_browser_profile_last_used,
 };
 use crate::services::browser_runtime_window;
-use proxycast_browser_runtime::BrowserStreamMode;
-use proxycast_browser_runtime::CdpSessionState;
-use proxycast_core::database::dao::browser_profile::BrowserProfileTransportKind;
+use lime_browser_runtime::BrowserStreamMode;
+use lime_browser_runtime::CdpSessionState;
+use lime_core::database::dao::browser_profile::BrowserProfileTransportKind;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Instant;
@@ -655,7 +655,7 @@ mod tests {
                     "shop_us",
                     "美区电商账号",
                     "https://seller.example.com/",
-                    "/tmp/proxycast/chrome_profiles/shop_us",
+                    "/tmp/lime/chrome_profiles/shop_us",
                     "2026-03-15T00:00:00Z",
                 ),
             )

@@ -14,11 +14,11 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use axum::{Json, Router};
 use chrono::Utc;
-use proxycast_core::config::{Config, FeishuBotConfig, FeishuGroupConfig};
-use proxycast_core::database::DbConnection;
-use proxycast_core::logger::LogStore;
-use proxycast_websocket::handlers::{RpcHandler, RpcHandlerState};
-use proxycast_websocket::protocol::{
+use lime_core::config::{Config, FeishuBotConfig, FeishuGroupConfig};
+use lime_core::database::DbConnection;
+use lime_core::logger::LogStore;
+use lime_websocket::handlers::{RpcHandler, RpcHandlerState};
+use lime_websocket::protocol::{
     AgentRunResult, AgentStopResult, AgentWaitResult, CronHealthResult, CronListResult,
     CronRunResult, GatewayRpcRequest, GatewayRpcResponse, RpcMethod, SessionGetResult,
     SessionsListResult,
@@ -1608,7 +1608,7 @@ fn danger_command_label(command: &FeishuCommand) -> &'static str {
 
 fn help_text() -> String {
     [
-        "🤖 ProxyCast Feishu Gateway 命令",
+        "🤖 Lime Feishu Gateway 命令",
         "/run <任务内容> - 启动一个 Agent 任务",
         "/new [首条消息] - 开启新对话（/reset 同义）",
         "/status <run_id> - 查看任务状态",
@@ -1871,10 +1871,7 @@ fn parse_result<T: DeserializeOwned>(value: serde_json::Value) -> Result<T, Stri
     serde_json::from_value(value).map_err(|e| format!("解析 RPC 结果失败: {e}"))
 }
 
-fn extract_rpc_error(
-    error: Option<proxycast_websocket::protocol::RpcError>,
-    fallback: &str,
-) -> String {
+fn extract_rpc_error(error: Option<lime_websocket::protocol::RpcError>, fallback: &str) -> String {
     if let Some(err) = error {
         return format!("{} (code={})", err.message, err.code);
     }
@@ -2231,7 +2228,7 @@ mod tests {
                     "chat_id": "oc_1",
                     "chat_type": "p2p",
                     "message_type": "text",
-                    "content": "{\"text\":\"你好，proxycast\"}"
+                    "content": "{\"text\":\"你好，lime\"}"
                 },
                 "sender": {
                     "sender_id": {
@@ -2246,7 +2243,7 @@ mod tests {
         assert_eq!(inbound.chat_id, "oc_1");
         assert_eq!(inbound.chat_kind, "p2p");
         assert_eq!(inbound.sender_id.as_deref(), Some("ou_xxx"));
-        assert_eq!(inbound.text, "你好，proxycast");
+        assert_eq!(inbound.text, "你好，lime");
     }
 
     #[test]

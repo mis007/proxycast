@@ -27,7 +27,7 @@ use crate::services::web_search_runtime_service::apply_web_search_runtime_env;
 use aster::agents::extension::ExtensionConfig;
 use aster::conversation::message::Message;
 use futures::StreamExt;
-use proxycast_agent::{
+use lime_agent::{
     convert_agent_event, execute_web_search_preflight_if_needed,
     merge_system_prompt_with_request_tool_policy,
     merge_system_prompt_with_web_search_preflight_context, resolve_request_tool_policy_with_mode,
@@ -755,7 +755,7 @@ pub async fn chat_configure_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proxycast_agent::resolve_request_tool_policy;
+    use lime_agent::resolve_request_tool_policy;
 
     #[test]
     fn test_send_message_request_deserialize_web_search_camel_case() {

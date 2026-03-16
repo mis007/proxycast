@@ -13,7 +13,7 @@ React 组件层，包含 UI 组件和业务组件。
 - `api-server/` - API 服务器配置组件
 - `clients/` - 客户端管理组件
 - `config/` - 配置管理组件
-- `connect/` - ProxyCast Connect 组件（中转商 API Key 添加）
+- `connect/` - Lime Connect 组件（中转商 API Key 添加）
 - `flow-monitor/` - LLM 流量监控组件
 - `general-chat/` - 通用对话功能组件（三栏布局：会话列表 + 聊天区域 + 画布）
 - `mcp/` - MCP 服务器管理组件（配置管理、运行时控制、工具/提示词/资源浏览与调用）

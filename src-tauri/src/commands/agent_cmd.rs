@@ -264,7 +264,7 @@ pub async fn agent_create_session(
 
     Ok(CreateSessionResponse {
         session_id,
-        credential_name: "ProxyCast".to_string(),
+        credential_name: "Lime".to_string(),
         credential_uuid: aster_config.credential_uuid,
         provider_type,
         model: Some(model_name),

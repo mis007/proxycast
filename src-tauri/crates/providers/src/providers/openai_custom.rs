@@ -1,5 +1,5 @@
 //! OpenAI Custom Provider (自定义 OpenAI 兼容 API)
-use proxycast_core::models::openai::ChatCompletionRequest;
+use lime_core::models::openai::ChatCompletionRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -43,11 +43,11 @@ impl Default for OpenAICustomProvider {
 
 impl OpenAICustomProvider {
     fn tool_calling_v2_enabled() -> bool {
-        proxycast_core::tool_calling::tool_calling_v2_enabled()
+        lime_core::tool_calling::tool_calling_v2_enabled()
     }
 
     fn native_input_examples_enabled() -> bool {
-        proxycast_core::tool_calling::tool_calling_native_input_examples_enabled()
+        lime_core::tool_calling::tool_calling_native_input_examples_enabled()
     }
 
     fn normalize_openai_request_payload(&self, payload: &mut serde_json::Value) {
@@ -77,8 +77,8 @@ impl OpenAICustomProvider {
                 .cloned()
                 .unwrap_or_else(|| serde_json::json!({}));
             let extension = parameters
-                .get("x-proxycast")
-                .or_else(|| parameters.get("x_proxycast"))
+                .get("x-lime")
+                .or_else(|| parameters.get("x_lime"))
                 .cloned()
                 .unwrap_or_else(|| serde_json::json!({}));
 
@@ -93,10 +93,8 @@ impl OpenAICustomProvider {
                     .get("name")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
-                input_examples = proxycast_core::tool_calling::resolve_tool_input_examples(
-                    tool_name,
-                    &parameters,
-                );
+                input_examples =
+                    lime_core::tool_calling::resolve_tool_input_examples(tool_name, &parameters);
             }
             let allowed_callers = extension
                 .get("allowed_callers")
@@ -581,7 +579,7 @@ mod tests {
     use super::*;
     use axum::{extract::State, http::header, response::IntoResponse, routing::post, Json, Router};
     use futures::StreamExt;
-    use proxycast_core::models::openai::{ChatMessage, FunctionDef, MessageContent, Tool};
+    use lime_core::models::openai::{ChatMessage, FunctionDef, MessageContent, Tool};
     use std::sync::Arc;
     use tokio::sync::Mutex;
 
@@ -655,7 +653,7 @@ mod tests {
                     parameters: Some(serde_json::json!({
                         "type":"object",
                         "properties":{"query":{"type":"string"}},
-                        "x-proxycast": {
+                        "x-lime": {
                             "input_examples":[{"query":"rust async"}],
                             "allowed_callers":["assistant","code_execution"],
                             "deferred_loading": true
@@ -682,7 +680,7 @@ mod tests {
                     "parameters": {
                         "type":"object",
                         "properties":{"query":{"type":"string"}},
-                        "x-proxycast": {
+                        "x-lime": {
                             "input_examples":[{"query":"rust async"}],
                             "allowed_callers":["assistant","code_execution"],
                             "deferred_loading":true
@@ -703,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_openai_request_payload_supports_x_proxycast_alias() {
+    fn test_normalize_openai_request_payload_supports_x_lime_alias() {
         let provider = OpenAICustomProvider::default();
         let mut payload = serde_json::json!({
             "model": "deepseek-chat",
@@ -716,7 +714,7 @@ mod tests {
                     "parameters": {
                         "type":"object",
                         "properties":{"query":{"type":"string"}},
-                        "x_proxycast": {
+                        "x_lime": {
                             "inputExamples":[{"query":"tool search"}],
                             "allowedCallers":["tool_search"]
                         }

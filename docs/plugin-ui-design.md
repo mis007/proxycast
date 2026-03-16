@@ -1,8 +1,8 @@
-# ProxyCast Plugin UI 系统设计
+# Lime Plugin UI 系统设计
 
 ## 概述
 
-借鉴 A2UI 的设计理念，为 ProxyCast 设计一套声明式的插件 UI 系统。核心思想是：
+借鉴 A2UI 的设计理念，为 Lime 设计一套声明式的插件 UI 系统。核心思想是：
 
 - **安全如数据，表达如代码**：插件只能声明 UI 结构，不能执行任意代码
 - **声明式 JSON 格式**：插件通过 JSON 描述 UI 意图，宿主应用负责渲染
@@ -13,7 +13,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        ProxyCast Host                           │
+│                        Lime Host                           │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                    Plugin UI Renderer                    │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │   │
@@ -365,7 +365,7 @@ interface SurfaceStyles {
 
 ## 与 A2UI 的差异
 
-| 特性 | A2UI | ProxyCast Plugin UI |
+| 特性 | A2UI | Lime Plugin UI |
 |------|------|---------------------|
 | 传输方式 | SSE/JSONL 流 | Tauri IPC |
 | 渲染框架 | Lit/Angular/Flutter | React |

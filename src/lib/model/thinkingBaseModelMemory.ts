@@ -1,6 +1,6 @@
 type ThinkingMemoryScope = "aster" | "general";
 
-const STORAGE_KEY = "proxycast.thinking.base_model_memory.v1";
+const STORAGE_KEY = "lime.thinking.base_model_memory.v1";
 
 type ThinkingBaseModelMap = Record<string, string>;
 

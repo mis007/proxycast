@@ -51,7 +51,7 @@ export function groupSkillsBySourceKind(skills: Skill[]): SkillSection[] {
     {
       key: "builtin",
       title: "BUILT-IN SKILLS",
-      description: "应用内置技能，随 ProxyCast 提供并默认可用。",
+      description: "应用内置技能，随 Lime 提供并默认可用。",
       skills: builtinSkills,
     },
     {

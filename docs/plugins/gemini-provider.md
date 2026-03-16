@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Gemini Provider 是 ProxyCast 的 Google Gemini 凭证提供者插件，支持 **OAuth 2.0 + PKCE**（Gemini CLI 兼容）和 **API Key**（Google AI Studio）两种认证方式。插件通过 Google Code Assist API 访问 Gemini 模型，支持个人 Google 账户和 Google Cloud/Workspace 企业账户。
+Gemini Provider 是 Lime 的 Google Gemini 凭证提供者插件，支持 **OAuth 2.0 + PKCE**（Gemini CLI 兼容）和 **API Key**（Google AI Studio）两种认证方式。插件通过 Google Code Assist API 访问 Gemini 模型，支持个人 Google 账户和 Google Cloud/Workspace 企业账户。
 
 ### 1.2 支持的认证方式
 
@@ -93,13 +93,13 @@ gemini-provider/
   "name": "gemini-provider",
   "version": "1.0.0",
   "description": "Gemini Provider - 支持 OAuth 和 API Key 两种认证方式访问 Google Gemini 模型",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/gemini-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "gemini-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "gemini",
@@ -881,13 +881,13 @@ pub fn convert_gemini_response(
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { AuthMethodTabs } from './components/AuthMethodTabs';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -1532,4 +1532,4 @@ pnpm test
 - [Gemini API 文档](https://ai.google.dev/docs)
 - [Google Cloud OAuth 2.0](https://developers.google.com/identity/protocols/oauth2)
 - [Gemini CLI 项目](https://github.com/google/gemini-cli)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)

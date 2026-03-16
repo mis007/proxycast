@@ -20,10 +20,10 @@
 //! # 使用示例
 //!
 //! ```ignore
-//! use proxycast::translator::kiro::{
+//! use lime::translator::kiro::{
 //!     AnthropicRequestTranslator, AnthropicResponseTranslator,
 //! };
-//! use proxycast::translator::traits::RequestTranslator;
+//! use lime::translator::traits::RequestTranslator;
 //!
 //! // 请求转换
 //! let translator = AnthropicRequestTranslator::new();

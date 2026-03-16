@@ -2,8 +2,8 @@
 //!
 //! 提供后台心跳循环，定期检查并执行到期任务
 
-use proxycast_core::database::DbConnection;
-use proxycast_scheduler::{AgentExecutor, AgentScheduler, SchedulerTrait, TaskExecutor};
+use lime_core::database::DbConnection;
+use lime_scheduler::{AgentExecutor, AgentScheduler, SchedulerTrait, TaskExecutor};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::interval;
@@ -186,7 +186,7 @@ impl SchedulerService {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use proxycast_scheduler::{ScheduledTask, SchedulerDao};
+    use lime_scheduler::{ScheduledTask, SchedulerDao};
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
 

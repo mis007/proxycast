@@ -1,7 +1,7 @@
 # Translation Fixes Applied
 
 ## Summary
-Fixed 20 translation issues in `proxycast/src/i18n/patches/en.json` where English translations had concatenated words or incorrect formatting, plus fixed a critical bug in the DOM replacement algorithm that caused partial translations.
+Fixed 20 translation issues in `lime/src/i18n/patches/en.json` where English translations had concatenated words or incorrect formatting, plus fixed a critical bug in the DOM replacement algorithm that caused partial translations.
 
 ## Critical Bug Fix: DOM Replacement Order
 
@@ -15,7 +15,7 @@ The DOM replacer was applying translations in an arbitrary order (based on `Obje
 - Result: Broken translation like "初timesSettings向导"
 
 ### Solution
-Modified `proxycast/src/i18n/dom-replacer.ts` to sort translation entries by length (longest first) before applying replacements. This ensures that longer, more specific phrases are translated before their component parts.
+Modified `lime/src/i18n/dom-replacer.ts` to sort translation entries by length (longest first) before applying replacements. This ensures that longer, more specific phrases are translated before their component parts.
 
 ```typescript
 // Sort patches by length (longest first) to avoid partial replacements
@@ -65,7 +65,7 @@ These translations had technical terms incorrectly formatted:
 | 安装完成后点击 | Click after InstallComplete | Click after installation completes |
 
 ## Impact
-These fixes improve the quality and readability of English translations throughout the ProxyCast application, ensuring:
+These fixes improve the quality and readability of English translations throughout the Lime application, ensuring:
 - Proper spacing between words
 - Natural English phrasing
 - Consistent terminology
@@ -73,8 +73,8 @@ These fixes improve the quality and readability of English translations througho
 - **No more partial or broken translations**
 
 ## Files Modified
-- `proxycast/src/i18n/patches/en.json` - 20 translation entries corrected
-- `proxycast/src/i18n/dom-replacer.ts` - Fixed replacement order algorithm
+- `lime/src/i18n/patches/en.json` - 20 translation entries corrected
+- `lime/src/i18n/dom-replacer.ts` - Fixed replacement order algorithm
 
 ## Testing Recommendations
 1. Restart the application to ensure patches apply with the new algorithm

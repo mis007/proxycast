@@ -62,7 +62,7 @@ use crate::services::content_creator::{
 // 创建服务
 let workflow_service = WorkflowService::new();
 let step_executor = StepExecutor::new();
-let progress_store = ProgressStore::new("proxycast.db")?;
+let progress_store = ProgressStore::new("lime.db")?;
 
 // 创建工作流
 let workflow = workflow_service

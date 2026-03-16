@@ -1966,10 +1966,10 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
                     const result = testResults[endpoint.id];
                     const isExpanded = expandedTest === endpoint.id;
                     const curlCmd = getCurlCommand(endpoint);
-                    const proxycastDebugHeaders = Object.entries(
+                    const limeDebugHeaders = Object.entries(
                       result?.responseHeaders || {},
                     ).filter(([key]) =>
-                      key.toLowerCase().startsWith("x-proxycast-"),
+                      key.toLowerCase().startsWith("x-lime-"),
                     );
 
                     return (
@@ -2082,13 +2082,13 @@ export function ApiServerPage({ hideHeader = false }: ApiServerPageProps) {
                                   </pre>
                                 </div>
                               ) : null}
-                              {proxycastDebugHeaders.length > 0 ? (
+                              {limeDebugHeaders.length > 0 ? (
                                 <div>
                                   <p className="mb-1 text-xs font-medium text-slate-500">
-                                    调试头（x-proxycast-*）
+                                    调试头（x-lime-*）
                                   </p>
                                   <div className="space-y-1 rounded-[18px] bg-white p-3 text-xs">
-                                    {proxycastDebugHeaders.map(
+                                    {limeDebugHeaders.map(
                                       ([key, value]) => (
                                         <div
                                           key={key}

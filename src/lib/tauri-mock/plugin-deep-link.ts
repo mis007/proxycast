@@ -15,7 +15,7 @@ export async function onOpenUrl(handler: UrlCallback): Promise<UnlistenFn> {
   // 模拟从 URL 获取 deep link 参数
   if (typeof window !== "undefined") {
     const urlParams = new URLSearchParams(window.location.search);
-    const deepLinkUrl = urlParams.get("proxycast");
+    const deepLinkUrl = urlParams.get("lime");
 
     if (deepLinkUrl) {
       console.log("[Mock] Deep link URL from params:", deepLinkUrl);
@@ -37,7 +37,7 @@ export async function getUrls(): Promise<string[]> {
 
   if (typeof window !== "undefined") {
     const urlParams = new URLSearchParams(window.location.search);
-    const deepLinkUrl = urlParams.get("proxycast");
+    const deepLinkUrl = urlParams.get("lime");
     return deepLinkUrl ? [deepLinkUrl] : [];
   }
 

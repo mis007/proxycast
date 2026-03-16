@@ -1454,7 +1454,7 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
     }
   });
 
-  it("收到带 ProxyCast 元数据块的 tool_end 后应清洗输出并恢复失败态 metadata", async () => {
+  it("收到带 Lime 元数据块的 tool_end 后应清洗输出并恢复失败态 metadata", async () => {
     const workspaceId = "ws-tool-metadata-block";
     seedSession(workspaceId, "session-tool-metadata-block");
     const harness = mountHook(workspaceId);
@@ -1499,13 +1499,13 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
               output: [
                 "子任务执行失败，需要人工接管",
                 "",
-                "[ProxyCast 工具元数据开始]",
+                "[Lime 工具元数据开始]",
                 JSON.stringify({
                   reported_success: false,
                   role: "planner",
                   failed_count: 1,
                 }),
-                "[ProxyCast 工具元数据结束]",
+                "[Lime 工具元数据结束]",
               ].join("\n"),
             },
           },
@@ -1521,7 +1521,7 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
 
       expect(toolCall?.status).toBe("failed");
       expect(toolCall?.result?.output).toBe("子任务执行失败，需要人工接管");
-      expect(toolCall?.result?.output).not.toContain("ProxyCast 工具元数据");
+      expect(toolCall?.result?.output).not.toContain("Lime 工具元数据");
       expect(toolCall?.result?.metadata).toMatchObject({
         reported_success: false,
         role: "planner",
@@ -1532,7 +1532,7 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
     }
   });
 
-  it("收到带 ProxyCast 元数据块的 tool_end error 后应清洗错误文本并恢复失败态 metadata", async () => {
+  it("收到带 Lime 元数据块的 tool_end error 后应清洗错误文本并恢复失败态 metadata", async () => {
     const workspaceId = "ws-tool-metadata-error-block";
     seedSession(workspaceId, "session-tool-metadata-error-block");
     const harness = mountHook(workspaceId);
@@ -1577,13 +1577,13 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
               error: [
                 "CDP 会话已断开，请重试",
                 "",
-                "[ProxyCast 工具元数据开始]",
+                "[Lime 工具元数据开始]",
                 JSON.stringify({
                   reported_success: false,
                   exit_code: 1,
                   stderr_length: 128,
                 }),
-                "[ProxyCast 工具元数据结束]",
+                "[Lime 工具元数据结束]",
               ].join("\n"),
             },
           },
@@ -1599,7 +1599,7 @@ describe("useAsterAgentChat action_required 渲染链路", () => {
 
       expect(toolCall?.status).toBe("failed");
       expect(toolCall?.result?.error).toBe("CDP 会话已断开，请重试");
-      expect(toolCall?.result?.error).not.toContain("ProxyCast 工具元数据");
+      expect(toolCall?.result?.error).not.toContain("Lime 工具元数据");
       expect(toolCall?.result?.metadata).toMatchObject({
         reported_success: false,
         exit_code: 1,
@@ -2699,7 +2699,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
     }
   });
 
-  it("切换话题时应清洗 tool_response error 中的 ProxyCast 元数据块", async () => {
+  it("切换话题时应清洗 tool_response error 中的 Lime 元数据块", async () => {
     const workspaceId = "ws-history-tool-error-metadata";
     const now = Math.floor(Date.now() / 1000);
     mockGetAsterSession.mockResolvedValue({
@@ -2722,13 +2722,13 @@ describe("useAsterAgentChat 偏好持久化", () => {
               error: [
                 "CDP 连接失败，请检查目标页面",
                 "",
-                "[ProxyCast 工具元数据开始]",
+                "[Lime 工具元数据开始]",
                 JSON.stringify({
                   reported_success: false,
                   exit_code: 1,
                   sandboxed: true,
                 }),
-                "[ProxyCast 工具元数据结束]",
+                "[Lime 工具元数据结束]",
               ].join("\n"),
             },
           ],
@@ -2752,7 +2752,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
       );
       expect(toolCall?.status).toBe("failed");
       expect(toolCall?.result?.error).toBe("CDP 连接失败，请检查目标页面");
-      expect(toolCall?.result?.error).not.toContain("ProxyCast 工具元数据");
+      expect(toolCall?.result?.error).not.toContain("Lime 工具元数据");
       expect(toolCall?.result?.metadata).toMatchObject({
         reported_success: false,
         exit_code: 1,

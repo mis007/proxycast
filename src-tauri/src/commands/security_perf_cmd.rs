@@ -106,7 +106,7 @@ pub async fn update_hint_routes(
     let mut s = state.write().await;
     s.config.hint_router.routes = routes
         .into_iter()
-        .map(|r| proxycast_core::config::HintRouteSettingsEntry {
+        .map(|r| lime_core::config::HintRouteSettingsEntry {
             hint: r.hint,
             provider: r.provider,
             model: r.model,

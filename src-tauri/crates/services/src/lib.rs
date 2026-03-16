@@ -1,4 +1,4 @@
-//! ProxyCast Services Crate
+//! Lime Services Crate
 //!
 //! 业务服务层，包含所有不依赖 Tauri 的业务逻辑。
 //!

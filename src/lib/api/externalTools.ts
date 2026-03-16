@@ -2,7 +2,7 @@
  * 外部工具 API
  *
  * 管理 Codex CLI 等外部命令行工具
- * 这些工具有自己的认证系统，不通过 ProxyCast 凭证池管理
+ * 这些工具有自己的认证系统，不通过 Lime 凭证池管理
  */
 
 import { safeInvoke } from "@/lib/dev-bridge";

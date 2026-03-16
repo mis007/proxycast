@@ -21,7 +21,7 @@ describe("browserAssistSession", () => {
         toolCalls: [
           {
             id: "tool-1",
-            name: "mcp__proxycast-browser__browser_navigate",
+            name: "mcp__lime-browser__browser_navigate",
             arguments: JSON.stringify({
               profile_key: "general_browser_assist",
               url: "https://example.com",

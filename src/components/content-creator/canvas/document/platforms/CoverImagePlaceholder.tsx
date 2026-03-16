@@ -39,7 +39,7 @@ function isPlaceholderUrl(src: string): boolean {
 }
 
 /** 自定义事件名：封面图重新生成成功 */
-export const COVER_IMAGE_REPLACED_EVENT = "proxycast:cover-image-replaced";
+export const COVER_IMAGE_REPLACED_EVENT = "lime:cover-image-replaced";
 
 /** 自定义事件 detail 类型 */
 export interface CoverImageReplacedDetail {

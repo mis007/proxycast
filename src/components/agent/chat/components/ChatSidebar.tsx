@@ -32,7 +32,7 @@ import type { Message } from "../types";
 
 const RECENT_TASK_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
 const OLDER_TASKS_INITIAL_COUNT = 8;
-const PINNED_TASK_IDS_STORAGE_KEY = "proxycast_task_sidebar_pinned_ids";
+const PINNED_TASK_IDS_STORAGE_KEY = "lime_task_sidebar_pinned_ids";
 
 const STATUS_META: Record<
   TaskStatus,
@@ -574,10 +574,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   return (
     <aside
-      className="w-[296px] shrink-0 border-r border-slate-200/80 bg-slate-50/88 backdrop-blur dark:border-white/10 dark:bg-[#111318]"
+      className="w-[308px] shrink-0 overflow-hidden rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.98)_0%,rgba(241,245,249,0.92)_100%)] shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/10 dark:bg-[#111318]"
       data-testid="chat-sidebar"
     >
-      <div className="flex h-full min-h-0 flex-col gap-4 p-3">
+      <div className="flex h-full min-h-0 flex-col gap-4 p-4">
         <div className="space-y-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -586,21 +586,21 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               value={searchKeyword}
               onChange={(event) => setSearchKeyword(event.target.value)}
               placeholder="搜索任务标题或摘要"
-              className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-white/20 dark:focus:ring-white/10"
+              className="h-11 w-full rounded-[18px] border border-slate-200/80 bg-white/92 pl-9 pr-3 text-sm text-slate-700 shadow-sm shadow-slate-950/5 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:focus:border-white/20 dark:focus:ring-white/10"
             />
           </div>
 
           <button
             type="button"
             onClick={onNewChat}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[18px] bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm shadow-slate-950/10 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
           >
             <Plus className="h-4 w-4" />
             新建任务
           </button>
 
           {primaryResumableItem ? (
-            <div className="rounded-[22px] border border-amber-200/80 bg-amber-50/85 px-3.5 py-3 shadow-sm shadow-amber-950/5 dark:border-amber-500/20 dark:bg-amber-500/10">
+            <div className="rounded-[24px] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.96)_0%,rgba(255,255,255,0.94)_100%)] px-3.5 py-3.5 shadow-sm shadow-amber-950/5 dark:border-amber-500/20 dark:bg-amber-500/10">
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
                   <Globe className="h-4 w-4" />
@@ -652,15 +652,15 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-white/85 bg-white/72 p-2 shadow-sm shadow-slate-950/5">
             <button
               type="button"
               onClick={() => setStatusFilter("all")}
               className={cn(
-                "inline-flex h-9 flex-1 items-center justify-center rounded-xl border text-xs font-medium transition",
+                "inline-flex h-9 flex-1 items-center justify-center rounded-2xl border px-2 text-xs font-medium transition",
                 statusFilter === "all"
                   ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
+                  : "border-slate-200/80 bg-white/90 text-slate-500 hover:border-slate-300 hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
               )}
             >
               全部任务
@@ -669,10 +669,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               type="button"
               onClick={() => setStatusFilter("active")}
               className={cn(
-                "inline-flex h-9 flex-1 items-center justify-center rounded-xl border text-xs font-medium transition",
+                "inline-flex h-9 flex-1 items-center justify-center rounded-2xl border px-2 text-xs font-medium transition",
                 statusFilter === "active"
                   ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
+                  : "border-slate-200/80 bg-white/90 text-slate-500 hover:border-slate-300 hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
               )}
             >
               仅看进行中
@@ -682,10 +682,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 type="button"
                 onClick={() => setStatusFilter("resumable")}
                 className={cn(
-                  "inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-medium transition",
+                  "inline-flex h-9 items-center justify-center rounded-2xl border px-3 text-xs font-medium transition",
                   statusFilter === "resumable"
                     ? "border-amber-500 bg-amber-500 text-white dark:border-amber-400 dark:bg-amber-400 dark:text-slate-900"
-                    : "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200",
+                    : "border-amber-200/80 bg-amber-50/90 text-amber-700 hover:border-amber-300 hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200",
                 )}
               >
                 待继续 {resumableTaskCount}
@@ -695,7 +695,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
 
         <div className="flex items-center justify-between px-1">
-          <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500">
+          <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500">
             任务
           </div>
           <div className="text-xs text-slate-400">
@@ -707,7 +707,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
           {!hasAnyTasks ? (
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-[26px] border border-dashed border-slate-200/90 bg-white/82 px-4 py-8 text-center shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/5">
               <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                 <Clock3 className="h-5 w-5" />
               </div>
@@ -719,7 +719,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               </p>
             </div>
           ) : !hasFilteredResults ? (
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-[26px] border border-dashed border-slate-200/90 bg-white/82 px-4 py-8 text-center shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/5">
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 没有匹配的任务
               </div>
@@ -771,7 +771,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             [section.key]: !prev[section.key],
                           }))
                         }
-                        className="flex w-full items-center justify-between rounded-xl px-2 py-1 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                        className="flex w-full items-center justify-between rounded-2xl px-2.5 py-2 text-left transition hover:bg-white/78 dark:hover:bg-white/5"
                       >
                         <div className="flex items-center gap-2">
                           <ChevronDown
@@ -823,13 +823,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                 }
                               }}
                               className={cn(
-                                "group rounded-[20px] border p-3 text-left transition",
+                                "group rounded-[22px] border p-3.5 text-left shadow-sm shadow-slate-950/5 transition",
                                 isResumableItem
-                                  ? "border-amber-200 bg-white shadow-sm shadow-amber-950/5 dark:border-amber-500/20 dark:bg-white/10"
+                                  ? "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.9)_0%,rgba(255,255,255,0.96)_100%)] shadow-sm shadow-amber-950/5 dark:border-amber-500/20 dark:bg-white/10"
                                   : "",
                                 item.isCurrent
-                                  ? "border-slate-300 bg-white shadow-sm shadow-slate-950/5 dark:border-white/15 dark:bg-white/10"
-                                  : "border-transparent bg-transparent hover:border-slate-200 hover:bg-white/82 dark:hover:border-white/10 dark:hover:bg-white/5",
+                                  ? "border-slate-300 bg-white/98 ring-1 ring-slate-100 dark:border-white/15 dark:bg-white/10"
+                                  : "border-slate-200/70 bg-white/72 hover:border-slate-300 hover:bg-white/92 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/10 dark:hover:bg-white/5",
                               )}
                             >
                               <div className="flex items-start gap-3">
@@ -855,7 +855,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                         onClick={(event) =>
                                           event.stopPropagation()
                                         }
-                                        className="h-8 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-900 outline-none focus:border-slate-400 dark:border-white/10 dark:bg-[#17191f] dark:text-slate-100"
+                                        className="h-8 flex-1 rounded-xl border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-900 outline-none focus:border-slate-400 dark:border-white/10 dark:bg-[#17191f] dark:text-slate-100"
                                       />
                                     ) : (
                                       <>

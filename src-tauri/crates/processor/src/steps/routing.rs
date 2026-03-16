@@ -4,9 +4,9 @@
 
 use super::traits::{PipelineStep, StepError};
 use async_trait::async_trait;
-use proxycast_core::processor::RequestContext;
-use proxycast_core::router::{ModelMapper, Router};
-use proxycast_core::ProviderType;
+use lime_core::processor::RequestContext;
+use lime_core::router::{ModelMapper, Router};
+use lime_core::ProviderType;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

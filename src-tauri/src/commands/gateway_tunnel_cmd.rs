@@ -4,7 +4,7 @@
 
 use crate::app::{AppState, LogState};
 use crate::config::GlobalConfigManagerState;
-use proxycast_gateway::tunnel::{
+use lime_gateway::tunnel::{
     create_cloudflare_tunnel, probe_tunnel, start_tunnel, status_tunnel_with_config, stop_tunnel,
     CloudflareTunnelCreateRequest, CloudflareTunnelCreateResult, GatewayTunnelProbeResult,
     GatewayTunnelState, GatewayTunnelStatus,
@@ -143,7 +143,7 @@ pub async fn gateway_tunnel_create(
                 .filter(|v| !v.is_empty())
                 .map(str::to_string)
         })
-        .unwrap_or_else(|| "proxycast-gateway".to_string());
+        .unwrap_or_else(|| "lime-gateway".to_string());
 
     let result = create_cloudflare_tunnel(
         &config,
@@ -313,7 +313,7 @@ pub async fn gateway_tunnel_sync_webhook_url(
 async fn persist_full_config(
     state: State<'_, AppState>,
     config_manager: State<'_, GlobalConfigManagerState>,
-    config: proxycast_core::config::Config,
+    config: lime_core::config::Config,
 ) -> Result<(), String> {
     {
         let mut app_state = state.write().await;
@@ -322,7 +322,7 @@ async fn persist_full_config(
     config_manager.0.save_config(&config).await
 }
 
-fn resolve_public_base_url(config: &proxycast_core::config::Config) -> Result<String, String> {
+fn resolve_public_base_url(config: &lime_core::config::Config) -> Result<String, String> {
     let value = config
         .gateway
         .tunnel
@@ -460,7 +460,7 @@ async fn resolve_installer_spec(platform: &str) -> Option<InstallerSpec> {
 }
 
 async fn detect_cloudflared_status(
-    config: &proxycast_core::config::Config,
+    config: &lime_core::config::Config,
 ) -> Result<CloudflaredInstallStatus, String> {
     let binary = config
         .gateway
@@ -501,7 +501,7 @@ async fn detect_cloudflared_status(
 }
 
 async fn install_cloudflared(
-    config: &proxycast_core::config::Config,
+    config: &lime_core::config::Config,
 ) -> Result<CloudflaredInstallResult, String> {
     let platform = detect_platform();
     let Some(spec) = resolve_installer_spec(&platform).await else {

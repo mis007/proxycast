@@ -5,8 +5,8 @@
 
 use crate::translator::kiro::openai::request::{get_model_map, DEFAULT_MODEL};
 use crate::translator::traits::{RequestTranslator, TranslateError};
-use proxycast_core::models::anthropic::*;
-use proxycast_core::models::codewhisperer::*;
+use lime_core::models::anthropic::*;
+use lime_core::models::codewhisperer::*;
 use std::collections::HashSet;
 use uuid::Uuid;
 

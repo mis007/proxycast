@@ -3,9 +3,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const APP_DATA_DIR_NAME: &str = "proxycast";
+const APP_DATA_DIR_NAME: &str = "lime";
+const LEGACY_APP_DATA_DIR_NAME: &str = "proxycast";
 const LEGACY_HOME_DIR_NAME: &str = ".proxycast";
-const DATABASE_FILE_NAME: &str = "proxycast.db";
+const COMPAT_HOME_DIR_NAME: &str = ".lime";
+const DATABASE_FILE_NAME: &str = "lime.db";
+const LEGACY_DATABASE_FILE_NAME: &str = "proxycast.db";
 const MIGRATION_MARKER_FILE: &str = ".migration_completed";
 const USER_SIGNAL_TABLES: &[&str] = &[
     "contents",
@@ -30,16 +33,28 @@ pub fn legacy_home_dir() -> Result<PathBuf, String> {
         .join(LEGACY_HOME_DIR_NAME))
 }
 
+fn legacy_app_data_dir() -> Result<PathBuf, String> {
+    Ok(dirs::data_dir()
+        .ok_or_else(|| "无法获取应用数据目录".to_string())?
+        .join(LEGACY_APP_DATA_DIR_NAME))
+}
+
+fn compat_home_dir() -> Result<PathBuf, String> {
+    Ok(dirs::home_dir()
+        .ok_or_else(|| "无法获取主目录".to_string())?
+        .join(COMPAT_HOME_DIR_NAME))
+}
+
 pub fn preferred_database_path() -> Result<PathBuf, String> {
     Ok(preferred_data_dir()?.join(DATABASE_FILE_NAME))
 }
 
 pub fn legacy_database_path() -> Result<PathBuf, String> {
-    Ok(legacy_home_dir()?.join(DATABASE_FILE_NAME))
+    Ok(legacy_home_dir()?.join(LEGACY_DATABASE_FILE_NAME))
 }
 
 pub fn resolve_database_path() -> Result<PathBuf, String> {
-    with_app_roots(resolve_database_path_from_roots)
+    with_app_roots(resolve_database_path_from_source_roots)
 }
 
 pub fn resolve_logs_dir() -> Result<PathBuf, String> {
@@ -68,7 +83,7 @@ pub fn resolve_project_skills_dir() -> Option<PathBuf> {
         .map(|cwd| resolve_project_skills_dir_from_cwd(&cwd))
 }
 
-pub fn resolve_proxycast_skill_roots() -> Result<Vec<PathBuf>, String> {
+pub fn resolve_lime_skill_roots() -> Result<Vec<PathBuf>, String> {
     let mut roots = Vec::new();
     if let Some(project_dir) = resolve_project_skills_dir() {
         roots.push(project_dir);
@@ -78,11 +93,11 @@ pub fn resolve_proxycast_skill_roots() -> Result<Vec<PathBuf>, String> {
 }
 
 pub fn resolve_user_memory_path() -> Result<PathBuf, String> {
-    with_app_roots(resolve_user_memory_path_from_roots)
+    with_app_roots(resolve_user_memory_path_from_source_roots)
 }
 
 pub fn resolve_default_project_dir() -> Result<PathBuf, String> {
-    with_app_roots(resolve_default_project_dir_from_roots)
+    with_app_roots(resolve_default_project_dir_from_source_roots)
 }
 
 pub fn best_effort_runtime_subdir(subdir: &str) -> PathBuf {
@@ -95,17 +110,51 @@ pub fn best_effort_app_data_file(file_name: &str) -> PathBuf {
         .join(file_name)
 }
 
+pub fn migrate_legacy_install_data() -> Result<(), String> {
+    let _ = resolve_database_path()?;
+
+    for (label, action) in [
+        ("logs", resolve_logs_dir as fn() -> Result<PathBuf, String>),
+        (
+            "request_logs",
+            resolve_request_logs_dir as fn() -> Result<PathBuf, String>,
+        ),
+        (
+            "projects",
+            resolve_projects_dir as fn() -> Result<PathBuf, String>,
+        ),
+        (
+            "sessions",
+            resolve_sessions_dir as fn() -> Result<PathBuf, String>,
+        ),
+        (
+            "skills",
+            resolve_skills_dir as fn() -> Result<PathBuf, String>,
+        ),
+        (
+            "user_memory",
+            resolve_user_memory_path as fn() -> Result<PathBuf, String>,
+        ),
+    ] {
+        if let Err(error) = action() {
+            tracing::warn!("[路径迁移] 启动迁移 {} 失败: {}", label, error);
+        }
+    }
+
+    Ok(())
+}
+
 fn with_app_roots<T>(
-    resolver: impl FnOnce(&Path, &Path) -> Result<T, String>,
+    resolver: impl FnOnce(&Path, &[PathBuf]) -> Result<T, String>,
 ) -> Result<T, String> {
     let preferred_root = preferred_data_dir()?;
-    let legacy_root = legacy_home_dir()?;
-    resolver(&preferred_root, &legacy_root)
+    let legacy_roots = migration_source_roots()?;
+    resolver(&preferred_root, &legacy_roots)
 }
 
 fn resolve_runtime_subdir(subdir: &str) -> Result<PathBuf, String> {
-    with_app_roots(|preferred_root, legacy_root| {
-        resolve_subdir_with_legacy_copy_from_roots(preferred_root, legacy_root, subdir)
+    with_app_roots(|preferred_root, legacy_roots| {
+        resolve_subdir_with_legacy_copy_from_source_roots(preferred_root, legacy_roots, subdir)
     })
 }
 
@@ -121,31 +170,61 @@ fn fallback_app_data_dir() -> PathBuf {
     std::env::temp_dir().join(APP_DATA_DIR_NAME)
 }
 
-fn resolve_default_project_dir_from_roots(
+fn migration_source_roots() -> Result<Vec<PathBuf>, String> {
+    let mut roots = Vec::new();
+
+    for root in [
+        legacy_app_data_dir()?,
+        legacy_home_dir()?,
+        compat_home_dir()?,
+    ] {
+        if !roots.iter().any(|existing| existing == &root) {
+            roots.push(root);
+        }
+    }
+
+    Ok(roots)
+}
+
+fn resolve_default_project_dir_from_source_roots(
     preferred_root: &Path,
-    legacy_root: &Path,
+    legacy_roots: &[PathBuf],
 ) -> Result<PathBuf, String> {
-    let default_dir =
-        resolve_subdir_with_legacy_copy_from_roots(preferred_root, legacy_root, "projects")?
-            .join("default");
+    let default_dir = resolve_subdir_with_legacy_copy_from_source_roots(
+        preferred_root,
+        legacy_roots,
+        "projects",
+    )?
+    .join("default");
     fs::create_dir_all(&default_dir)
         .map_err(|e| format!("无法创建默认项目目录 {}: {e}", default_dir.display()))?;
     Ok(default_dir)
 }
 
-fn resolve_user_memory_path_from_roots(
+#[cfg(test)]
+fn resolve_default_project_dir_from_roots(
     preferred_root: &Path,
     legacy_root: &Path,
+) -> Result<PathBuf, String> {
+    resolve_default_project_dir_from_source_roots(preferred_root, &[legacy_root.to_path_buf()])
+}
+
+fn resolve_user_memory_path_from_source_roots(
+    preferred_root: &Path,
+    legacy_roots: &[PathBuf],
 ) -> Result<PathBuf, String> {
     let preferred_path = preferred_root.join("AGENTS.md");
     if preferred_path.exists() {
         return Ok(preferred_path);
     }
 
-    let legacy_path = legacy_root.join("AGENTS.md");
-    if !legacy_path.exists() {
+    let legacy_path = legacy_roots
+        .iter()
+        .map(|root| root.join("AGENTS.md"))
+        .find(|path| path.exists());
+    let Some(legacy_path) = legacy_path else {
         return Ok(preferred_path);
-    }
+    };
 
     if let Some(parent) = preferred_path.parent() {
         fs::create_dir_all(parent)
@@ -165,66 +244,70 @@ fn resolve_user_memory_path_from_roots(
     }
 }
 
-fn resolve_database_path_from_roots(
+#[cfg(test)]
+fn resolve_user_memory_path_from_roots(
     preferred_root: &Path,
     legacy_root: &Path,
+) -> Result<PathBuf, String> {
+    resolve_user_memory_path_from_source_roots(preferred_root, &[legacy_root.to_path_buf()])
+}
+
+fn resolve_database_path_from_source_roots(
+    preferred_root: &Path,
+    legacy_roots: &[PathBuf],
 ) -> Result<PathBuf, String> {
     fs::create_dir_all(preferred_root)
         .map_err(|e| format!("无法创建数据库目录 {}: {e}", preferred_root.display()))?;
 
     let preferred_path = preferred_root.join(DATABASE_FILE_NAME);
     let marker_path = preferred_root.join(MIGRATION_MARKER_FILE);
-
-    // 标记文件存在 → 迁移已完成，直接用 preferred 路径
-    if marker_path.exists() {
-        return Ok(preferred_path);
-    }
-
-    let legacy_path = legacy_root.join(DATABASE_FILE_NAME);
-
-    // 无旧库 → 全新安装，写标记后直接返回
-    if !legacy_path.exists() {
-        write_migration_marker(&marker_path);
-        return Ok(preferred_path);
-    }
-
-    // preferred 库不存在 → 首次迁移
-    if !preferred_path.exists() {
-        let result = migrate_or_fallback_to_legacy(&legacy_path, &preferred_path);
-        if result
-            .as_ref()
-            .map(|p| p == &preferred_path)
-            .unwrap_or(false)
-        {
-            write_migration_marker(&marker_path);
-        }
-        return result;
-    }
-
-    // 两个库都存在，检查是否需要用旧库覆盖空的新库
     let preferred_signal = inspect_database_signal(&preferred_path);
-    let legacy_signal = inspect_database_signal(&legacy_path);
+    let legacy_path = select_best_legacy_database_candidate(preferred_root, legacy_roots);
 
-    if should_replace_preferred_with_legacy(
-        preferred_path.as_path(),
-        preferred_signal.as_ref(),
-        legacy_path.as_path(),
-        legacy_signal.as_ref(),
-    ) {
-        let result = migrate_or_fallback_to_legacy(&legacy_path, &preferred_path);
-        if result
-            .as_ref()
-            .map(|p| p == &preferred_path)
-            .unwrap_or(false)
-        {
-            write_migration_marker(&marker_path);
+    if let Some(legacy_path) = legacy_path.as_ref() {
+        let legacy_signal = inspect_database_signal(legacy_path);
+        let should_migrate = if marker_path.exists() {
+            should_replace_preferred_with_legacy(
+                preferred_path.as_path(),
+                preferred_signal.as_ref(),
+                legacy_path.as_path(),
+                legacy_signal.as_ref(),
+            )
+        } else if !preferred_path.exists() {
+            true
+        } else {
+            should_replace_preferred_with_legacy(
+                preferred_path.as_path(),
+                preferred_signal.as_ref(),
+                legacy_path.as_path(),
+                legacy_signal.as_ref(),
+            )
+        };
+
+        if should_migrate {
+            let result = migrate_or_fallback_to_legacy(legacy_path, &preferred_path);
+            if result
+                .as_ref()
+                .map(|path| path == &preferred_path)
+                .unwrap_or(false)
+            {
+                write_migration_marker(&marker_path);
+            }
+            return result;
         }
-        return result;
     }
 
-    // preferred 库已有用户数据，迁移完成
+    // 无可迁移旧库 → 新安装或已迁移完成
     write_migration_marker(&marker_path);
     Ok(preferred_path)
+}
+
+#[cfg(test)]
+fn resolve_database_path_from_roots(
+    preferred_root: &Path,
+    legacy_root: &Path,
+) -> Result<PathBuf, String> {
+    resolve_database_path_from_source_roots(preferred_root, &[legacy_root.to_path_buf()])
 }
 
 fn write_migration_marker(marker_path: &Path) {
@@ -263,27 +346,101 @@ fn migrate_or_fallback_to_legacy(
     }
 }
 
-fn resolve_subdir_with_legacy_copy_from_roots(
+fn resolve_subdir_with_legacy_copy_from_source_roots(
     preferred_root: &Path,
-    legacy_root: &Path,
+    legacy_roots: &[PathBuf],
     subdir: &str,
 ) -> Result<PathBuf, String> {
     let preferred_dir = preferred_root.join(subdir);
     fs::create_dir_all(&preferred_dir)
         .map_err(|e| format!("无法创建目录 {}: {e}", preferred_dir.display()))?;
 
-    // 标记文件存在 → 迁移已完成，跳过旧目录扫描
     let marker_path = preferred_root.join(MIGRATION_MARKER_FILE);
-    if marker_path.exists() {
+    if marker_path.exists() && dir_has_entries(&preferred_dir) {
         return Ok(preferred_dir);
     }
 
-    let legacy_dir = legacy_root.join(subdir);
-    if legacy_dir.exists() {
-        copy_dir_contents_if_missing(&legacy_dir, &preferred_dir)?;
+    for legacy_root in legacy_roots {
+        let legacy_dir = legacy_root.join(subdir);
+        if legacy_dir.exists() {
+            copy_dir_contents_if_missing(&legacy_dir, &preferred_dir)?;
+        }
     }
 
     Ok(preferred_dir)
+}
+
+#[cfg(test)]
+fn resolve_subdir_with_legacy_copy_from_roots(
+    preferred_root: &Path,
+    legacy_root: &Path,
+    subdir: &str,
+) -> Result<PathBuf, String> {
+    resolve_subdir_with_legacy_copy_from_source_roots(
+        preferred_root,
+        &[legacy_root.to_path_buf()],
+        subdir,
+    )
+}
+
+fn dir_has_entries(path: &Path) -> bool {
+    fs::read_dir(path)
+        .ok()
+        .and_then(|mut entries| entries.next())
+        .is_some()
+}
+
+fn select_best_legacy_database_candidate(
+    preferred_root: &Path,
+    legacy_roots: &[PathBuf],
+) -> Option<PathBuf> {
+    let mut candidates = vec![preferred_root.join(LEGACY_DATABASE_FILE_NAME)];
+
+    for legacy_root in legacy_roots {
+        candidates.push(legacy_root.join(LEGACY_DATABASE_FILE_NAME));
+    }
+    for legacy_root in legacy_roots {
+        candidates.push(legacy_root.join(DATABASE_FILE_NAME));
+    }
+
+    let mut deduped = Vec::new();
+    for candidate in candidates {
+        if !deduped
+            .iter()
+            .any(|existing: &PathBuf| existing == &candidate)
+        {
+            deduped.push(candidate);
+        }
+    }
+
+    let mut best: Option<(usize, DatabaseSignal, PathBuf)> = None;
+    for (priority, candidate) in deduped.into_iter().enumerate() {
+        let Some(signal) = inspect_database_signal(&candidate) else {
+            continue;
+        };
+        if !signal.has_schema && signal.user_signal == 0 {
+            continue;
+        }
+
+        let should_replace = match best.as_ref() {
+            None => true,
+            Some((best_priority, best_signal, _)) => {
+                signal.user_signal > best_signal.user_signal
+                    || (signal.user_signal == best_signal.user_signal
+                        && signal.has_schema
+                        && !best_signal.has_schema)
+                    || (signal.user_signal == best_signal.user_signal
+                        && signal.has_schema == best_signal.has_schema
+                        && priority < *best_priority)
+            }
+        };
+
+        if should_replace {
+            best = Some((priority, signal, candidate));
+        }
+    }
+
+    best.map(|(_, _, path)| path)
 }
 
 fn migrate_legacy_database(legacy_path: &Path, preferred_path: &Path) -> Result<(), String> {
@@ -466,8 +623,8 @@ mod tests {
     #[test]
     fn resolve_database_path_migrates_legacy_database() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&legacy_root).unwrap();
 
         let legacy_db = legacy_root.join(DATABASE_FILE_NAME);
@@ -477,7 +634,7 @@ mod tests {
             [],
         )
         .unwrap();
-        conn.execute("INSERT INTO sample (name) VALUES ('proxycast')", [])
+        conn.execute("INSERT INTO sample (name) VALUES ('lime')", [])
             .unwrap();
 
         let resolved = resolve_database_path_from_roots(&preferred_root, &legacy_root).unwrap();
@@ -488,17 +645,17 @@ mod tests {
         let name: String = migrated
             .query_row("SELECT name FROM sample LIMIT 1", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(name, "proxycast");
+        assert_eq!(name, "lime");
     }
 
     #[test]
     fn resolve_logs_dir_copies_legacy_files() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         let legacy_logs = legacy_root.join("logs");
         fs::create_dir_all(&legacy_logs).unwrap();
-        fs::write(legacy_logs.join("proxycast.log"), "legacy log").unwrap();
+        fs::write(legacy_logs.join("lime.log"), "legacy log").unwrap();
 
         let resolved =
             resolve_subdir_with_legacy_copy_from_roots(&preferred_root, &legacy_root, "logs")
@@ -506,7 +663,7 @@ mod tests {
 
         assert_eq!(resolved, preferred_root.join("logs"));
         assert_eq!(
-            fs::read_to_string(resolved.join("proxycast.log")).unwrap(),
+            fs::read_to_string(resolved.join("lime.log")).unwrap(),
             "legacy log"
         );
     }
@@ -514,8 +671,8 @@ mod tests {
     #[test]
     fn resolve_projects_dir_copies_legacy_project_directories() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         let legacy_project_dir = legacy_root.join("projects").join("legacy-project");
         fs::create_dir_all(&legacy_project_dir).unwrap();
         fs::write(legacy_project_dir.join("note.md"), "legacy project").unwrap();
@@ -534,8 +691,8 @@ mod tests {
     #[test]
     fn resolve_sessions_dir_copies_legacy_session_directories() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         let legacy_session_dir = legacy_root
             .join("sessions")
             .join("legacy-session")
@@ -563,8 +720,8 @@ mod tests {
     #[test]
     fn resolve_skills_dir_copies_legacy_skill_directories() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         let legacy_skill_dir = legacy_root.join("skills").join("legacy-skill");
         fs::create_dir_all(&legacy_skill_dir).unwrap();
         fs::write(legacy_skill_dir.join("SKILL.md"), "legacy skill").unwrap();
@@ -590,8 +747,8 @@ mod tests {
     #[test]
     fn resolve_user_memory_path_copies_legacy_agents_file() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&legacy_root).unwrap();
         fs::write(legacy_root.join("AGENTS.md"), "legacy agents").unwrap();
 
@@ -605,8 +762,8 @@ mod tests {
     #[test]
     fn resolve_default_project_dir_creates_default_subdirectory() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
 
         let resolved =
             resolve_default_project_dir_from_roots(&preferred_root, &legacy_root).unwrap();
@@ -617,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn fallback_runtime_subdir_uses_proxycast_temp_namespace() {
+    fn fallback_runtime_subdir_uses_lime_temp_namespace() {
         let fallback = fallback_runtime_subdir("logs");
         assert!(fallback.ends_with(Path::new(APP_DATA_DIR_NAME).join("logs")));
     }
@@ -625,8 +782,8 @@ mod tests {
     #[test]
     fn resolve_database_path_replaces_bootstrap_db_with_legacy_data() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&preferred_root).unwrap();
         fs::create_dir_all(&legacy_root).unwrap();
 
@@ -668,8 +825,8 @@ mod tests {
     #[test]
     fn resolve_database_path_keeps_preferred_when_it_has_user_data() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&preferred_root).unwrap();
         fs::create_dir_all(&legacy_root).unwrap();
 
@@ -706,10 +863,10 @@ mod tests {
     }
 
     #[test]
-    fn resolve_database_path_skips_migration_when_marker_exists() {
+    fn resolve_database_path_recovers_from_legacy_when_marker_exists_but_new_db_is_empty() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&preferred_root).unwrap();
         fs::create_dir_all(&legacy_root).unwrap();
 
@@ -741,7 +898,7 @@ mod tests {
         // 写入标记文件 → 模拟已迁移过
         fs::write(preferred_root.join(MIGRATION_MARKER_FILE), "1700000000").unwrap();
 
-        // 即使旧库有数据、新库为空，也不应触发迁移
+        // 即使标记已存在，只要新库仍是空壳，也应自动恢复旧库数据
         let resolved = resolve_database_path_from_roots(&preferred_root, &legacy_root).unwrap();
         assert_eq!(resolved, preferred_db);
 
@@ -749,15 +906,47 @@ mod tests {
         let count: u64 = conn
             .query_row("SELECT COUNT(*) FROM contents", [], |row| row.get(0))
             .unwrap();
-        // 新库仍为空，说明没有被旧库覆盖
-        assert_eq!(count, 0);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn resolve_database_path_migrates_proxycast_appdata_database_on_first_lime_launch() {
+        let temp = tempdir().unwrap();
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_appdata_root = temp.path().join("appdata").join("proxycast");
+        fs::create_dir_all(&legacy_appdata_root).unwrap();
+
+        let legacy_db = legacy_appdata_root.join(LEGACY_DATABASE_FILE_NAME);
+        let conn = Connection::open(&legacy_db).unwrap();
+        conn.execute(
+            "CREATE TABLE contents (id INTEGER PRIMARY KEY, title TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO contents (title) VALUES ('proxycast legacy')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let resolved =
+            resolve_database_path_from_source_roots(&preferred_root, &[legacy_appdata_root])
+                .unwrap();
+        assert_eq!(resolved, preferred_root.join(DATABASE_FILE_NAME));
+
+        let conn = Connection::open(&resolved).unwrap();
+        let title: String = conn
+            .query_row("SELECT title FROM contents LIMIT 1", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(title, "proxycast legacy");
     }
 
     #[test]
     fn resolve_database_path_writes_marker_after_successful_migration() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         fs::create_dir_all(&legacy_root).unwrap();
 
         let legacy_db = legacy_root.join(DATABASE_FILE_NAME);
@@ -783,8 +972,8 @@ mod tests {
     #[test]
     fn resolve_database_path_writes_marker_for_fresh_install() {
         let temp = tempdir().unwrap();
-        let preferred_root = temp.path().join("appdata").join("proxycast");
-        let legacy_root = temp.path().join("home").join(".proxycast");
+        let preferred_root = temp.path().join("appdata").join("lime");
+        let legacy_root = temp.path().join("home").join(".lime");
         // 不创建 legacy_root → 模拟全新安装
 
         let marker_path = preferred_root.join(MIGRATION_MARKER_FILE);

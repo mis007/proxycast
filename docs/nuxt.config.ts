@@ -1,7 +1,7 @@
 export default {
   extends: ["docus"],
   app: {
-    baseURL: "/proxycast/",
+    baseURL: "/lime/",
   },
   image: {
     provider: "none",
@@ -10,6 +10,6 @@ export default {
     robotsTxt: false,
   },
   llms: {
-    domain: "https://proxycast.local",
+    domain: "https://lime.local",
   },
 };

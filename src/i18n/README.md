@@ -1,4 +1,4 @@
-# ProxyCast Internationalization (i18n) Guide
+# Lime Internationalization (i18n) Guide
 
 ## 📚 Table of Contents
 
@@ -15,7 +15,7 @@
 
 ## Overview
 
-ProxyCast uses a **hybrid i18n system** combining:
+Lime uses a **hybrid i18n system** combining:
 - **Patch Layer**: DOM-based text replacement for static UI text
 - **Dynamic Templates**: Template-based translation for text with variables
 
@@ -590,4 +590,4 @@ For issues or questions:
 ---
 
 **Last Updated:** 2025-01-12
-**Maintainer:** ProxyCast Development Team
+**Maintainer:** Lime Development Team

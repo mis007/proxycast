@@ -1,6 +1,6 @@
-const RESOURCE_PROJECT_STORAGE_KEY = "proxycast-resource-project-id";
+const RESOURCE_PROJECT_STORAGE_KEY = "lime-resource-project-id";
 const LEGACY_IMAGE_GEN_PROJECT_KEY = "image-gen-target-project-id";
-const RESOURCE_PROJECT_CHANGE_EVENT = "proxycast:resource-project-change";
+const RESOURCE_PROJECT_CHANGE_EVENT = "lime:resource-project-change";
 
 export type ResourceProjectChangeSource =
   | "resources"

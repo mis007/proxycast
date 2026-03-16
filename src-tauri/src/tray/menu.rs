@@ -9,8 +9,8 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-pub use proxycast_core::tray_menu_meta::menu_ids;
-pub use proxycast_core::tray_menu_meta::{get_menu_item_ids, parse_server_address};
+pub use lime_core::tray_menu_meta::menu_ids;
+pub use lime_core::tray_menu_meta::{get_menu_item_ids, parse_server_address};
 
 /// 托盘菜单构建错误
 #[derive(Debug, thiserror::Error)]

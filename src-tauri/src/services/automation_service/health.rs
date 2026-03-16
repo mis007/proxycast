@@ -2,8 +2,8 @@
 
 use crate::database::DbConnection;
 use chrono::{DateTime, Duration, Timelike, Utc};
-use proxycast_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
-use proxycast_core::database::dao::automation_job::{AutomationJob, AutomationJobDao};
+use lime_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
+use lime_core::database::dao::automation_job::{AutomationJob, AutomationJobDao};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -243,7 +243,7 @@ fn is_in_cooldown(job: &AutomationJob, now: DateTime<Utc>) -> bool {
 }
 
 fn build_failure_trend_24h(
-    runs: &[proxycast_core::database::dao::agent_run::AgentRun],
+    runs: &[lime_core::database::dao::agent_run::AgentRun],
     now: DateTime<Utc>,
 ) -> Vec<AutomationFailureTrendPoint> {
     let mut points = Vec::with_capacity(24);
@@ -335,9 +335,9 @@ fn build_alerts(
 mod tests {
     use super::*;
     use crate::database::schema::create_tables;
-    use proxycast_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
-    use proxycast_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
-    use proxycast_core::database::dao::automation_job::AutomationJobDao;
+    use lime_core::config::{AutomationExecutionMode, DeliveryConfig, TaskSchedule};
+    use lime_core::database::dao::agent_run::{AgentRun, AgentRunDao, AgentRunStatus};
+    use lime_core::database::dao::automation_job::AutomationJobDao;
     use rusqlite::Connection;
     use serde_json::json;
     use std::sync::{Arc, Mutex};

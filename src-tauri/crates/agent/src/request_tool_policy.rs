@@ -12,6 +12,7 @@ use aster::conversation::message::Message;
 use aster::tools::ToolContext;
 use chrono::{Datelike, Local, NaiveDate};
 use futures::{stream, StreamExt};
+use lime_core::env_compat;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -25,10 +26,22 @@ pub const WEB_SEARCH_SYNTHESIS_MARKER: &str = "【预检索后输出要求】";
 
 const DEFAULT_REQUIRED_TOOLS: &[&str] = &["WebSearch"];
 const DEFAULT_ALLOWED_TOOLS: &[&str] = &["WebSearch", "WebFetch"];
-const WEB_SEARCH_REQUIRED_TOOLS_ENV: &str = "PROXYCAST_WEB_SEARCH_REQUIRED_TOOLS";
-const WEB_SEARCH_ALLOWED_TOOLS_ENV: &str = "PROXYCAST_WEB_SEARCH_ALLOWED_TOOLS";
-const WEB_SEARCH_DISALLOWED_TOOLS_ENV: &str = "PROXYCAST_WEB_SEARCH_DISALLOWED_TOOLS";
-const WEB_SEARCH_PREFLIGHT_ENABLED_ENV: &str = "PROXYCAST_WEB_SEARCH_PREFLIGHT_ENABLED";
+const WEB_SEARCH_REQUIRED_TOOLS_ENV_KEYS: &[&str] = &[
+    "LIME_WEB_SEARCH_REQUIRED_TOOLS",
+    "PROXYCAST_WEB_SEARCH_REQUIRED_TOOLS",
+];
+const WEB_SEARCH_ALLOWED_TOOLS_ENV_KEYS: &[&str] = &[
+    "LIME_WEB_SEARCH_ALLOWED_TOOLS",
+    "PROXYCAST_WEB_SEARCH_ALLOWED_TOOLS",
+];
+const WEB_SEARCH_DISALLOWED_TOOLS_ENV_KEYS: &[&str] = &[
+    "LIME_WEB_SEARCH_DISALLOWED_TOOLS",
+    "PROXYCAST_WEB_SEARCH_DISALLOWED_TOOLS",
+];
+const WEB_SEARCH_PREFLIGHT_ENABLED_ENV_KEYS: &[&str] = &[
+    "LIME_WEB_SEARCH_PREFLIGHT_ENABLED",
+    "PROXYCAST_WEB_SEARCH_PREFLIGHT_ENABLED",
+];
 const STREAM_EVENT_DIAG_WARN_TEXT_DELTA_CHARS: usize = 2_000;
 const STREAM_EVENT_DIAG_WARN_TOOL_OUTPUT_CHARS: usize = 8_000;
 const STREAM_EVENT_DIAG_WARN_CONTEXT_STEPS: usize = 24;
@@ -355,9 +368,9 @@ impl RequestToolPolicy {
 /// 规则：
 /// - `effective_web_search = request_web_search.unwrap_or(mode_default)`
 /// - 白/黑名单支持环境变量覆盖：
-///   - `PROXYCAST_WEB_SEARCH_REQUIRED_TOOLS`
-///   - `PROXYCAST_WEB_SEARCH_ALLOWED_TOOLS`
-///   - `PROXYCAST_WEB_SEARCH_DISALLOWED_TOOLS`
+///   - `LIME_WEB_SEARCH_REQUIRED_TOOLS`（兼容 `PROXYCAST_WEB_SEARCH_REQUIRED_TOOLS`）
+///   - `LIME_WEB_SEARCH_ALLOWED_TOOLS`（兼容 `PROXYCAST_WEB_SEARCH_ALLOWED_TOOLS`）
+///   - `LIME_WEB_SEARCH_DISALLOWED_TOOLS`（兼容 `PROXYCAST_WEB_SEARCH_DISALLOWED_TOOLS`）
 pub fn resolve_request_tool_policy(
     request_web_search: Option<bool>,
     mode_default: bool,
@@ -378,10 +391,11 @@ pub fn resolve_request_tool_policy_with_mode(
         _ => RequestToolPolicyMode::Disabled,
     };
     let effective_web_search = search_mode.enables_web_search();
-    let required_tools = parse_tool_list_env(WEB_SEARCH_REQUIRED_TOOLS_ENV, DEFAULT_REQUIRED_TOOLS);
+    let required_tools =
+        parse_tool_list_env(WEB_SEARCH_REQUIRED_TOOLS_ENV_KEYS, DEFAULT_REQUIRED_TOOLS);
     let mut allowed_tools =
-        parse_tool_list_env(WEB_SEARCH_ALLOWED_TOOLS_ENV, DEFAULT_ALLOWED_TOOLS);
-    let disallowed_tools = parse_tool_list_env(WEB_SEARCH_DISALLOWED_TOOLS_ENV, &[]);
+        parse_tool_list_env(WEB_SEARCH_ALLOWED_TOOLS_ENV_KEYS, DEFAULT_ALLOWED_TOOLS);
+    let disallowed_tools = parse_tool_list_env(WEB_SEARCH_DISALLOWED_TOOLS_ENV_KEYS, &[]);
 
     for required in &required_tools {
         if !allowed_tools
@@ -460,9 +474,8 @@ pub fn merge_system_prompt_with_request_tool_policy(
     }
 }
 
-fn parse_tool_list_env(key: &str, default_values: &[&str]) -> Vec<String> {
-    let from_env = std::env::var(key)
-        .ok()
+fn parse_tool_list_env(keys: &[&str], default_values: &[&str]) -> Vec<String> {
+    let from_env = env_compat::var(keys)
         .map(|raw| parse_tool_list(&raw))
         .filter(|tools| !tools.is_empty());
 
@@ -1444,12 +1457,12 @@ where
 }
 
 fn is_web_search_preflight_enabled() -> bool {
-    match std::env::var(WEB_SEARCH_PREFLIGHT_ENABLED_ENV) {
-        Ok(raw) => match raw.trim().to_ascii_lowercase().as_str() {
+    match env_compat::var(WEB_SEARCH_PREFLIGHT_ENABLED_ENV_KEYS) {
+        Some(raw) => match raw.trim().to_ascii_lowercase().as_str() {
             "0" | "false" | "no" | "off" => false,
             _ => true,
         },
-        Err(_) => true,
+        None => true,
     }
 }
 

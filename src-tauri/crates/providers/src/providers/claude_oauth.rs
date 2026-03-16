@@ -603,7 +603,7 @@ pub async fn exchange_claude_authorization_code(
     // 保存凭证到应用数据目录
     let creds_dir = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("credentials")
         .join("claude_oauth");
 
@@ -929,7 +929,7 @@ pub async fn oauth_with_cookie(
     // 保存凭证到应用数据目录
     let creds_dir = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("proxycast")
+        .join("lime")
         .join("credentials")
         .join("claude_oauth");
 

@@ -92,7 +92,7 @@ impl Default for ContextMemoryConfig {
     fn default() -> Self {
         let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
         Self {
-            memory_dir: home_dir.join(".proxycast").join("memory"),
+            memory_dir: home_dir.join(".lime").join("memory"),
             max_entries_per_session: 100,
             auto_archive_days: 30,
             auto_cleanup_enabled: true,

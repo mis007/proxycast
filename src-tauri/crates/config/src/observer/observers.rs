@@ -6,9 +6,9 @@
 use super::events::ConfigChangeEvent;
 use super::traits::ConfigObserver;
 use async_trait::async_trait;
-use proxycast_core::config::{Config, EndpointProvidersConfig};
-use proxycast_core::router::{ModelMapper, Router};
-use proxycast_infra::Injector;
+use lime_core::config::{Config, EndpointProvidersConfig};
+use lime_core::router::{ModelMapper, Router};
+use lime_infra::Injector;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -52,7 +52,7 @@ impl ConfigObserver for RouterObserver {
         if let Ok(provider_type) = config
             .routing
             .default_provider
-            .parse::<proxycast_core::ProviderType>()
+            .parse::<lime_core::ProviderType>()
         {
             let mut router = self.router.write().await;
             router.set_default_provider(provider_type);

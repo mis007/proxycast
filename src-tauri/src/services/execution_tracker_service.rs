@@ -316,12 +316,15 @@ impl ExecutionTracker {
 }
 
 fn is_tracker_enabled() -> bool {
-    match std::env::var("PROXYCAST_EXECUTION_TRACKER_ENABLED") {
-        Ok(raw) => {
+    match lime_core::env_compat::var(&[
+        "LIME_EXECUTION_TRACKER_ENABLED",
+        "PROXYCAST_EXECUTION_TRACKER_ENABLED",
+    ]) {
+        Some(raw) => {
             let normalized = raw.trim().to_ascii_lowercase();
             !matches!(normalized.as_str(), "0" | "false" | "off" | "no")
         }
-        Err(_) => true,
+        None => true,
     }
 }
 

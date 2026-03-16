@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const STORAGE_KEY = "proxycast_sound_enabled";
+const STORAGE_KEY = "lime_sound_enabled";
 const SOUND_INTERVAL = 120; // 打字音效间隔 120ms
 
 export interface UseSoundReturn {

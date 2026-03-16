@@ -1,6 +1,6 @@
 //! 配置类型定义
 //!
-//! 定义 ProxyCast 的配置结构，支持 YAML 和 JSON 序列化/反序列化
+//! 定义 Lime 的配置结构，支持 YAML 和 JSON 序列化/反序列化
 //! 保持与旧版 JSON 配置的向后兼容性
 
 use crate::models::injection_types::{InjectionMode, InjectionRule};
@@ -229,7 +229,7 @@ pub struct ApiKeyEntry {
 
 /// 默认 auth_dir 路径
 fn default_auth_dir() -> String {
-    "~/.proxycast/auth".to_string()
+    "~/.lime/auth".to_string()
 }
 
 /// 端点 Provider 配置
@@ -2404,7 +2404,7 @@ impl Default for MemorySourcesConfig {
             managed_policy_path: None,
             project_memory_paths: vec!["AGENTS.md".to_string(), ".agents/AGENTS.md".to_string()],
             project_rule_dirs: vec![".agents/rules".to_string()],
-            user_memory_path: Some("~/.proxycast/AGENTS.md".to_string()),
+            user_memory_path: Some("~/.lime/AGENTS.md".to_string()),
             project_local_memory_path: Some("AGENTS.local.md".to_string()),
         }
     }
@@ -2422,7 +2422,7 @@ pub struct MemoryAutoConfig {
     /// 启动时加载 MEMORY 入口的最大行数
     #[serde(default = "default_memory_auto_max_loaded_lines")]
     pub max_loaded_lines: u32,
-    /// 自动记忆根目录（可选，默认 ~/.proxycast/projects/<project>/memory）
+    /// 自动记忆根目录（可选，默认 ~/.lime/projects/<project>/memory）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_dir: Option<String>,
 }
@@ -2626,7 +2626,7 @@ mod unit_tests {
         assert!(!config.injection.enabled);
         assert!(config.injection.rules.is_empty());
         // 新增字段测试
-        assert_eq!(config.auth_dir, "~/.proxycast/auth");
+        assert_eq!(config.auth_dir, "~/.lime/auth");
         assert!(config.credential_pool.kiro.is_empty());
         assert!(config.credential_pool.openai.is_empty());
         assert!(config.crash_reporting.enabled);

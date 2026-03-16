@@ -65,23 +65,23 @@ describe("项目管理 API", () => {
 
     it("应该调用命令获取 workspace 根目录", async () => {
       vi.mocked(safeInvoke).mockResolvedValueOnce(
-        "/Users/test/.proxycast/projects",
+        "/Users/test/.lime/projects",
       );
 
       const root = await getWorkspaceProjectsRoot();
 
-      expect(root).toBe("/Users/test/.proxycast/projects");
+      expect(root).toBe("/Users/test/.lime/projects");
       expect(safeInvoke).toHaveBeenCalledWith("workspace_get_projects_root");
     });
 
     it("应该调用命令解析项目目录", async () => {
       vi.mocked(safeInvoke).mockResolvedValueOnce(
-        "/Users/test/.proxycast/projects/MyProject",
+        "/Users/test/.lime/projects/MyProject",
       );
 
       const path = await resolveProjectRootPath("MyProject");
 
-      expect(path).toBe("/Users/test/.proxycast/projects/MyProject");
+      expect(path).toBe("/Users/test/.lime/projects/MyProject");
       expect(safeInvoke).toHaveBeenCalledWith(
         "workspace_resolve_project_path",
         {
@@ -92,12 +92,12 @@ describe("项目管理 API", () => {
 
     it("应该将空名称传给后端统一处理", async () => {
       vi.mocked(safeInvoke).mockResolvedValueOnce(
-        "/Users/test/.proxycast/projects/未命名项目",
+        "/Users/test/.lime/projects/未命名项目",
       );
 
       const path = await resolveProjectRootPath("   ");
 
-      expect(path).toBe("/Users/test/.proxycast/projects/未命名项目");
+      expect(path).toBe("/Users/test/.lime/projects/未命名项目");
       expect(safeInvoke).toHaveBeenCalledWith(
         "workspace_resolve_project_path",
         {
@@ -111,17 +111,17 @@ describe("项目管理 API", () => {
         id: "p1",
         name: "测试项目",
         workspace_type: "general",
-        root_path: "/Users/test/.proxycast/projects/demo",
+        root_path: "/Users/test/.lime/projects/demo",
       });
 
       const project = await getProjectByRootPath(
-        "/Users/test/.proxycast/projects/demo",
+        "/Users/test/.lime/projects/demo",
       );
 
       expect(project?.id).toBe("p1");
-      expect(project?.rootPath).toBe("/Users/test/.proxycast/projects/demo");
+      expect(project?.rootPath).toBe("/Users/test/.lime/projects/demo");
       expect(safeInvoke).toHaveBeenCalledWith("workspace_get_by_path", {
-        rootPath: "/Users/test/.proxycast/projects/demo",
+        rootPath: "/Users/test/.lime/projects/demo",
       });
     });
 
@@ -129,7 +129,7 @@ describe("项目管理 API", () => {
       vi.mocked(safeInvoke).mockResolvedValueOnce(null);
 
       const project = await getProjectByRootPath(
-        "/Users/test/.proxycast/projects/missing",
+        "/Users/test/.lime/projects/missing",
       );
 
       expect(project).toBeNull();
@@ -140,7 +140,7 @@ describe("项目管理 API", () => {
         id: "default-1",
         name: "默认项目",
         workspace_type: "general",
-        root_path: "/Users/test/.proxycast/projects/default",
+        root_path: "/Users/test/.lime/projects/default",
         is_default: true,
       });
 
@@ -151,7 +151,7 @@ describe("项目管理 API", () => {
           id: "default-1",
           name: "默认项目",
           workspaceType: "general",
-          rootPath: "/Users/test/.proxycast/projects/default",
+          rootPath: "/Users/test/.lime/projects/default",
           isDefault: true,
         }),
       );

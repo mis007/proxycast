@@ -3,26 +3,25 @@
 //! 通过内存态开关提供跨 crate 的统一读取入口，并保留环境变量兜底覆盖。
 
 use crate::config::{Config, ToolCallingConfig};
+use crate::env_compat;
 use serde_json::{Map, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-const ENV_TOOLCALL_V2_ENABLED: &str = "PROXYCAST_TOOLCALL_V2_ENABLED";
-const ENV_TOOLCALL_V2_DYNAMIC_FILTERING: &str = "PROXYCAST_TOOLCALL_V2_DYNAMIC_FILTERING";
-const ENV_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES: &str = "PROXYCAST_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES";
+const ENV_TOOLCALL_V2_ENABLED: &[&str] =
+    &["LIME_TOOLCALL_V2_ENABLED", "PROXYCAST_TOOLCALL_V2_ENABLED"];
+const ENV_TOOLCALL_V2_DYNAMIC_FILTERING: &[&str] = &[
+    "LIME_TOOLCALL_V2_DYNAMIC_FILTERING",
+    "PROXYCAST_TOOLCALL_V2_DYNAMIC_FILTERING",
+];
+const ENV_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES: &[&str] = &[
+    "LIME_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES",
+    "PROXYCAST_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES",
+];
 
 static TOOLCALL_RUNTIME_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static TOOLCALL_V2_ENABLED: AtomicBool = AtomicBool::new(true);
 static TOOLCALL_DYNAMIC_FILTERING_ENABLED: AtomicBool = AtomicBool::new(true);
 static TOOLCALL_NATIVE_INPUT_EXAMPLES_ENABLED: AtomicBool = AtomicBool::new(false);
-
-fn parse_bool_env(name: &str) -> Option<bool> {
-    let raw = std::env::var(name).ok()?;
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "1" | "true" | "yes" | "on" => Some(true),
-        "0" | "false" | "no" | "off" => Some(false),
-        _ => None,
-    }
-}
 
 /// 将配置应用到进程内运行时开关。
 pub fn apply_tool_calling_runtime_config(config: &Config) {
@@ -39,7 +38,7 @@ pub fn apply_tool_calling_runtime_config_with_flags(flags: &ToolCallingConfig) {
 
 /// Tool Calling 2.0 总开关。
 pub fn tool_calling_v2_enabled() -> bool {
-    if let Some(value) = parse_bool_env(ENV_TOOLCALL_V2_ENABLED) {
+    if let Some(value) = env_compat::bool_var(ENV_TOOLCALL_V2_ENABLED) {
         return value;
     }
     if TOOLCALL_RUNTIME_INITIALIZED.load(Ordering::Acquire) {
@@ -50,7 +49,7 @@ pub fn tool_calling_v2_enabled() -> bool {
 
 /// Tool Calling 动态过滤开关。
 pub fn tool_calling_dynamic_filtering_enabled() -> bool {
-    if let Some(value) = parse_bool_env(ENV_TOOLCALL_V2_DYNAMIC_FILTERING) {
+    if let Some(value) = env_compat::bool_var(ENV_TOOLCALL_V2_DYNAMIC_FILTERING) {
         return value;
     }
     if TOOLCALL_RUNTIME_INITIALIZED.load(Ordering::Acquire) {
@@ -61,7 +60,7 @@ pub fn tool_calling_dynamic_filtering_enabled() -> bool {
 
 /// Tool Calling 原生 input examples 透传开关。
 pub fn tool_calling_native_input_examples_enabled() -> bool {
-    if let Some(value) = parse_bool_env(ENV_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES) {
+    if let Some(value) = env_compat::bool_var(ENV_TOOLCALL_V2_NATIVE_INPUT_EXAMPLES) {
         return value;
     }
     if TOOLCALL_RUNTIME_INITIALIZED.load(Ordering::Acquire) {
@@ -72,8 +71,8 @@ pub fn tool_calling_native_input_examples_enabled() -> bool {
 
 fn schema_read_examples(schema: &Value) -> Vec<Value> {
     let extension = schema
-        .get("x-proxycast")
-        .or_else(|| schema.get("x_proxycast"))
+        .get("x-lime")
+        .or_else(|| schema.get("x_lime"))
         .unwrap_or(schema);
 
     extension
@@ -274,7 +273,7 @@ mod tests {
     fn test_resolve_tool_input_examples_prefers_configured_examples() {
         let schema = serde_json::json!({
             "type": "object",
-            "x-proxycast": {
+            "x-lime": {
                 "input_examples": [{"query": "rust async"}]
             }
         });

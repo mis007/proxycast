@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Codex Provider 是 ProxyCast 的 OpenAI Codex 凭证提供者插件，支持 **OAuth 2.0 + PKCE** 和 **API Key** 两种认证方式访问 OpenAI GPT 系列模型。插件兼容 Codex CLI 的凭证格式，可以直接导入 `~/.codex/auth.json` 使用。
+Codex Provider 是 Lime 的 OpenAI Codex 凭证提供者插件，支持 **OAuth 2.0 + PKCE** 和 **API Key** 两种认证方式访问 OpenAI GPT 系列模型。插件兼容 Codex CLI 的凭证格式，可以直接导入 `~/.codex/auth.json` 使用。
 
 ### 1.2 支持的认证方式
 
@@ -91,13 +91,13 @@ codex-provider/
   "name": "codex-provider",
   "version": "1.0.0",
   "description": "Codex Provider - 支持 OAuth 和 API Key 两种认证方式访问 OpenAI GPT 模型",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/codex-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "codex-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "codex",
@@ -730,13 +730,13 @@ fn transform_to_codex_format(request: &Value) -> Result<Value> {
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { AuthMethodTabs } from './components/AuthMethodTabs';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -806,7 +806,7 @@ export default function CodexProviderUI({ sdk, pluginId }: PluginProps) {
 type AuthMethod = 'oauth' | 'api_key' | 'import';
 
 interface AuthMethodTabsProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -1803,4 +1803,4 @@ pub fn calculate_cost(usage: &UsageData, model: &str) -> CostInfo {
 - [OpenAI API 文档](https://platform.openai.com/docs/api-reference)
 - [Codex CLI 项目](https://github.com/openai/codex)
 - [OAuth 2.0 PKCE 规范](https://datatracker.ietf.org/doc/html/rfc7636)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)

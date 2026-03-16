@@ -368,7 +368,7 @@ pub async fn search_web_images(
         .header("Authorization", api_key)
         .header(
             reqwest::header::USER_AGENT,
-            "Mozilla/5.0 (compatible; ProxyCast/0.75; +https://github.com/aiclientproxy/proxycast)",
+            "Mozilla/5.0 (compatible; Lime/0.75; +https://github.com/aiclientproxy/lime)",
         )
         .header(reqwest::header::ACCEPT, "application/json")
         .query(&query)

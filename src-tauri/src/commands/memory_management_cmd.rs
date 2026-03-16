@@ -18,8 +18,8 @@ use crate::services::memory_source_resolver_service::{
     resolve_effective_sources, EffectiveMemorySourcesResponse,
 };
 use chrono::{Local, NaiveDateTime, TimeZone};
-use proxycast_core::app_paths;
-use proxycast_services::context_memory_service::{MemoryEntry, MemoryFileType};
+use lime_core::app_paths;
+use lime_services::context_memory_service::{MemoryEntry, MemoryFileType};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

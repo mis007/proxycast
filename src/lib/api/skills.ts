@@ -71,7 +71,7 @@ export interface ImportedSkillResult {
   directory: string;
 }
 
-export type AppType = "claude" | "codex" | "gemini" | "proxycast";
+export type AppType = "claude" | "codex" | "gemini" | "lime";
 
 function normalizeStandardCompliance(
   compliance?: Partial<SkillStandardCompliance> | null,
@@ -112,7 +112,7 @@ function normalizeInspection(inspection: SkillInspection): SkillInspection {
 }
 
 export const skillsApi = {
-  async getLocal(app: AppType = "proxycast"): Promise<Skill[]> {
+  async getLocal(app: AppType = "lime"): Promise<Skill[]> {
     const skills = await safeInvoke<Skill[]>("get_local_skills_for_app", {
       app,
     });
@@ -120,7 +120,7 @@ export const skillsApi = {
   },
 
   async getAll(
-    app: AppType = "proxycast",
+    app: AppType = "lime",
     options?: { refreshRemote?: boolean },
   ): Promise<Skill[]> {
     const skills = await safeInvoke<Skill[]>("get_skills_for_app", {
@@ -132,14 +132,14 @@ export const skillsApi = {
 
   async install(
     directory: string,
-    app: AppType = "proxycast",
+    app: AppType = "lime",
   ): Promise<boolean> {
     return safeInvoke("install_skill_for_app", { app, directory });
   },
 
   async uninstall(
     directory: string,
-    app: AppType = "proxycast",
+    app: AppType = "lime",
   ): Promise<boolean> {
     return safeInvoke("uninstall_skill_for_app", { app, directory });
   },
@@ -161,15 +161,15 @@ export const skillsApi = {
   },
 
   /**
-   * 获取已安装的 ProxyCast Skills 目录列表
+   * 获取已安装的 Lime Skills 目录列表
    *
-   * 扫描 ProxyCast 应用 skills 目录，返回包含 SKILL.md 的子目录名列表。
+   * 扫描 Lime 应用 skills 目录，返回包含 SKILL.md 的子目录名列表。
    * 这些 Skills 将被传递给 aster 用于 AI Agent 功能。
    *
    * @returns 已安装的 Skill 目录名列表
    */
-  async getInstalledProxyCastSkills(): Promise<string[]> {
-    return safeInvoke("get_installed_proxycast_skills");
+  async getInstalledLimeSkills(): Promise<string[]> {
+    return safeInvoke("get_installed_lime_skills");
   },
 
   /**
@@ -181,7 +181,7 @@ export const skillsApi = {
    */
   async inspectLocalSkill(
     directory: string,
-    app: AppType = "proxycast",
+    app: AppType = "lime",
   ): Promise<SkillInspection> {
     const inspection = await safeInvoke<SkillInspection>(
       "inspect_local_skill_for_app",
@@ -192,7 +192,7 @@ export const skillsApi = {
 
   async createSkillScaffold(
     request: CreateSkillScaffoldRequest,
-    app: AppType = "proxycast",
+    app: AppType = "lime",
   ): Promise<SkillInspection> {
     const inspection = await safeInvoke<SkillInspection>(
       "create_skill_scaffold_for_app",
@@ -206,7 +206,7 @@ export const skillsApi = {
 
   async importLocalSkill(
     sourcePath: string,
-    app: AppType = "proxycast",
+    app: AppType = "lime",
   ): Promise<ImportedSkillResult> {
     return safeInvoke<ImportedSkillResult>("import_local_skill_for_app", {
       app,

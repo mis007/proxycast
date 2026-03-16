@@ -6,13 +6,13 @@
 
 use super::traits::{PipelineStep, StepError};
 use async_trait::async_trait;
-use proxycast_core::processor::RequestContext;
-use proxycast_core::ProviderType;
-use proxycast_infra::resilience::{FailoverManager, TimeoutError};
-use proxycast_infra::{
+use lime_core::processor::RequestContext;
+use lime_core::ProviderType;
+use lime_infra::resilience::{FailoverManager, TimeoutError};
+use lime_infra::{
     Failover, FailoverConfig, Retrier, RetryConfig, TimeoutConfig, TimeoutController,
 };
-use proxycast_services::provider_pool_service::ProviderPoolService;
+use lime_services::provider_pool_service::ProviderPoolService;
 use std::future::Future;
 use std::sync::Arc;
 

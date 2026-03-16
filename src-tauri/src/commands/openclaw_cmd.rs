@@ -3,7 +3,8 @@ use crate::database::DbConnection;
 use crate::services::openclaw_service::{
     openclaw_install_event_name, ActionResult, BinaryAvailabilityStatus, BinaryInstallStatus,
     ChannelInfo, CommandPreview, EnvironmentStatus, GatewayStatusInfo, HealthInfo,
-    InstallProgressEvent, NodeCheckResult, OpenClawServiceState, SyncModelEntry, UpdateInfo,
+    InstallProgressEvent, NodeCheckResult, OpenClawRuntimeCandidate, OpenClawServiceState,
+    SyncModelEntry, UpdateInfo,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -171,6 +172,23 @@ pub async fn openclaw_get_progress_logs(
 ) -> Result<Vec<InstallProgressEvent>, String> {
     let service = service.0.lock().await;
     Ok(service.get_progress_logs())
+}
+
+#[tauri::command]
+pub async fn openclaw_list_runtime_candidates(
+    service: State<'_, OpenClawServiceState>,
+) -> Result<Vec<OpenClawRuntimeCandidate>, String> {
+    let service = service.0.lock().await;
+    service.list_runtime_candidates().await
+}
+
+#[tauri::command]
+pub async fn openclaw_set_preferred_runtime(
+    runtime_id: Option<String>,
+    service: State<'_, OpenClawServiceState>,
+) -> Result<ActionResult, String> {
+    let service = service.0.lock().await;
+    service.set_preferred_runtime(runtime_id.as_deref()).await
 }
 
 #[tauri::command]

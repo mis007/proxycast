@@ -10,7 +10,7 @@
 
 ### 1.1 插件简介
 
-Droid Provider 是 ProxyCast 的 Factory.ai (Droid) 插件，通过 **WorkOS OAuth** 集成 Factory.ai 平台，支持 Claude、OpenAI、Gemini 等多种模型的统一访问。
+Droid Provider 是 Lime 的 Factory.ai (Droid) 插件，通过 **WorkOS OAuth** 集成 Factory.ai 平台，支持 Claude、OpenAI、Gemini 等多种模型的统一访问。
 
 ### 1.2 支持的认证方式
 
@@ -105,13 +105,13 @@ droid-provider/
   "name": "droid-provider",
   "version": "1.0.0",
   "description": "Droid Provider - Factory.ai 集成，支持 WorkOS OAuth 和 API Key 模式",
-  "author": "ProxyCast Team",
+  "author": "Lime Team",
   "homepage": "https://github.com/aiclientproxy/droid-provider",
   "license": "MIT",
 
   "plugin_type": "oauth_provider",
   "entry": "droid-provider-cli",
-  "min_proxycast_version": "1.0.0",
+  "min_lime_version": "1.0.0",
 
   "provider": {
     "id": "droid",
@@ -1538,13 +1538,13 @@ impl DroidRelayService {
 
 ```tsx
 // src/index.tsx
-import { ProxyCastPluginSDK } from '@proxycast/plugin-sdk';
+import { LimePluginSDK } from '@lime/plugin-sdk';
 import { CredentialList } from './components/CredentialList';
 import { AuthMethodTabs } from './components/AuthMethodTabs';
 import { SettingsPanel } from './components/SettingsPanel';
 
 interface PluginProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   pluginId: string;
 }
 
@@ -1614,7 +1614,7 @@ export default function DroidProviderUI({ sdk, pluginId }: PluginProps) {
 type AuthMethod = 'workos_oauth' | 'api_key' | 'manual';
 
 interface AuthMethodTabsProps {
-  sdk: ProxyCastPluginSDK;
+  sdk: LimePluginSDK;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -2025,5 +2025,5 @@ pnpm test
 
 - [Factory.ai 官网](https://factory.ai/)
 - [WorkOS 文档](https://workos.com/docs/)
-- [ProxyCast 插件开发指南](../prd/credential-provider-plugin-architecture.md)
+- [Lime 插件开发指南](../prd/credential-provider-plugin-architecture.md)
 - [claude-relay-service](https://github.com/aiclientproxy/claude-relay-service)

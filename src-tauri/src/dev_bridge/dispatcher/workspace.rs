@@ -27,7 +27,7 @@ fn get_optional_bool_arg(args: &JsonValue, primary: &str, secondary: &str) -> Op
 }
 
 fn get_workspace_projects_root_dir() -> Result<PathBuf, String> {
-    proxycast_core::app_paths::resolve_projects_dir()
+    lime_core::app_paths::resolve_projects_dir()
 }
 
 fn sanitize_project_dir_name(name: &str) -> String {

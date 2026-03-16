@@ -13,16 +13,14 @@
 //! 6. 插件后置钩子 (PluginPostStep)
 //! 7. 统计记录 (TelemetryStep)
 
-pub use proxycast_core::processor::RequestContext;
+pub use lime_core::processor::RequestContext;
 
+use lime_core::plugin::PluginManager;
+use lime_core::router::{ModelMapper, Router};
+use lime_core::ProviderType;
+use lime_infra::{Failover, Injector, Retrier, StatsAggregator, TimeoutController, TokenTracker};
+use lime_services::provider_pool_service::ProviderPoolService;
 use parking_lot::RwLock as ParkingLotRwLock;
-use proxycast_core::plugin::PluginManager;
-use proxycast_core::router::{ModelMapper, Router};
-use proxycast_core::ProviderType;
-use proxycast_infra::{
-    Failover, Injector, Retrier, StatsAggregator, TimeoutController, TokenTracker,
-};
-use proxycast_services::provider_pool_service::ProviderPoolService;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -53,7 +51,7 @@ pub struct RequestProcessor {
     /// 热重载协调锁（避免配置更新期间请求读取不一致的配置）
     pub reload_lock: Arc<RwLock<()>>,
     /// 提示路由器
-    pub hint_router: Arc<RwLock<proxycast_core::router::HintRouter>>,
+    pub hint_router: Arc<RwLock<lime_core::router::HintRouter>>,
     /// 对话修剪器
     pub conversation_trimmer: Arc<crate::conversation_manager::ConversationTrimmer>,
 }
@@ -84,7 +82,7 @@ impl RequestProcessor {
             tokens,
             pool_service,
             reload_lock: Arc::new(RwLock::new(())),
-            hint_router: Arc::new(RwLock::new(proxycast_core::router::HintRouter::default())),
+            hint_router: Arc::new(RwLock::new(lime_core::router::HintRouter::default())),
             conversation_trimmer: Arc::new(crate::conversation_manager::ConversationTrimmer::new(
                 crate::conversation_manager::TrimConfig::default(),
             )),
@@ -105,7 +103,7 @@ impl RequestProcessor {
             tokens: Arc::new(ParkingLotRwLock::new(TokenTracker::with_defaults())),
             pool_service,
             reload_lock: Arc::new(RwLock::new(())),
-            hint_router: Arc::new(RwLock::new(proxycast_core::router::HintRouter::default())),
+            hint_router: Arc::new(RwLock::new(lime_core::router::HintRouter::default())),
             conversation_trimmer: Arc::new(crate::conversation_manager::ConversationTrimmer::new(
                 crate::conversation_manager::TrimConfig::default(),
             )),
@@ -139,7 +137,7 @@ impl RequestProcessor {
             tokens,
             pool_service,
             reload_lock: Arc::new(RwLock::new(())),
-            hint_router: Arc::new(RwLock::new(proxycast_core::router::HintRouter::default())),
+            hint_router: Arc::new(RwLock::new(lime_core::router::HintRouter::default())),
             conversation_trimmer: Arc::new(crate::conversation_manager::ConversationTrimmer::new(
                 crate::conversation_manager::TrimConfig::default(),
             )),

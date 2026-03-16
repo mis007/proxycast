@@ -54,7 +54,7 @@
 - 依赖 aster 框架的能力
 - 需要等待 P1 任务完成（general 模式迁移）
 
-### 策略 B：在 ProxyCast 层实现（备选）
+### 策略 B：在 Lime 层实现（备选）
 
 **前提**：aster 框架不支持或支持不足
 
@@ -66,7 +66,7 @@
 
 **优点**：
 - 完全可控，不依赖外部框架
-- 可以针对 ProxyCast 的场景优化
+- 可以针对 Lime 的场景优化
 
 **缺点**：
 - 需要自己实现和维护
@@ -135,7 +135,7 @@
 
 ## 参考资料
 
-- 研究报告：ProxyCast AI Agent 改进研究报告
+- 研究报告：Lime AI Agent 改进研究报告
 - aster-rust GitHub: https://github.com/astercloud/aster-rust
 - 相关文件：
   - src-tauri/crates/services/src/session_context_service.rs

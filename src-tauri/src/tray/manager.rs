@@ -223,7 +223,7 @@ impl<R: Runtime> TrayManager<R> {
             .icon(initial_icon.clone())
             .menu(&menu)
             .show_menu_on_left_click(false)
-            .tooltip("ProxyCast - AI API 代理")
+            .tooltip("Lime - AI API 代理")
             .on_tray_icon_event(|tray, event| {
                 let app = tray.app_handle();
                 handle_tray_icon_event(app, event);

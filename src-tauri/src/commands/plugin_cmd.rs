@@ -11,7 +11,7 @@
 
 #![allow(dead_code)]
 
-use proxycast_core::plugin::{
+use lime_core::plugin::{
     PluginConfig, PluginInfo, PluginManager, PluginManifest, PluginQueueStats, PluginTaskRecord,
     PluginTaskState, PluginType,
 };
@@ -416,7 +416,7 @@ pub async fn get_plugins_with_ui(
 // 插件 UI 相关命令
 // ============================================================================
 
-use proxycast_core::plugin::{UIMessage, UserAction};
+use lime_core::plugin::{UIMessage, UserAction};
 
 /// 获取插件 UI 定义
 /// 返回插件的初始 UI 消息列表

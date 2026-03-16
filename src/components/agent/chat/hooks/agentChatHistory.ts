@@ -3,7 +3,7 @@ import type { Message, MessageImage, ContentPart } from "../types";
 import type { AsterSessionDetail } from "@/lib/api/agentRuntime";
 import { mergeArtifacts } from "../utils/messageArtifacts";
 import {
-  extractProxycastToolMetadataBlock,
+  extractLimeToolMetadataBlock,
   isToolResultSuccessful,
   normalizeHistoryImagePart,
   normalizeToolResultImages,
@@ -398,9 +398,9 @@ export const hydrateSessionDetailMessages = (
           const rawOutputText = typeof part.output === "string" ? part.output : "";
           const rawErrorText = typeof part.error === "string" ? part.error : "";
           const normalizedOutput =
-            extractProxycastToolMetadataBlock(rawOutputText);
+            extractLimeToolMetadataBlock(rawOutputText);
           const normalizedError =
-            extractProxycastToolMetadataBlock(rawErrorText);
+            extractLimeToolMetadataBlock(rawErrorText);
           const normalizedResult = {
             success: part.success !== false,
             output: normalizedOutput.text,

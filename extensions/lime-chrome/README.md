@@ -1,10 +1,10 @@
-# Proxycast Chrome Bridge 扩展
+# Lime Chrome Bridge 扩展
 
-用于把 Chrome 页面能力接入 Proxycast 的浏览器桥接通道，供各业务 AI Agent 通过统一 `browser_execute_action` / MCP 浏览器工具调用。
+用于把 Chrome 页面能力接入 Lime 的浏览器桥接通道，供各业务 AI Agent 通过统一 `browser_execute_action` / MCP 浏览器工具调用。
 
 ## 功能
 
-- Observer 通道自动连接：`/proxycast-chrome-observer/Proxycast_Key=...`
+- Observer 通道自动连接：`/lime-chrome-observer/Lime_Key=...`
 - 页面信息上报：标题、URL、Markdown
 - 远程指令执行：`open_url` / `click` / `type` / `scroll` / `switch_tab` / `list_tabs` / `go_back` 等
 - 弹窗配置：`serverUrl`、`bridgeKey`、`profileKey`、监控开关、手动抓取
@@ -14,21 +14,21 @@
 1. 打开 Chrome `chrome://extensions`
 2. 打开右上角「开发者模式」
 3. 点击「加载已解压的扩展程序」
-4. 选择目录：`extensions/proxycast-chrome`
+4. 选择目录：`extensions/lime-chrome`
 
 ## 配置
 
 点击扩展图标打开弹窗，配置：
 
-- `Server URL`：Proxycast 服务地址，例如 `ws://127.0.0.1:8999`
-- `Bridge Key`：Proxycast 服务 API Key（与后端 `Proxycast_Key` 一致）
+- `Server URL`：Lime 服务地址，例如 `ws://127.0.0.1:8999`
+- `Bridge Key`：Lime 服务 API Key（与后端 `Lime_Key` 一致）
 - `Profile Key`：浏览器会话隔离键（建议与业务场景对应，如 `research_a`）
 
 点击「保存并重连」后，扩展会建立 observer WebSocket 连接。
 
 ## 验证
 
-1. 在 Proxycast 设置中查看 `get_chrome_bridge_status`，`observer_count` 应大于 0
+1. 在 Lime 设置中查看 `get_chrome_bridge_status`，`observer_count` 应大于 0
 2. 调用 `browser_execute_action`：
 
 ```json

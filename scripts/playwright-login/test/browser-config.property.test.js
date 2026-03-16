@@ -40,11 +40,11 @@ describe('Property 2: 浏览器配置完整性', () => {
           assert.strictEqual(typeof config.userDataDir, 'string');
           assert.ok(config.userDataDir.length > 0, 'userDataDir 不能为空');
           
-          // 应该包含 .proxycast 目录
+          // 应该包含 .lime 目录
           assert.ok(
-            config.userDataDir.includes('.proxycast') || 
-            config.userDataDir.includes('proxycast'),
-            'userDataDir 应该在 proxycast 相关目录下'
+            config.userDataDir.includes('.lime') || 
+            config.userDataDir.includes('lime'),
+            'userDataDir 应该在 lime 相关目录下'
           );
         }
       ),

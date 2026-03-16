@@ -1,8 +1,8 @@
-# LobsterAI 业务闭环对标与 ProxyCast AI Agent 规划
+# LobsterAI 业务闭环对标与 Lime AI Agent 规划
 
 ## 1. 文档目标
 
-本文从**资深架构师**与**产品经理**双视角，对 `LobsterAI` 与 `ProxyCast` 做业务闭环级对标，明确：
+本文从**资深架构师**与**产品经理**双视角，对 `LobsterAI` 与 `Lime` 做业务闭环级对标，明确：
 
 1. 我们应该借鉴什么（高价值能力）
 2. 我们不应该照搬什么（避免技术债和垃圾代码）
@@ -23,7 +23,7 @@
 - `src/main/libs/coworkMemoryExtractor.ts`
 - `src/main/im/imGatewayManager.ts`
 
-### 2.2 ProxyCast 侧（已核对）
+### 2.2 Lime 侧（已核对）
 
 - `src-tauri/src/services/execution_tracker_service.rs`
 - `src-tauri/src/services/heartbeat_service/mod.rs`
@@ -44,7 +44,7 @@
 - 已形成多入口入站闭环：本地 + IM（钉钉/飞书/Telegram/Discord）
 - IM 不只是通知，而是可直接触发任务/会话执行
 
-### ProxyCast
+### Lime
 
 - 已具备本地执行与 Heartbeat 任务执行
 - WebSocket RPC 的 `agent.run` / `cron.run` 仍是占位实现（TODO）
@@ -66,7 +66,7 @@
 - 达到阈值后自动停用任务（避免无限失败）
 - 应用异常退出后会修复 stuck running 状态
 
-### ProxyCast
+### Lime
 
 - Heartbeat 已有：超时、重试、执行记录、通知
 - Execution Tracker 已有统一 run 摘要（`agent_runs`）
@@ -86,7 +86,7 @@
 - 任务与 run 记录绑定，便于按任务看健康度
 - 调度执行结果可做通知回执
 
-### ProxyCast
+### Lime
 
 - `agent_runs` 已统一 chat/skill/heartbeat，这是明显优势
 - 但尚未形成“任务健康面板 + 告警阈值 + 运营指标”产品层
@@ -105,7 +105,7 @@
 - 有对话记忆提取链路（规则 + 守门）
 - 更接近“会话后自动沉淀”
 
-### ProxyCast
+### Lime
 
 - 已有统一记忆体系和 `unified_memory_analyze`
 - 更偏分析/批处理入口，实时自动沉淀闭环不够强
@@ -122,7 +122,7 @@
 
 - 有工具审批机制
 
-### ProxyCast
+### Lime
 
 - `aster_agent_cmd` 已有较完整的权限与沙箱策略
 - 安全基础不弱，具备差异化潜力
@@ -163,7 +163,7 @@
 
 ---
 
-## 6. ProxyCast 可执行路线图（业务优先）
+## 6. Lime 可执行路线图（业务优先）
 
 ## P0（必须，2~3 周）：先打通“远程可控最小闭环”
 
@@ -241,7 +241,7 @@
 
 ### 架构师视角
 
-ProxyCast 的底座（追踪、权限、沙箱、Provider 能力）已经具备，当前应避免重构冲动，重点补齐远程触发和任务治理层。
+Lime 的底座（追踪、权限、沙箱、Provider 能力）已经具备，当前应避免重构冲动，重点补齐远程触发和任务治理层。
 
 ### 产品经理视角
 

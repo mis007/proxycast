@@ -14,7 +14,7 @@
 
 ---
 
-## 值得 Proxycast 参考的设计
+## 值得 Lime 参考的设计
 
 ### 1. 守护进程 + 客户端架构 ⭐⭐⭐
 
@@ -48,7 +48,7 @@ async function dispatch(line: string, socket: Socket) {
 }
 ```
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **替代 Tauri event 的高吞吐方案** - 当事件推送超过 100/s 时,切换到本地 Unix Socket
 - ✅ **守护进程管理浏览器实例** - 避免每次命令都启动新浏览器
 - ✅ **命令-响应模式** - 清晰的请求/响应边界,便于错误处理
@@ -90,7 +90,7 @@ async function launch() {
 2. **预注入 Hook** - 使用 `addInitScript` 在页面加载前注入 React DevTools hook
 3. **自动打开 DevTools** - `--auto-open-devtools-for-tabs` 确保扩展激活
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **扩展 CDP 能力** - 不仅仅是原始 CDP,还可以加载自定义扩展
 - ✅ **预注入脚本** - 在页面加载前注入监控/调试脚本
 - ✅ **持久化上下文** - 使用 `launchPersistentContext` 保持会话状态
@@ -128,7 +128,7 @@ export async function inspect(page: Page, nodeId: number) {
 }
 ```
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **深度调试能力** - 不仅看到 DOM,还能看到 React 组件结构
 - ✅ **状态检查** - 检查组件的 props/hooks/state
 - ✅ **源码定位** - 通过 source map 定位到原始源码位置
@@ -184,7 +184,7 @@ export async function unlock() {
 3. **Unlock** - 释放锁,让动态数据加载
 4. **Analyze** - 对比 locked/unlocked 状态,识别哪些组件是动态的
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **性能分析** - 识别哪些组件导致页面加载慢
 - ✅ **SSR/CSR 边界** - 清晰看到服务端渲染和客户端渲染的边界
 - ✅ **优化指导** - 帮助用户优化 PPR shell,提升首屏加载速度
@@ -246,7 +246,7 @@ export function inspect(idx: number) {
 }
 ```
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **完整的 Network 追踪** - 记录所有请求/响应
 - ✅ **性能分析** - 识别慢请求
 - ✅ **调试 API 调用** - 检查请求/响应内容
@@ -290,7 +290,7 @@ async function getConsumer(url: string) {
 }
 ```
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **错误定位** - 将压缩代码的错误映射到原始源码
 - ✅ **组件定位** - 显示组件在源码中的位置
 - ✅ **调试体验** - 让用户看到可读的源码,而不是压缩后的代码
@@ -327,7 +327,7 @@ export async function errors() {
 }
 ```
 
-**Proxycast 应用:**
+**Lime 应用:**
 - ✅ **统一错误收集** - 收集构建错误、运行时错误、Console 错误
 - ✅ **结构化错误** - 提供完整的堆栈信息和源码位置
 - ✅ **错误分类** - 区分不同类型的错误,便于排查
@@ -352,7 +352,7 @@ export async function errors() {
 └─────────────────────┘
 ```
 
-### Proxycast 当前架构
+### Lime 当前架构
 ```
 ┌─────────────┐
 │  前端 UI    │
@@ -505,4 +505,4 @@ impl ReactDevTools {
 5. **Source Map 支持** - 将压缩代码映射到原始源码
 6. **完整的 Network 追踪** - 记录所有请求/响应
 
-这些设计可以直接应用到 Proxycast 的 Phase 2-3 实现中,特别是守护进程架构和预注入脚本能力。
+这些设计可以直接应用到 Lime 的 Phase 2-3 实现中,特别是守护进程架构和预注入脚本能力。

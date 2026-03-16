@@ -14,8 +14,8 @@ export interface Provider {
   is_current: boolean;
 }
 
-// proxycast 保留用于内部配置存储，但不在 UI 的 Tab 中显示
-export type AppType = "claude" | "codex" | "gemini" | "proxycast";
+// lime 保留用于内部配置存储，但不在 UI 的 Tab 中显示
+export type AppType = "claude" | "codex" | "gemini" | "lime";
 
 // 同步状态枚举
 export type SyncStatus = "InSync" | "OutOfSync" | "Conflict";
@@ -63,7 +63,7 @@ export const switchApi = {
   checkConfigSync: (appType: AppType): Promise<SyncCheckResult> =>
     safeInvoke("check_config_sync_status", { appType }),
 
-  /** 从外部配置同步到 ProxyCast */
+  /** 从外部配置同步到 Lime */
   syncFromExternal: (appType: AppType): Promise<string> =>
     safeInvoke("sync_from_external_config", { appType }),
 };

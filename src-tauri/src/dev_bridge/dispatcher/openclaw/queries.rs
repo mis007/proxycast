@@ -69,6 +69,11 @@ pub(super) async fn try_handle(
             let result = service.get_progress_logs();
             serde_json::to_value(result)?
         }
+        "openclaw_list_runtime_candidates" => {
+            let (_app_handle, service) = openclaw_context(state)?;
+            let service = service.lock().await;
+            serde_json::to_value(service.list_runtime_candidates().await?)?
+        }
         _ => return Ok(None),
     };
 

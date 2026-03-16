@@ -333,7 +333,7 @@ impl Default for AgentConfig {
 ///
 /// 参考 Manus Agent 的模块化设计，使用结构化的提示词组织
 /// 支持通过配置文件覆盖
-pub const DEFAULT_SYSTEM_PROMPT: &str = r#"你是 ProxyCast 内置的 AI 助手。
+pub const DEFAULT_SYSTEM_PROMPT: &str = r#"你是 Lime 内置的 AI 助手。
 
 <identity>
 - 你是一个友好、专业的 AI 助手

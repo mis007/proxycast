@@ -80,7 +80,7 @@ describe("generalAgentPrompt", () => {
     expect(prompt).toContain("<proposed_plan>");
   });
 
-  it("启用 Browser Assist 时应强制网页任务走 ProxyCast 浏览器会话", () => {
+  it("启用 Browser Assist 时应强制网页任务走 Lime 浏览器会话", () => {
     const prompt = buildGeneralAgentSystemPrompt("general", {
       harness: {
         browserAssistEnabled: true,

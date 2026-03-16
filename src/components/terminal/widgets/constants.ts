@@ -191,6 +191,6 @@ export const PLOT_COLORS = [
  * localStorage 键名
  */
 export const STORAGE_KEYS = {
-  WIDGET_CONFIG: "proxycast-widget-config",
-  ACTIVE_WIDGET: "proxycast-active-widget",
+  WIDGET_CONFIG: "lime-widget-config",
+  ACTIVE_WIDGET: "lime-active-widget",
 };

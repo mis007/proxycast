@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn test_build_default_prompt() {
         let prompt = SystemPromptBuilder::new().build();
-        assert!(prompt.contains("ProxyCast Agent"));
+        assert!(prompt.contains("Lime Agent"));
         assert!(prompt.contains("工具使用策略"));
         assert!(prompt.contains("代码编写指南"));
     }

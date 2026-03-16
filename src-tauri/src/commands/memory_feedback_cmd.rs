@@ -1,8 +1,8 @@
 //! Memory feedback commands
 
 use crate::database::DbConnection;
-use proxycast_core::database::lock_db;
-use proxycast_memory::feedback::{
+use lime_core::database::lock_db;
+use lime_memory::feedback::{
     calculate_approval_rate, current_timestamp, generate_feedback_id, get_recent_feedbacks,
     record_feedback, FeedbackAction, UserFeedback,
 };

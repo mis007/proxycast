@@ -2,11 +2,11 @@
 //!
 //! 提供基于 Aster 框架的 Tauri 命令
 //! 这是新的对话系统实现，与 native_agent_cmd.rs 并行存在
-//! 支持从 ProxyCast 凭证池自动选择凭证
+//! 支持从 Lime 凭证池自动选择凭证
 
 use crate::agent::aster_state::{ProviderConfig, SessionConfigBuilder};
 use crate::agent::{
-    AsterAgentState, AsterAgentWrapper, ProxyCastScheduler, QueueInsertResult, QueuedTurnSnapshot,
+    AsterAgentState, AsterAgentWrapper, LimeScheduler, QueueInsertResult, QueuedTurnSnapshot,
     QueuedTurnTask, SessionDetail, SessionInfo, SubAgentRole, TauriAgentEvent,
 };
 use crate::commands::api_key_provider_cmd::ApiKeyProviderServiceState;
@@ -56,19 +56,19 @@ use aster::tools::{
 use async_trait::async_trait;
 use futures::StreamExt;
 #[cfg(test)]
-use proxycast_agent::request_tool_policy::REQUEST_TOOL_POLICY_MARKER;
-use proxycast_agent::request_tool_policy::{
+use lime_agent::request_tool_policy::REQUEST_TOOL_POLICY_MARKER;
+use lime_agent::request_tool_policy::{
     merge_system_prompt_with_request_tool_policy, resolve_request_tool_policy_with_mode,
     stream_reply_with_policy, ReplyAttemptError, RequestToolPolicy, RequestToolPolicyMode,
 };
-use proxycast_agent::{
+use lime_agent::{
     durable_memory_permission_pattern, is_virtual_memory_path, message_suggests_news_expansion,
     resolve_virtual_memory_path, virtual_memory_relative_path, TauriRuntimeStatus,
     DURABLE_MEMORY_VIRTUAL_ROOT,
 };
-use proxycast_services::api_key_provider_service::ApiKeyProviderService;
-use proxycast_services::mcp_service::McpService;
-use proxycast_services::video_generation_service::{
+use lime_services::api_key_provider_service::ApiKeyProviderService;
+use lime_services::mcp_service::McpService;
+use lime_services::video_generation_service::{
     CreateVideoGenerationRequest, VideoGenerationService,
 };
 use serde::{Deserialize, Serialize};
@@ -83,29 +83,44 @@ use uuid::Uuid;
 const DEFAULT_BASH_TIMEOUT_SECS: u64 = 300;
 const MAX_BASH_TIMEOUT_SECS: u64 = 1800;
 const CODE_EXECUTION_EXTENSION_NAME: &str = "code_execution";
-const WORKSPACE_SANDBOX_ENABLED_ENV: &str = "PROXYCAST_WORKSPACE_SANDBOX_ENABLED";
-const WORKSPACE_SANDBOX_STRICT_ENV: &str = "PROXYCAST_WORKSPACE_SANDBOX_STRICT";
-const WORKSPACE_SANDBOX_NOTIFY_ENV: &str = "PROXYCAST_WORKSPACE_SANDBOX_NOTIFY_ON_FALLBACK";
+const WORKSPACE_SANDBOX_ENABLED_ENV_KEYS: &[&str] = &[
+    "LIME_WORKSPACE_SANDBOX_ENABLED",
+    "PROXYCAST_WORKSPACE_SANDBOX_ENABLED",
+];
+const WORKSPACE_SANDBOX_STRICT_ENV_KEYS: &[&str] = &[
+    "LIME_WORKSPACE_SANDBOX_STRICT",
+    "PROXYCAST_WORKSPACE_SANDBOX_STRICT",
+];
+const WORKSPACE_SANDBOX_NOTIFY_ENV_KEYS: &[&str] = &[
+    "LIME_WORKSPACE_SANDBOX_NOTIFY_ON_FALLBACK",
+    "PROXYCAST_WORKSPACE_SANDBOX_NOTIFY_ON_FALLBACK",
+];
 const WORKSPACE_SANDBOX_FALLBACK_WARNING_CODE: &str = "workspace_sandbox_fallback";
 const WORKSPACE_PATH_AUTO_CREATED_WARNING_CODE: &str = "workspace_path_auto_created";
 const SOCIAL_IMAGE_TOOL_NAME: &str = "social_generate_cover_image";
 const SOCIAL_IMAGE_DEFAULT_MODEL: &str = "gemini-3-pro-image-preview";
 const SOCIAL_IMAGE_DEFAULT_SIZE: &str = "1024x1024";
 const SOCIAL_IMAGE_DEFAULT_RESPONSE_FORMAT: &str = "url";
-const PROXYCAST_CREATE_VIDEO_TASK_TOOL_NAME: &str = "proxycast_create_video_generation_task";
-const PROXYCAST_CREATE_BROADCAST_TASK_TOOL_NAME: &str =
-    "proxycast_create_broadcast_generation_task";
-const PROXYCAST_CREATE_COVER_TASK_TOOL_NAME: &str = "proxycast_create_cover_generation_task";
-const PROXYCAST_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME: &str =
-    "proxycast_create_modal_resource_search_task";
-const PROXYCAST_CREATE_IMAGE_TASK_TOOL_NAME: &str = "proxycast_create_image_generation_task";
-const PROXYCAST_CREATE_URL_PARSE_TASK_TOOL_NAME: &str = "proxycast_create_url_parse_task";
-const PROXYCAST_CREATE_TYPESETTING_TASK_TOOL_NAME: &str = "proxycast_create_typesetting_task";
+const LIME_CREATE_VIDEO_TASK_TOOL_NAME: &str = "lime_create_video_generation_task";
+const LIME_CREATE_BROADCAST_TASK_TOOL_NAME: &str = "lime_create_broadcast_generation_task";
+const LIME_CREATE_COVER_TASK_TOOL_NAME: &str = "lime_create_cover_generation_task";
+const LIME_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME: &str = "lime_create_modal_resource_search_task";
+const LIME_CREATE_IMAGE_TASK_TOOL_NAME: &str = "lime_create_image_generation_task";
+const LIME_CREATE_URL_PARSE_TASK_TOOL_NAME: &str = "lime_create_url_parse_task";
+const LIME_CREATE_TYPESETTING_TASK_TOOL_NAME: &str = "lime_create_typesetting_task";
 const AUTO_CONTINUE_PROMPT_MARKER: &str = "【自动续写策略】";
 const ELICITATION_CONTEXT_PROMPT_MARKER: &str = "【已收集的补充信息】";
-const PROXYCAST_TOOL_METADATA_BEGIN: &str = "[ProxyCast 工具元数据开始]";
-const PROXYCAST_TOOL_METADATA_END: &str = "[ProxyCast 工具元数据结束]";
-const BROWSER_ASSIST_ALLOW_PATTERN: &str = "mcp__proxycast-browser__*";
+const LIME_TOOL_METADATA_BEGIN: &str = "[Lime 工具元数据开始]";
+const LIME_TOOL_METADATA_END: &str = "[Lime 工具元数据结束]";
+const FORCE_REACT_HINT_ENV_KEYS: &[&str] =
+    &["LIME_FORCE_REACT_HINTS", "PROXYCAST_FORCE_REACT_HINTS"];
+const CODE_ORCHESTRATED_HINT_ENV_KEYS: &[&str] = &[
+    "LIME_CODE_ORCHESTRATED_HINTS",
+    "PROXYCAST_CODE_ORCHESTRATED_HINTS",
+];
+const BROWSER_PROFILE_KEY_ENV_KEYS: &[&str] =
+    &["LIME_BROWSER_PROFILE_KEY", "PROXYCAST_BROWSER_PROFILE_KEY"];
+const BROWSER_ASSIST_ALLOW_PATTERN: &str = "mcp__lime-browser__*";
 const BROWSER_ASSIST_DENY_PATTERNS: &[&str] = &["mcp__playwright__*", "browser_*", "playwright*"];
 
 static SHARED_TASK_MANAGER: OnceLock<Arc<TaskManager>> = OnceLock::new();
@@ -151,13 +166,8 @@ enum WorkspaceSandboxApplyOutcome {
     },
 }
 
-fn parse_bool_env(name: &str) -> Option<bool> {
-    let raw = std::env::var(name).ok()?;
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "1" | "true" | "yes" | "on" => Some(true),
-        "0" | "false" | "no" | "off" => Some(false),
-        _ => None,
-    }
+fn parse_bool_env(names: &[&str]) -> Option<bool> {
+    lime_core::env_compat::bool_var(names)
 }
 
 fn resolve_workspace_sandbox_policy(
@@ -170,13 +180,13 @@ fn resolve_workspace_sandbox_policy(
         notify_on_fallback: config.agent.workspace_sandbox.notify_on_fallback,
     };
 
-    if let Some(enabled) = parse_bool_env(WORKSPACE_SANDBOX_ENABLED_ENV) {
+    if let Some(enabled) = parse_bool_env(WORKSPACE_SANDBOX_ENABLED_ENV_KEYS) {
         policy.enabled = enabled;
     }
-    if let Some(strict) = parse_bool_env(WORKSPACE_SANDBOX_STRICT_ENV) {
+    if let Some(strict) = parse_bool_env(WORKSPACE_SANDBOX_STRICT_ENV_KEYS) {
         policy.strict = strict;
     }
-    if let Some(notify) = parse_bool_env(WORKSPACE_SANDBOX_NOTIFY_ENV) {
+    if let Some(notify) = parse_bool_env(WORKSPACE_SANDBOX_NOTIFY_ENV_KEYS) {
         policy.notify_on_fallback = notify;
     }
 
@@ -302,7 +312,7 @@ pub async fn aster_agent_configure_provider(
 
 /// 从凭证池配置 Aster Agent 的 Provider
 ///
-/// 自动从 ProxyCast 凭证池选择可用凭证并配置 Aster Provider
+/// 自动从 Lime 凭证池选择可用凭证并配置 Aster Provider
 #[tauri::command]
 pub async fn aster_agent_configure_from_pool(
     state: State<'_, AsterAgentState>,
@@ -512,10 +522,10 @@ pub struct AgentRuntimeSessionDetail {
     pub created_at: i64,
     pub updated_at: i64,
     pub thread_id: String,
-    pub messages: Vec<proxycast_agent::event_converter::TauriMessage>,
+    pub messages: Vec<lime_agent::event_converter::TauriMessage>,
     pub execution_strategy: Option<String>,
-    pub turns: Vec<proxycast_core::database::dao::agent_timeline::AgentThreadTurn>,
-    pub items: Vec<proxycast_core::database::dao::agent_timeline::AgentThreadItem>,
+    pub turns: Vec<lime_core::database::dao::agent_timeline::AgentThreadTurn>,
+    pub items: Vec<lime_core::database::dao::agent_timeline::AgentThreadItem>,
     #[serde(default)]
     pub queued_turns: Vec<QueuedTurnSnapshot>,
 }
@@ -1033,7 +1043,7 @@ fn extract_harness_nested_object<'a>(
 fn parse_browser_backend_hint(value: &str) -> Option<BrowserBackendType> {
     match value.trim().to_ascii_lowercase().as_str() {
         "aster_compat" => Some(BrowserBackendType::AsterCompat),
-        "proxycast_extension_bridge" => Some(BrowserBackendType::ProxycastExtensionBridge),
+        "lime_extension_bridge" => Some(BrowserBackendType::LimeExtensionBridge),
         "cdp_direct" => Some(BrowserBackendType::CdpDirect),
         _ => None,
     }
@@ -1165,7 +1175,7 @@ fn append_browser_assist_session_permissions(
         parameter_restrictions: Vec::new(),
         scope: PermissionScope::Session,
         reason: Some(
-            "Browser Assist 会话已启用：网页任务应统一走 ProxyCast 浏览器运行时工具".to_string(),
+            "Browser Assist 会话已启用：网页任务应统一走 Lime 浏览器运行时工具".to_string(),
         ),
         expires_at: None,
         metadata: HashMap::new(),
@@ -1180,7 +1190,7 @@ fn append_browser_assist_session_permissions(
             parameter_restrictions: Vec::new(),
             scope: PermissionScope::Session,
             reason: Some(
-                "Browser Assist 会话禁止回退到 Playwright 浏览器工具；请改用 mcp__proxycast-browser__*，以便右侧画布附着实时浏览器会话"
+                "Browser Assist 会话禁止回退到 Playwright 浏览器工具；请改用 mcp__lime-browser__*，以便右侧画布附着实时浏览器会话"
                     .to_string(),
             ),
             expires_at: None,
@@ -1969,7 +1979,7 @@ fn should_force_react_for_message(message: &str) -> bool {
         "web fetch",
         "web_fetch",
     ];
-    resolve_intent_hints("PROXYCAST_FORCE_REACT_HINTS", &default_hints)
+    resolve_intent_hints(FORCE_REACT_HINT_ENV_KEYS, &default_hints)
         .iter()
         .any(|kw| lowered.contains(kw))
 }
@@ -1977,14 +1987,14 @@ fn should_force_react_for_message(message: &str) -> bool {
 fn should_use_code_orchestrated_for_message(message: &str) -> bool {
     let lowered = message.to_lowercase();
     // 默认不做消息关键词硬编码推断，Auto 模式优先走 ReAct。
-    // 如需启用自动切换，可通过环境变量 PROXYCAST_CODE_ORCHESTRATED_HINTS 显式配置。
-    resolve_intent_hints("PROXYCAST_CODE_ORCHESTRATED_HINTS", &[])
+    // 如需启用自动切换，可通过环境变量 LIME_CODE_ORCHESTRATED_HINTS 显式配置。
+    resolve_intent_hints(CODE_ORCHESTRATED_HINT_ENV_KEYS, &[])
         .iter()
         .any(|kw| lowered.contains(kw))
 }
 
-fn resolve_intent_hints(env_key: &str, defaults: &[&str]) -> Vec<String> {
-    if let Ok(raw) = std::env::var(env_key) {
+fn resolve_intent_hints(env_keys: &[&str], defaults: &[&str]) -> Vec<String> {
+    if let Some(raw) = lime_core::env_compat::var(env_keys) {
         let parsed = raw
             .split(',')
             .map(|item| item.trim().to_lowercase())
@@ -2306,7 +2316,7 @@ fn append_workspace_bash_summary(
     }
 
     let output_truncated = output.contains("[output truncated:");
-    output.push_str("\n[ProxyCast 执行摘要]\n");
+    output.push_str("\n[Lime 执行摘要]\n");
     output.push_str(&format!("exit_code: {exit_code}\n"));
     output.push_str(&format!("stdout_length: {stdout_length}\n"));
     output.push_str(&format!("stderr_length: {stderr_length}\n"));
@@ -2316,15 +2326,15 @@ fn append_workspace_bash_summary(
     output
 }
 
-fn output_contains_proxycast_metadata_block(output: &str) -> bool {
-    output.contains(PROXYCAST_TOOL_METADATA_BEGIN) && output.contains(PROXYCAST_TOOL_METADATA_END)
+fn output_contains_lime_metadata_block(output: &str) -> bool {
+    output.contains(LIME_TOOL_METADATA_BEGIN) && output.contains(LIME_TOOL_METADATA_END)
 }
 
-fn append_proxycast_tool_metadata_block(
+fn append_lime_tool_metadata_block(
     mut content: String,
     metadata: &serde_json::Map<String, serde_json::Value>,
 ) -> String {
-    if output_contains_proxycast_metadata_block(&content) {
+    if output_contains_lime_metadata_block(&content) {
         return content;
     }
 
@@ -2336,11 +2346,11 @@ fn append_proxycast_tool_metadata_block(
     }
 
     let metadata_json = serde_json::to_string(metadata).unwrap_or_else(|_| "{}".to_string());
-    content.push_str(PROXYCAST_TOOL_METADATA_BEGIN);
+    content.push_str(LIME_TOOL_METADATA_BEGIN);
     content.push('\n');
     content.push_str(&metadata_json);
     content.push('\n');
-    content.push_str(PROXYCAST_TOOL_METADATA_END);
+    content.push_str(LIME_TOOL_METADATA_END);
     content
 }
 
@@ -2362,14 +2372,14 @@ fn encode_tool_result_for_harness_observability(result: ToolResult) -> ToolResul
     }
 
     let encoded_output =
-        if metadata.is_empty() || output_contains_proxycast_metadata_block(&base_content) {
+        if metadata.is_empty() || output_contains_lime_metadata_block(&base_content) {
             base_content
         } else {
             let metadata_object = metadata
                 .iter()
                 .map(|(key, value)| (key.clone(), value.clone()))
                 .collect::<serde_json::Map<String, serde_json::Value>>();
-            append_proxycast_tool_metadata_block(base_content, &metadata_object)
+            append_lime_tool_metadata_block(base_content, &metadata_object)
         };
 
     ToolResult::success(encoded_output).with_metadata_map(metadata)
@@ -3100,7 +3110,7 @@ impl Tool for SubAgentTaskTool {
         let task_id = task.id.clone();
 
         let mut scheduler =
-            ProxyCastScheduler::new(self.db.clone()).with_app_handle(self.app_handle.clone());
+            LimeScheduler::new(self.db.clone()).with_app_handle(self.app_handle.clone());
         if !context.session_id.trim().is_empty() {
             scheduler = scheduler.with_event_session_id(context.session_id.clone());
         }
@@ -3137,14 +3147,14 @@ impl Tool for SubAgentTaskTool {
 }
 
 #[derive(Debug, Clone)]
-struct ProxycastBrowserMcpTool {
+struct LimeBrowserMcpTool {
     tool_name: String,
     action_name: String,
     description: String,
     input_schema: serde_json::Value,
 }
 
-impl ProxycastBrowserMcpTool {
+impl LimeBrowserMcpTool {
     fn new(
         tool_name: String,
         action_name: String,
@@ -3214,8 +3224,14 @@ impl ProxycastBrowserMcpTool {
         }
         context
             .environment
-            .get("PROXYCAST_BROWSER_PROFILE_KEY")
+            .get(BROWSER_PROFILE_KEY_ENV_KEYS[0])
             .cloned()
+            .or_else(|| {
+                context
+                    .environment
+                    .get(BROWSER_PROFILE_KEY_ENV_KEYS[1])
+                    .cloned()
+            })
     }
 
     fn extract_launch_url(action_name: &str, params: &serde_json::Value) -> Option<String> {
@@ -3239,7 +3255,7 @@ impl ProxycastBrowserMcpTool {
 }
 
 #[async_trait]
-impl Tool for ProxycastBrowserMcpTool {
+impl Tool for LimeBrowserMcpTool {
     fn name(&self) -> &str {
         &self.tool_name
     }
@@ -3430,7 +3446,7 @@ impl Tool for SocialGenerateCoverImageTool {
     }
 
     fn description(&self) -> &str {
-        "为社媒文章生成封面图，内部复用 ProxyCast 的 /v1/images/generations 能力。"
+        "为社媒文章生成封面图，内部复用 Lime 的 /v1/images/generations 能力。"
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -3457,7 +3473,7 @@ impl Tool for SocialGenerateCoverImageTool {
             },
             "required": ["prompt"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["image", "social-media", "cover"],
                 "allowed_callers": ["assistant", "skill"],
@@ -3626,7 +3642,7 @@ fn resolve_output_relative_path(
 
     let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let suffix = uuid::Uuid::new_v4().simple().to_string();
-    Ok(PathBuf::from(".proxycast")
+    Ok(PathBuf::from(".lime")
         .join("tasks")
         .join(task_type)
         .join(format!("{timestamp}-{suffix}.json")))
@@ -3670,7 +3686,7 @@ fn submit_creation_task_record(
         "path": output_rel_path.to_string_lossy().to_string(),
         "absolute_path": output_abs_path.to_string_lossy().to_string()
     });
-    if let Err(error) = app_handle.emit("proxycast://creation_task_submitted", &emitted_payload) {
+    if let Err(error) = app_handle.emit("lime://creation_task_submitted", &emitted_payload) {
         tracing::warn!(
             "[AsterAgent] creation_task_submitted 事件发送失败: {}",
             error
@@ -3710,20 +3726,20 @@ struct BroadcastTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateBroadcastTaskTool {
+struct LimeCreateBroadcastTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateBroadcastTaskTool {
+impl LimeCreateBroadcastTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateBroadcastTaskTool {
+impl Tool for LimeCreateBroadcastTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_BROADCAST_TASK_TOOL_NAME
+        LIME_CREATE_BROADCAST_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -3743,7 +3759,7 @@ impl Tool for ProxycastCreateBroadcastTaskTool {
             },
             "required": ["content"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["broadcast", "task", "creation"],
                 "allowed_callers": ["assistant", "skill"]
@@ -3801,20 +3817,20 @@ struct CoverTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateCoverTaskTool {
+struct LimeCreateCoverTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateCoverTaskTool {
+impl LimeCreateCoverTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateCoverTaskTool {
+impl Tool for LimeCreateCoverTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_COVER_TASK_TOOL_NAME
+        LIME_CREATE_COVER_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -3836,7 +3852,7 @@ impl Tool for ProxycastCreateCoverTaskTool {
             },
             "required": ["prompt"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["cover", "image", "task"],
                 "allowed_callers": ["assistant", "skill"]
@@ -3893,20 +3909,20 @@ struct ResourceSearchTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateResourceSearchTaskTool {
+struct LimeCreateResourceSearchTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateResourceSearchTaskTool {
+impl LimeCreateResourceSearchTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateResourceSearchTaskTool {
+impl Tool for LimeCreateResourceSearchTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME
+        LIME_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -3927,7 +3943,7 @@ impl Tool for ProxycastCreateResourceSearchTaskTool {
             },
             "required": ["resourceType", "query"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["resource", "search", "task"],
                 "allowed_callers": ["assistant", "skill"]
@@ -3984,20 +4000,20 @@ struct ImageTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateImageTaskTool {
+struct LimeCreateImageTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateImageTaskTool {
+impl LimeCreateImageTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateImageTaskTool {
+impl Tool for LimeCreateImageTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_IMAGE_TASK_TOOL_NAME
+        LIME_CREATE_IMAGE_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -4018,7 +4034,7 @@ impl Tool for ProxycastCreateImageTaskTool {
             },
             "required": ["prompt"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["image", "task", "generation"],
                 "allowed_callers": ["assistant", "skill"]
@@ -4073,20 +4089,20 @@ struct UrlParseTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateUrlParseTaskTool {
+struct LimeCreateUrlParseTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateUrlParseTaskTool {
+impl LimeCreateUrlParseTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateUrlParseTaskTool {
+impl Tool for LimeCreateUrlParseTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_URL_PARSE_TASK_TOOL_NAME
+        LIME_CREATE_URL_PARSE_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -4106,7 +4122,7 @@ impl Tool for ProxycastCreateUrlParseTaskTool {
             },
             "required": ["url"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["url", "parse", "task"],
                 "allowed_callers": ["assistant", "skill"]
@@ -4156,20 +4172,20 @@ struct TypesettingTaskInput {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateTypesettingTaskTool {
+struct LimeCreateTypesettingTaskTool {
     app_handle: AppHandle,
 }
 
-impl ProxycastCreateTypesettingTaskTool {
+impl LimeCreateTypesettingTaskTool {
     fn new(app_handle: AppHandle) -> Self {
         Self { app_handle }
     }
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateTypesettingTaskTool {
+impl Tool for LimeCreateTypesettingTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_TYPESETTING_TASK_TOOL_NAME
+        LIME_CREATE_TYPESETTING_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
@@ -4188,7 +4204,7 @@ impl Tool for ProxycastCreateTypesettingTaskTool {
             },
             "required": ["content"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["typesetting", "task", "text"],
                 "allowed_callers": ["assistant", "skill"]
@@ -4225,12 +4241,12 @@ impl Tool for ProxycastCreateTypesettingTaskTool {
 }
 
 #[derive(Clone)]
-struct ProxycastCreateVideoGenerationTaskTool {
+struct LimeCreateVideoGenerationTaskTool {
     db: DbConnection,
     api_key_provider_service: Arc<ApiKeyProviderService>,
 }
 
-impl ProxycastCreateVideoGenerationTaskTool {
+impl LimeCreateVideoGenerationTaskTool {
     fn new(db: DbConnection, api_key_provider_service: Arc<ApiKeyProviderService>) -> Self {
         Self {
             db,
@@ -4240,13 +4256,13 @@ impl ProxycastCreateVideoGenerationTaskTool {
 }
 
 #[async_trait]
-impl Tool for ProxycastCreateVideoGenerationTaskTool {
+impl Tool for LimeCreateVideoGenerationTaskTool {
     fn name(&self) -> &str {
-        PROXYCAST_CREATE_VIDEO_TASK_TOOL_NAME
+        LIME_CREATE_VIDEO_TASK_TOOL_NAME
     }
 
     fn description(&self) -> &str {
-        "调用 ProxyCast 视频任务服务，创建真实的视频生成任务。"
+        "调用 Lime 视频任务服务，创建真实的视频生成任务。"
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -4268,7 +4284,7 @@ impl Tool for ProxycastCreateVideoGenerationTaskTool {
             },
             "required": ["projectId", "providerId", "model", "prompt"],
             "additionalProperties": false,
-            "x-proxycast": {
+            "x-lime": {
                 "always_visible": true,
                 "tags": ["video", "task", "generation"],
                 "allowed_callers": ["assistant", "skill"],
@@ -4340,7 +4356,7 @@ impl ToolSearchBridgeTool {
             return schema.clone();
         };
         let extension = root
-            .entry("x-proxycast".to_string())
+            .entry("x-lime".to_string())
             .or_insert_with(|| serde_json::json!({}));
         let Some(extension_obj) = extension.as_object_mut() else {
             return schema.clone();
@@ -4367,8 +4383,8 @@ impl ToolSearchBridgeTool {
         Vec<serde_json::Value>, // input_examples
     ) {
         let extension = schema
-            .get("x-proxycast")
-            .or_else(|| schema.get("x_proxycast"))
+            .get("x-lime")
+            .or_else(|| schema.get("x_lime"))
             .unwrap_or(schema);
 
         let deferred_loading = extension
@@ -4405,7 +4421,7 @@ impl ToolSearchBridgeTool {
             })
             .unwrap_or_default();
         let input_examples =
-            proxycast_core::tool_calling::resolve_tool_input_examples(tool_name, schema);
+            lime_core::tool_calling::resolve_tool_input_examples(tool_name, schema);
 
         (
             deferred_loading,
@@ -4588,7 +4604,7 @@ impl Tool for ToolSearchBridgeTool {
 fn browser_mcp_tool_names() -> Vec<String> {
     let mut names = Vec::new();
     for tool in get_chrome_mcp_tools() {
-        names.push(format!("mcp__proxycast-browser__{}", tool.name));
+        names.push(format!("mcp__lime-browser__{}", tool.name));
     }
     names
 }
@@ -4596,12 +4612,12 @@ fn browser_mcp_tool_names() -> Vec<String> {
 fn register_browser_mcp_tools_to_registry(registry: &mut aster::tools::ToolRegistry) {
     let tool_defs = get_chrome_mcp_tools();
     for tool_def in tool_defs {
-        for prefix in ["mcp__proxycast-browser__"] {
+        for prefix in ["mcp__lime-browser__"] {
             let full_name = format!("{prefix}{}", tool_def.name);
             if registry.contains(&full_name) {
                 continue;
             }
-            let tool = ProxycastBrowserMcpTool::new(
+            let tool = LimeBrowserMcpTool::new(
                 full_name,
                 tool_def.name.clone(),
                 tool_def.description.clone(),
@@ -4628,41 +4644,35 @@ fn register_creation_task_tools_to_registry(
     api_key_provider_service: Arc<ApiKeyProviderService>,
     app_handle: AppHandle,
 ) {
-    if !registry.contains(PROXYCAST_CREATE_VIDEO_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateVideoGenerationTaskTool::new(
+    if !registry.contains(LIME_CREATE_VIDEO_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateVideoGenerationTaskTool::new(
             db.clone(),
             api_key_provider_service.clone(),
         )));
     }
-    if !registry.contains(PROXYCAST_CREATE_BROADCAST_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateBroadcastTaskTool::new(
+    if !registry.contains(LIME_CREATE_BROADCAST_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateBroadcastTaskTool::new(
             app_handle.clone(),
         )));
     }
-    if !registry.contains(PROXYCAST_CREATE_COVER_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateCoverTaskTool::new(
+    if !registry.contains(LIME_CREATE_COVER_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateCoverTaskTool::new(app_handle.clone())));
+    }
+    if !registry.contains(LIME_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateResourceSearchTaskTool::new(
             app_handle.clone(),
         )));
     }
-    if !registry.contains(PROXYCAST_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateResourceSearchTaskTool::new(
+    if !registry.contains(LIME_CREATE_IMAGE_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateImageTaskTool::new(app_handle.clone())));
+    }
+    if !registry.contains(LIME_CREATE_URL_PARSE_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateUrlParseTaskTool::new(
             app_handle.clone(),
         )));
     }
-    if !registry.contains(PROXYCAST_CREATE_IMAGE_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateImageTaskTool::new(
-            app_handle.clone(),
-        )));
-    }
-    if !registry.contains(PROXYCAST_CREATE_URL_PARSE_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateUrlParseTaskTool::new(
-            app_handle.clone(),
-        )));
-    }
-    if !registry.contains(PROXYCAST_CREATE_TYPESETTING_TASK_TOOL_NAME) {
-        registry.register(Box::new(ProxycastCreateTypesettingTaskTool::new(
-            app_handle,
-        )));
+    if !registry.contains(LIME_CREATE_TYPESETTING_TASK_TOOL_NAME) {
+        registry.register(Box::new(LimeCreateTypesettingTaskTool::new(app_handle)));
     }
 }
 
@@ -5225,13 +5235,13 @@ async fn apply_workspace_sandbox_permissions(
         "tool_search",
         "three_stage_workflow",
         SOCIAL_IMAGE_TOOL_NAME,
-        PROXYCAST_CREATE_VIDEO_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_BROADCAST_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_COVER_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_IMAGE_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_URL_PARSE_TASK_TOOL_NAME,
-        PROXYCAST_CREATE_TYPESETTING_TASK_TOOL_NAME,
+        LIME_CREATE_VIDEO_TASK_TOOL_NAME,
+        LIME_CREATE_BROADCAST_TASK_TOOL_NAME,
+        LIME_CREATE_COVER_TASK_TOOL_NAME,
+        LIME_CREATE_RESOURCE_SEARCH_TASK_TOOL_NAME,
+        LIME_CREATE_IMAGE_TASK_TOOL_NAME,
+        LIME_CREATE_URL_PARSE_TASK_TOOL_NAME,
+        LIME_CREATE_TYPESETTING_TASK_TOOL_NAME,
     ] {
         permissions.push(ToolPermission {
             tool: tool_name.to_string(),
@@ -5374,7 +5384,7 @@ async fn execute_aster_chat_request(
     ensure_social_image_tool_registered(state, config_manager).await?;
 
     // 直接使用前端传递的 session_id
-    // ProxyCastSessionStore 会在 add_message 时自动创建不存在的 session
+    // LimeSessionStore 会在 add_message 时自动创建不存在的 session
     // 同时 get_session 也会自动创建不存在的 session
     let session_id = &request.session_id;
 
@@ -5480,7 +5490,7 @@ async fn execute_aster_chat_request(
     }
 
     // 启动并注入 MCP extensions 到 Aster Agent
-    let (_start_ok, start_fail) = ensure_proxycast_mcp_servers_running(db, mcp_manager).await;
+    let (_start_ok, start_fail) = ensure_lime_mcp_servers_running(db, mcp_manager).await;
     if start_fail > 0 {
         tracing::warn!(
             "[AsterAgent] 部分 MCP server 自动启动失败 ({} 失败)，后续可用工具可能不完整",
@@ -5574,10 +5584,7 @@ async fn execute_aster_chat_request(
                     session.system_prompt
                 }
                 None => {
-                    tracing::debug!(
-                        "[AsterAgent] ProxyCast 数据库中未找到 session: {}",
-                        session_id
-                    );
+                    tracing::debug!("[AsterAgent] Lime 数据库中未找到 session: {}", session_id);
                     None
                 }
             };
@@ -5811,7 +5818,7 @@ async fn execute_aster_chat_request(
         session_config_builder.build()
     };
 
-    proxycast_agent::tools::set_skill_tool_session_access(session_id, model_skill_tool_enabled);
+    lime_agent::tools::set_skill_tool_session_access(session_id, model_skill_tool_enabled);
     let final_result = tracker
         .with_run_custom(
             RunSource::Chat,
@@ -5977,13 +5984,13 @@ async fn execute_aster_chat_request(
 
                 match result {
                     Ok(_) => RunFinishDecision {
-                        status: proxycast_core::database::dao::agent_run::AgentRunStatus::Success,
+                        status: lime_core::database::dao::agent_run::AgentRunStatus::Success,
                         error_code: None,
                         error_message: None,
                         metadata: Some(metadata),
                     },
                     Err(err) => RunFinishDecision {
-                        status: proxycast_core::database::dao::agent_run::AgentRunStatus::Error,
+                        status: lime_core::database::dao::agent_run::AgentRunStatus::Error,
                         error_code: Some("chat_stream_failed".to_string()),
                         error_message: Some(err.clone()),
                         metadata: Some(metadata),
@@ -5992,7 +5999,7 @@ async fn execute_aster_chat_request(
             },
         )
         .await;
-    proxycast_agent::tools::clear_skill_tool_session_access(session_id);
+    lime_agent::tools::clear_skill_tool_session_access(session_id);
 
     match final_result {
         Ok(()) => {
@@ -6978,7 +6985,7 @@ pub async fn aster_agent_submit_elicitation_response(
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use proxycast_agent::request_tool_policy::resolve_request_tool_policy;
+    use lime_agent::request_tool_policy::resolve_request_tool_policy;
     use regex::Regex;
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
@@ -7035,8 +7042,12 @@ mod tests {
 
     impl DurableMemoryEnvGuard {
         fn set(path: &Path) -> Self {
-            let previous = std::env::var_os("PROXYCAST_DURABLE_MEMORY_DIR");
-            std::env::set_var("PROXYCAST_DURABLE_MEMORY_DIR", path.as_os_str());
+            let previous = lime_core::env_compat::var_os(&[
+                lime_agent::LIME_DURABLE_MEMORY_ROOT_ENV,
+                lime_agent::LEGACY_DURABLE_MEMORY_ROOT_ENV,
+            ]);
+            std::env::set_var(lime_agent::LIME_DURABLE_MEMORY_ROOT_ENV, path.as_os_str());
+            std::env::remove_var(lime_agent::LEGACY_DURABLE_MEMORY_ROOT_ENV);
             Self { previous }
         }
     }
@@ -7044,10 +7055,11 @@ mod tests {
     impl Drop for DurableMemoryEnvGuard {
         fn drop(&mut self) {
             if let Some(value) = &self.previous {
-                std::env::set_var("PROXYCAST_DURABLE_MEMORY_DIR", value);
+                std::env::set_var(lime_agent::LIME_DURABLE_MEMORY_ROOT_ENV, value);
             } else {
-                std::env::remove_var("PROXYCAST_DURABLE_MEMORY_DIR");
+                std::env::remove_var(lime_agent::LIME_DURABLE_MEMORY_ROOT_ENV);
             }
+            std::env::remove_var(lime_agent::LEGACY_DURABLE_MEMORY_ROOT_ENV);
         }
     }
 
@@ -7352,7 +7364,7 @@ mod tests {
         };
 
         assert_eq!(
-            ProxycastBrowserMcpTool::resolve_backend("find", &params, Some(&session_hint)),
+            LimeBrowserMcpTool::resolve_backend("find", &params, Some(&session_hint)),
             Some(BrowserBackendType::CdpDirect)
         );
     }
@@ -7368,15 +7380,11 @@ mod tests {
         };
 
         assert_eq!(
-            ProxycastBrowserMcpTool::resolve_backend("find", &params, Some(&session_hint)),
+            LimeBrowserMcpTool::resolve_backend("find", &params, Some(&session_hint)),
             None
         );
         assert_eq!(
-            ProxycastBrowserMcpTool::resolve_backend(
-                "javascript_tool",
-                &params,
-                Some(&session_hint)
-            ),
+            LimeBrowserMcpTool::resolve_backend("javascript_tool", &params, Some(&session_hint)),
             None
         );
     }
@@ -7392,11 +7400,11 @@ mod tests {
         };
 
         assert_eq!(
-            ProxycastBrowserMcpTool::resolve_backend("navigate", &params, Some(&session_hint)),
+            LimeBrowserMcpTool::resolve_backend("navigate", &params, Some(&session_hint)),
             Some(BrowserBackendType::CdpDirect)
         );
         assert_eq!(
-            ProxycastBrowserMcpTool::resolve_backend("read_page", &params, Some(&session_hint)),
+            LimeBrowserMcpTool::resolve_backend("read_page", &params, Some(&session_hint)),
             Some(BrowserBackendType::CdpDirect)
         );
     }
@@ -8041,7 +8049,7 @@ mod tests {
             .output
             .as_deref()
             .unwrap_or_default()
-            .contains(PROXYCAST_TOOL_METADATA_BEGIN));
+            .contains(LIME_TOOL_METADATA_BEGIN));
         assert!(encoded
             .output
             .as_deref()
@@ -8058,21 +8066,21 @@ mod tests {
         assert!(encoded.success);
         let output = encoded.output.as_deref().unwrap_or_default();
         assert!(output.contains("执行失败"));
-        assert!(output.contains(PROXYCAST_TOOL_METADATA_BEGIN));
+        assert!(output.contains(LIME_TOOL_METADATA_BEGIN));
         assert!(output.contains("\"reported_success\":false"));
     }
 
     #[test]
     fn test_encode_tool_result_for_harness_observability_is_idempotent() {
         let initial = ToolResult::success(format!(
-            "ok\n\n{PROXYCAST_TOOL_METADATA_BEGIN}\n{{\"reported_success\":false}}\n{PROXYCAST_TOOL_METADATA_END}"
+            "ok\n\n{LIME_TOOL_METADATA_BEGIN}\n{{\"reported_success\":false}}\n{LIME_TOOL_METADATA_END}"
         ))
         .with_metadata("reported_success", serde_json::json!(false));
 
         let encoded = encode_tool_result_for_harness_observability(initial);
         let output = encoded.output.as_deref().unwrap_or_default();
-        assert_eq!(output.matches(PROXYCAST_TOOL_METADATA_BEGIN).count(), 1);
-        assert_eq!(output.matches(PROXYCAST_TOOL_METADATA_END).count(), 1);
+        assert_eq!(output.matches(LIME_TOOL_METADATA_BEGIN).count(), 1);
+        assert_eq!(output.matches(LIME_TOOL_METADATA_END).count(), 1);
     }
 
     #[test]
@@ -8151,7 +8159,7 @@ mod tests {
     #[test]
     fn test_tool_search_parse_schema_metadata() {
         let schema = serde_json::json!({
-            "x-proxycast": {
+            "x-lime": {
                 "deferred_loading": true,
                 "always_visible": false,
                 "allowed_callers": ["assistant", "code_execution"],
@@ -8277,7 +8285,7 @@ mod tests {
                 "Search docs",
                 serde_json::json!({
                     "type": "object",
-                    "x-proxycast": {
+                    "x-lime": {
                         "deferred_loading": true,
                         "allowed_callers": ["assistant"],
                         "tags": ["docs", "search"]
@@ -8289,7 +8297,7 @@ mod tests {
                 "Admin-only tool",
                 serde_json::json!({
                     "type": "object",
-                    "x-proxycast": {
+                    "x-lime": {
                         "deferred_loading": true,
                         "allowed_callers": ["code_execution"],
                         "tags": ["admin"]
@@ -8301,7 +8309,7 @@ mod tests {
                 "Weather by city",
                 serde_json::json!({
                     "type": "object",
-                    "x-proxycast": {
+                    "x-lime": {
                         "deferred_loading": false,
                         "tags": ["weather"]
                     }
@@ -8360,7 +8368,7 @@ mod tests {
     }
 }
 
-/// 将 ProxyCast 已运行的 MCP servers 注入到 Aster Agent 作为 extensions
+/// 将 Lime 已运行的 MCP servers 注入到 Aster Agent 作为 extensions
 ///
 /// 获取 McpClientManager 中所有已运行的 server 配置，
 /// 转换为 Aster 的 ExtensionConfig::Stdio 并注册到 Agent。
@@ -8480,10 +8488,10 @@ async fn inject_mcp_extensions(
     (success_count, fail_count)
 }
 
-/// 确保 ProxyCast 可用的 MCP servers 已启动
+/// 确保 Lime 可用的 MCP servers 已启动
 ///
-/// 启动启用了 `enabled_proxycast` 的服务器。
-async fn ensure_proxycast_mcp_servers_running(
+/// 启动启用了 `enabled_lime` 的服务器。
+async fn ensure_lime_mcp_servers_running(
     db: &DbConnection,
     mcp_manager: &McpManagerState,
 ) -> (usize, usize) {
@@ -8500,7 +8508,7 @@ async fn ensure_proxycast_mcp_servers_running(
     }
 
     let candidates: Vec<&crate::models::mcp_model::McpServer> =
-        servers.iter().filter(|s| s.enabled_proxycast).collect();
+        servers.iter().filter(|s| s.enabled_lime).collect();
 
     if candidates.is_empty() {
         return (0, 0);

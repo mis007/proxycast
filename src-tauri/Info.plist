@@ -15,16 +15,16 @@
 		</dict>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>ProxyCast URL</string>
+			<string>Lime URL</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>proxycast</string>
+				<string>lime</string>
 			</array>
 		</dict>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ProxyCast 需要访问麦克风以使用语音输入功能</string>
+	<string>Lime 需要访问麦克风以使用语音输入功能</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>ProxyCast 需要控制其他应用以输入识别的文本</string>
+	<string>Lime 需要控制其他应用以输入识别的文本</string>
 </dict>
 </plist>

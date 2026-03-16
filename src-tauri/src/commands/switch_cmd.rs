@@ -1,8 +1,8 @@
 use crate::database::DbConnection;
 use crate::models::app_type::AppType;
 use crate::models::provider_model::Provider;
-use proxycast_services::live_sync::{check_config_sync, sync_from_external, SyncCheckResult};
-use proxycast_services::switch::SwitchService;
+use lime_services::live_sync::{check_config_sync, sync_from_external, SyncCheckResult};
+use lime_services::switch::SwitchService;
 use serde_json::Value;
 use tauri::State;
 
@@ -78,7 +78,7 @@ pub fn check_config_sync_status(
         .parse()
         .map_err(|e| format!("Invalid app type: {e}"))?;
 
-    // 获取当前 ProxyCast 中设置的 provider
+    // 获取当前 Lime 中设置的 provider
     let current_provider = SwitchService::get_current_provider(&db, &app_type)?
         .map(|p| p.id)
         .unwrap_or_else(|| "unknown".to_string());
@@ -88,7 +88,7 @@ pub fn check_config_sync_status(
         .map_err(|e| format!("Failed to check config sync: {e}"))
 }
 
-/// 从外部配置同步到 ProxyCast
+/// 从外部配置同步到 Lime
 #[tauri::command]
 pub async fn sync_from_external_config(
     db: State<'_, DbConnection>,

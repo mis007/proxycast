@@ -4,7 +4,7 @@
 
 ## 架构说明
 
-ProxyCast Connect 前端组件，实现中转商 API Key 添加确认流程。
+Lime Connect 前端组件，实现中转商 API Key 添加确认流程。
 使用 shadcn/ui 组件库和 TailwindCSS 进行样式管理。
 
 ## 功能概述

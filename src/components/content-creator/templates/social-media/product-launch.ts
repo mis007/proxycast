@@ -21,7 +21,7 @@ export const productLaunchTemplate: ContentTemplate = {
   ],
 
   titleExamples: [
-    "ProxyCast：创作者的 AI Agent 平台",
+    "Lime：创作者的 AI Agent 平台",
     "告别低效创作，一个工具搞定全流程",
     "支持 9 大创作主题的 AI 内容平台",
   ],
@@ -91,7 +91,7 @@ export const productLaunchTemplate: ContentTemplate = {
 创作一篇关于「{{product}}」的产品发布内容，适合发布在{{platform}}平台。
 
 ## 标题要求
-- 格式参考：「ProxyCast：创作者的 AI Agent 平台」
+- 格式参考：「Lime：创作者的 AI Agent 平台」
 - 突出产品名和核心价值
 - 20-30 字
 

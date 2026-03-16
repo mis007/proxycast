@@ -7,8 +7,8 @@ use crate::providers::traits::{CredentialProvider, ProviderResult};
 use crate::translator::kiro::anthropic::request::convert_anthropic_to_codewhisperer;
 use crate::translator::kiro::openai::request::convert_openai_to_codewhisperer;
 use async_trait::async_trait;
-use proxycast_core::models::anthropic::AnthropicMessagesRequest;
-use proxycast_core::models::openai::*;
+use lime_core::models::anthropic::AnthropicMessagesRequest;
+use lime_core::models::openai::*;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -754,7 +754,7 @@ impl KiroProvider {
             };
 
             return Err(format!(
-                "IdC 认证配置不完整：缺少 {missing}。\n\n⚠️ 注意：IdC 凭证的 refreshToken 无法用于 Social 认证，必须提供完整的 IdC 配置。\n\n💡 解决方案：\n1. 删除当前凭证\n2. 重新从 Kiro IDE 获取最新的凭证文件（确保完成完整的 SSO 登录流程）\n3. 确保 ~/.aws/sso/cache/ 目录下有对应的 clientIdHash 文件\n4. 重新添加凭证到 ProxyCast"
+                "IdC 认证配置不完整：缺少 {missing}。\n\n⚠️ 注意：IdC 凭证的 refreshToken 无法用于 Social 认证，必须提供完整的 IdC 配置。\n\n💡 解决方案：\n1. 删除当前凭证\n2. 重新从 Kiro IDE 获取最新的凭证文件（确保完成完整的 SSO 登录流程）\n3. 确保 ~/.aws/sso/cache/ 目录下有对应的 clientIdHash 文件\n4. 重新添加凭证到 Lime"
             ).into());
         }
         let refresh_url = self.get_refresh_url();
@@ -1000,14 +1000,13 @@ impl KiroProvider {
         let cw_request = convert_openai_to_codewhisperer(request, profile_arn.clone());
         let url = self.get_base_url();
 
-        // 安全修复：仅在 PROXYCAST_DEBUG=1 时写入请求调试文件，避免泄露敏感信息
-        let debug_enabled = std::env::var("PROXYCAST_DEBUG")
-            .map(|v| v == "1")
-            .unwrap_or(false);
+        // 安全修复：仅在 LIME_DEBUG=1 时写入请求调试文件，兼容旧的 PROXYCAST_DEBUG。
+        let debug_enabled =
+            lime_core::env_compat::bool_var(&["LIME_DEBUG", "PROXYCAST_DEBUG"]).unwrap_or(false);
         if debug_enabled {
             if let Ok(json_str) = serde_json::to_string_pretty(&cw_request) {
-                let debug_dir = proxycast_core::app_paths::resolve_logs_dir()
-                    .unwrap_or_else(|_| std::env::temp_dir().join("proxycast").join("logs"));
+                let debug_dir = lime_core::app_paths::resolve_logs_dir()
+                    .unwrap_or_else(|_| std::env::temp_dir().join("lime").join("logs"));
                 let uuid_prefix = uuid::Uuid::new_v4()
                     .to_string()
                     .split('-')

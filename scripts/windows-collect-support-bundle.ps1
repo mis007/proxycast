@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 function Write-Step {
   param([string]$Message)
-  Write-Host "[ProxyCast Support] $Message"
+  Write-Host "[Lime Support] $Message"
 }
 
 function Ensure-Directory {
@@ -111,14 +111,14 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
   $OutputRoot = if ([string]::IsNullOrWhiteSpace($desktop)) { $env:TEMP } else { $desktop }
 }
 
-$bundleName = "ProxyCast-Support-$timestamp"
+$bundleName = "Lime-Support-$timestamp"
 $bundleDir = Join-Path $OutputRoot $bundleName
 $zipPath = "$bundleDir.zip"
 
-$appDataDir = Join-Path $env:APPDATA "proxycast"
-$legacyDir = Join-Path $env:USERPROFILE ".proxycast"
+$appDataDir = Join-Path $env:APPDATA "lime"
+$legacyDir = Join-Path $env:USERPROFILE ".lime"
 $configPath = Join-Path $appDataDir "config.yaml"
-$dbPath = Join-Path $legacyDir "proxycast.db"
+$dbPath = Join-Path $legacyDir "lime.db"
 $logsDir = Join-Path $legacyDir "logs"
 $requestLogsDir = Join-Path $legacyDir "request_logs"
 
@@ -135,7 +135,7 @@ $systemInfo = [ordered]@{
   powershell_version = $PSVersionTable.PSVersion.ToString()
   webview2_version = Get-WebView2Version
   appdata_dir = $appDataDir
-  legacy_proxycast_dir = $legacyDir
+  legacy_lime_dir = $legacyDir
   config_path = $configPath
   database_path = $dbPath
   shell_paths = @{
@@ -162,7 +162,7 @@ $copiedLogs = Copy-DirectoryIfExists -SourcePath $logsDir -DestinationPath (Join
 $copiedRequestLogs = Copy-DirectoryIfExists -SourcePath $requestLogsDir -DestinationPath (Join-Path $bundleDir "logs/request_logs")
 
 @(
-  "ProxyCast 支持包已生成。",
+  "Lime 支持包已生成。",
   "",
   "已收集内容：",
   "- system-info.json（系统与路径元数据）",
@@ -172,7 +172,7 @@ $copiedRequestLogs = Copy-DirectoryIfExists -SourcePath $requestLogsDir -Destina
   "",
   "默认未收集内容：",
   "- config.yaml 正文（避免泄露 API Key / 凭证）",
-  "- proxycast.db 正文（避免泄露会话与敏感数据）",
+  "- lime.db 正文（避免泄露会话与敏感数据）",
   "- credentials/ 目录内容",
   "",
   "是否复制 logs: $copiedLogs",

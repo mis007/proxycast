@@ -125,7 +125,7 @@ jobs:
             fi
             {
               echo "RELEASE_BODY<<RELEASE_BODY_EOF"
-              echo "## ProxyCast ${TAG}"
+              echo "## Lime ${TAG}"
               echo ""
               echo "### Changes"
               echo "${CHANGELOG}"
@@ -177,7 +177,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
@@ -200,7 +200,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
@@ -225,7 +225,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
@@ -260,7 +260,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
@@ -289,7 +289,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
@@ -312,7 +312,7 @@ jobs:
           tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "ProxyCast ${{ github.event.inputs.version || github.ref_name }}"
+          releaseName: "Lime ${{ github.event.inputs.version || github.ref_name }}"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false

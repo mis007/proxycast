@@ -1,3 +1,11 @@
+import {
+  EMPTY_STATE_META_PILL_CLASSNAME,
+  EMPTY_STATE_PANEL_CLASSNAME,
+  EMPTY_STATE_PANEL_EMBEDDED_CLASSNAME,
+  EMPTY_STATE_PRESET_BUTTON_CLASSNAME,
+  EMPTY_STATE_RECOMMENDATION_CARD_CLASSNAME,
+} from "./emptyStateSurfaceTokens";
+
 export interface EmptyStateQuickActionItem {
   key: string;
   title: string;
@@ -40,11 +48,7 @@ export function EmptyStateQuickActions({
 
   return (
     <section
-      className={
-        embedded
-          ? "rounded-[20px] border border-white/80 bg-white/58 p-3 shadow-sm shadow-slate-950/5 backdrop-blur-sm"
-          : "rounded-[24px] border border-slate-200/80 bg-white/76 p-4 shadow-sm shadow-slate-950/5 backdrop-blur-sm md:p-5"
-      }
+      className={embedded ? EMPTY_STATE_PANEL_EMBEDDED_CLASSNAME : EMPTY_STATE_PANEL_CLASSNAME}
     >
       <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
         <div>
@@ -62,7 +66,7 @@ export function EmptyStateQuickActions({
               key={preset.key}
               type="button"
               onClick={() => onPresetAction?.(preset)}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/88 px-3 py-1.5 text-[13px] text-slate-600 shadow-sm shadow-slate-950/5 transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+              className={EMPTY_STATE_PRESET_BUTTON_CLASSNAME}
             >
               {preset.icon ? (
                 <span aria-hidden="true" className="text-base leading-none">
@@ -76,7 +80,7 @@ export function EmptyStateQuickActions({
       ) : null}
 
       {selectedTextPreview ? (
-        <div className="mt-2.5 rounded-2xl border border-sky-200/70 bg-sky-50/75 px-3.5 py-2 text-xs leading-5 text-slate-600">
+        <div className="mt-2.5 rounded-2xl border border-sky-200/70 bg-sky-50/85 px-3.5 py-2.5 text-xs leading-5 text-slate-600">
           已检测到当前选中内容，点击推荐动作时会自动携带上下文：
           <span className="ml-1 font-medium text-slate-900">
             “{selectedTextPreview}”
@@ -90,10 +94,10 @@ export function EmptyStateQuickActions({
             key={item.key}
             type="button"
             onClick={() => onAction(item)}
-            className="group flex min-w-0 flex-col items-start gap-2 rounded-[18px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(248,250,252,0.88)_100%)] px-3.5 py-3 text-left shadow-sm shadow-slate-950/5 transition-colors hover:border-slate-300 hover:bg-white"
+            className={EMPTY_STATE_RECOMMENDATION_CARD_CLASSNAME}
           >
             <div className="flex w-full items-start justify-between gap-3">
-              <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+              <span className={EMPTY_STATE_META_PILL_CLASSNAME}>
                 {item.badge}
               </span>
               <span className="text-[11px] font-medium text-slate-400 transition-colors group-hover:text-slate-500">

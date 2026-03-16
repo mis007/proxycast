@@ -1,5 +1,5 @@
 /**
- * @file ProxyCast Connect 组件入口
+ * @file Lime Connect 组件入口
  * @description 导出 Connect 功能相关的所有组件
  * @module components/connect
  */

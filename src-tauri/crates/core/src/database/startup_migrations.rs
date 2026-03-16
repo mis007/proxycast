@@ -99,9 +99,9 @@ fn run_legacy_api_key_cleanup(conn: &Connection) {
 fn run_mcp_startup_migrations(conn: &Connection) {
     run_nonfatal_count_migration(
         conn,
-        "MCP ProxyCast 启用状态修复失败",
-        migration::migrate_mcp_proxycast_enabled,
-        |_, count| format!("[数据库] 已修复 {} 条 MCP ProxyCast 启用状态", count),
+        "MCP Lime 启用状态修复失败",
+        migration::migrate_mcp_lime_enabled,
+        |_, count| format!("[数据库] 已修复 {} 条 MCP Lime 启用状态", count),
     );
 
     run_nonfatal_count_migration(

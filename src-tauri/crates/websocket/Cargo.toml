@@ -1,5 +1,5 @@
 [package]
-name = "proxycast-websocket"
+name = "lime-websocket"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,9 +8,9 @@ homepage.workspace = true
 
 [dependencies]
 # 项目内 crate
-proxycast-core.workspace = true
-proxycast-agent = { path = "../agent" }
-proxycast-scheduler.workspace = true
+lime-core.workspace = true
+lime-agent = { path = "../agent" }
+lime-scheduler.workspace = true
 
 # 序列化
 serde.workspace = true

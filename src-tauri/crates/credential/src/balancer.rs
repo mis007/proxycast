@@ -4,11 +4,11 @@
 
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
-use proxycast_core::credential::health::{HealthCheckConfig, HealthChecker};
-use proxycast_core::credential::pool::{CredentialPool, PoolError};
-use proxycast_core::credential::types::Credential;
-use proxycast_core::ProviderType;
-use proxycast_infra::ProxyClientFactory;
+use lime_core::credential::health::{HealthCheckConfig, HealthChecker};
+use lime_core::credential::pool::{CredentialPool, PoolError};
+use lime_core::credential::types::Credential;
+use lime_core::ProviderType;
+use lime_infra::ProxyClientFactory;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -374,7 +374,7 @@ impl Default for LoadBalancer {
 #[cfg(test)]
 mod balancer_tests {
     use super::*;
-    use proxycast_core::credential::types::CredentialData;
+    use lime_core::credential::types::CredentialData;
 
     fn create_test_credential(id: &str, provider: ProviderType) -> Credential {
         Credential::new(
@@ -472,7 +472,7 @@ mod balancer_tests {
 
     #[test]
     fn test_load_balancer_auto_unhealthy() {
-        use proxycast_core::credential::types::CredentialStatus;
+        use lime_core::credential::types::CredentialStatus;
 
         let lb = LoadBalancer::round_robin();
         let pool = Arc::new(CredentialPool::new(ProviderType::Kiro));
@@ -490,7 +490,7 @@ mod balancer_tests {
 
     #[test]
     fn test_load_balancer_auto_recovery() {
-        use proxycast_core::credential::types::CredentialStatus;
+        use lime_core::credential::types::CredentialStatus;
 
         let lb = LoadBalancer::round_robin();
         let pool = Arc::new(CredentialPool::new(ProviderType::Kiro));
@@ -516,7 +516,7 @@ mod balancer_tests {
 
         {
             let mut entry = pool.credentials.get_mut("cred-1").unwrap();
-            entry.status = proxycast_core::credential::types::CredentialStatus::Cooldown {
+            entry.status = lime_core::credential::types::CredentialStatus::Cooldown {
                 until: Utc::now() - Duration::seconds(1),
             };
         }
@@ -524,7 +524,7 @@ mod balancer_tests {
         let cred = pool.get("cred-1").unwrap();
         assert!(matches!(
             cred.status,
-            proxycast_core::credential::types::CredentialStatus::Cooldown { .. }
+            lime_core::credential::types::CredentialStatus::Cooldown { .. }
         ));
 
         let selected = lb.select(ProviderType::Kiro).unwrap();
@@ -533,7 +533,7 @@ mod balancer_tests {
         let cred = pool.get("cred-1").unwrap();
         assert!(matches!(
             cred.status,
-            proxycast_core::credential::types::CredentialStatus::Active
+            lime_core::credential::types::CredentialStatus::Active
         ));
     }
 

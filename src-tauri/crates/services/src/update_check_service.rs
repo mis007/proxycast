@@ -59,7 +59,7 @@ pub struct UpdateCheckService {
 impl UpdateCheckService {
     const CURRENT_VERSION: &'static str = env!("CARGO_PKG_VERSION");
     const DEFAULT_GITHUB_API_URL: &'static str =
-        "https://api.github.com/repos/aiclientproxy/proxycast/releases/latest";
+        "https://api.github.com/repos/aiclientproxy/lime/releases/latest";
 
     pub fn new() -> Self {
         Self {
@@ -147,7 +147,7 @@ impl UpdateCheckService {
 
         match client
             .get(&self.github_api_url)
-            .header("User-Agent", "ProxyCast")
+            .header("User-Agent", "Lime")
             .header("Accept", "application/vnd.github.v3+json")
             .send()
             .await
@@ -265,7 +265,7 @@ impl Default for UpdateCheckService {
 //     app_handle
 //         .notification()
 //         .builder()
-//         .title("ProxyCast 有新版本可用")
+//         .title("Lime 有新版本可用")
 //         .body(&format!(
 //             "新版本 {} 已发布，当前版本 {}",
 //             latest, update_info.current_version

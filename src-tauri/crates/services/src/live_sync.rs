@@ -1,12 +1,12 @@
-use proxycast_core::models::{AppType, Provider};
+use lime_core::models::{AppType, Provider};
 use serde_json::{json, Value};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// ProxyCast 管理的环境变量块标记
-const ENV_BLOCK_START: &str = "# >>> ProxyCast Claude Config >>>";
-const ENV_BLOCK_END: &str = "# <<< ProxyCast Claude Config <<<";
+/// Lime 管理的环境变量块标记
+const ENV_BLOCK_START: &str = "# >>> Lime Claude Config >>>";
+const ENV_BLOCK_END: &str = "# <<< Lime Claude Config <<<";
 
 /// 原子写入 JSON 文件，防止配置损坏
 /// 参考 cc-switch 的实现：使用临时文件 + 重命名的原子操作
@@ -75,7 +75,7 @@ pub(crate) fn create_backup(
 
 fn should_create_backup() -> bool {
     if cfg!(target_os = "windows") {
-        return std::env::var("PROXYCAST_FORCE_BACKUP")
+        return lime_core::env_compat::var(&["LIME_FORCE_BACKUP", "PROXYCAST_FORCE_BACKUP"])
             .map(|value| {
                 let value = value.to_lowercase();
                 value == "1" || value == "true" || value == "yes"
@@ -243,26 +243,26 @@ pub fn write_env_to_shell_config(
         String::new()
     };
 
-    // 移除旧的 ProxyCast 配置块
+    // 移除旧的 Lime 配置块
     let mut new_content = String::new();
-    let mut in_proxycast_block = false;
+    let mut in_lime_block = false;
 
     for line in existing_content.lines() {
         if line.trim() == ENV_BLOCK_START {
-            in_proxycast_block = true;
+            in_lime_block = true;
             continue;
         }
         if line.trim() == ENV_BLOCK_END {
-            in_proxycast_block = false;
+            in_lime_block = false;
             continue;
         }
-        if !in_proxycast_block {
+        if !in_lime_block {
             new_content.push_str(line);
             new_content.push('\n');
         }
     }
 
-    // 添加新的 ProxyCast 配置块
+    // 添加新的 Lime 配置块
     if !env_vars.is_empty() {
         // 确保前面有空行
         if !new_content.ends_with("\n\n") && !new_content.is_empty() {
@@ -271,7 +271,7 @@ pub fn write_env_to_shell_config(
 
         new_content.push_str(ENV_BLOCK_START);
         new_content.push('\n');
-        new_content.push_str("# ProxyCast managed Claude Code configuration\n");
+        new_content.push_str("# Lime managed Claude Code configuration\n");
         new_content.push_str("# Do not edit this block manually\n");
 
         for (key, value) in env_vars {
@@ -302,7 +302,7 @@ pub fn write_env_to_shell_config(
     Ok(())
 }
 
-/// 从 shell 配置文件读取 ProxyCast 管理的环境变量
+/// 从 shell 配置文件读取 Lime 管理的环境变量
 fn read_env_from_shell_config(
 ) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
     let config_path = get_shell_config_path()?;
@@ -313,21 +313,21 @@ fn read_env_from_shell_config(
 
     let content = fs::read_to_string(&config_path)?;
     let mut env_vars = Vec::new();
-    let mut in_proxycast_block = false;
+    let mut in_lime_block = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
 
         if trimmed == ENV_BLOCK_START {
-            in_proxycast_block = true;
+            in_lime_block = true;
             continue;
         }
         if trimmed == ENV_BLOCK_END {
-            in_proxycast_block = false;
+            in_lime_block = false;
             continue;
         }
 
-        if in_proxycast_block {
+        if in_lime_block {
             if let Some((key, value)) = parse_shell_env_line(trimmed) {
                 env_vars.push((key, value));
             }
@@ -345,7 +345,7 @@ pub fn get_app_config_path(app_type: &AppType) -> Option<PathBuf> {
         AppType::Claude => Some(home.join(".claude").join("settings.json")),
         AppType::Codex => Some(home.join(".codex")),
         AppType::Gemini => Some(home.join(".gemini")),
-        AppType::ProxyCast => None,
+        AppType::Lime => None,
     }
 }
 
@@ -358,7 +358,7 @@ pub fn sync_to_live(
         AppType::Claude => sync_claude_settings(provider),
         AppType::Codex => sync_codex_config(provider),
         AppType::Gemini => sync_gemini_config(provider),
-        AppType::ProxyCast => Ok(()),
+        AppType::Lime => Ok(()),
     }
 }
 
@@ -644,7 +644,7 @@ pub fn read_live_settings(
                 "config": config
             }))
         }
-        AppType::ProxyCast => Ok(json!({})),
+        AppType::Lime => Ok(json!({})),
     }
 }
 
@@ -727,7 +727,7 @@ pub fn parse_current_provider_from_live(
 
             Ok("unknown".to_string())
         }
-        AppType::ProxyCast => Ok("proxycast".to_string()),
+        AppType::Lime => Ok("lime".to_string()),
     }
 }
 
@@ -753,7 +753,7 @@ pub fn check_config_sync(
         SyncStatus::OutOfSync
     } else {
         // 这里需要更智能的判断：
-        // 如果外部配置是通过ProxyCast设置的，应该检查是否已有匹配的provider
+        // 如果外部配置是通过Lime设置的，应该检查是否已有匹配的provider
         // 只有确实是来自其他外部软件的配置才标记为冲突
 
         // 对于简化，先标记为冲突，让前端的更详细的比对逻辑来处理
@@ -788,7 +788,7 @@ fn get_config_last_modified(app_type: &AppType) -> Option<String> {
         AppType::Claude => home.join(".claude").join("settings.json"),
         AppType::Codex => home.join(".codex").join("auth.json"),
         AppType::Gemini => home.join(".gemini").join(".env"),
-        AppType::ProxyCast => return None,
+        AppType::Lime => return None,
     };
 
     if let Ok(metadata) = std::fs::metadata(&path) {
@@ -802,7 +802,7 @@ fn get_config_last_modified(app_type: &AppType) -> Option<String> {
     None
 }
 
-/// 从外部配置同步到 ProxyCast 数据库
+/// 从外部配置同步到 Lime 数据库
 /// 这个函数需要与 switch service 集成来更新数据库中的 provider 记录
 pub fn sync_from_external(
     app_type: &AppType,

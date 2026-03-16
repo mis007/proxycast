@@ -153,14 +153,14 @@ Kiro 凭证采用完全独立的副本策略：
 
 ### 修改凭证管理
 
-- 凭证文件存储在应用数据目录下的 `proxycast/credentials/`；`~/Library/Application Support/proxycast/credentials/` 仅作为 macOS 示例，Windows 请使用对应的应用数据目录
+- 凭证文件存储在应用数据目录下的 `lime/credentials/`；`~/Library/Application Support/lime/credentials/` 仅作为 macOS 示例，Windows 请使用对应的应用数据目录
 - 数据库存储凭证元数据和状态
 - Token 缓存在数据库中，避免频繁读取文件
 
 ### 调试技巧
 
 - 日志输出使用 `tracing` 宏
-- API 请求调试文件保存在应用日志目录；`~/.proxycast/logs/` 仅作为 macOS 示例，实现与排障时不要写死该路径
+- API 请求调试文件保存在应用日志目录；`~/.lime/logs/` 仅作为 macOS 示例，实现与排障时不要写死该路径
 - 使用 `debug_kiro_credentials` 命令调试凭证加载
 
 ## 文档维护

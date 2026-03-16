@@ -33,7 +33,7 @@ export type ThemeWorkspacePage =
   | "workspace-novel";
 
 export const LAST_THEME_WORKSPACE_PAGE_STORAGE_KEY =
-  "proxycast:last-theme-workspace-page";
+  "lime:last-theme-workspace-page";
 
 export const THEME_WORKSPACE_PAGE_MAP: Record<
   WorkspaceTheme,
