@@ -40,6 +40,18 @@ export interface ThemeWorkbenchRunMetadataSummary {
   artifactPaths: string[];
 }
 
+export function formatThemeWorkbenchRunMetadata(raw: string | null): string {
+  if (!raw || !raw.trim()) {
+    return "-";
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 function normalizeArtifactPaths(raw?: string[]): string[] {
   if (!Array.isArray(raw)) {
     return [];

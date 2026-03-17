@@ -1,8 +1,10 @@
-## Lime v0.89.0
+## Lime v0.89.1
 
 ### ✨ 主要更新
 
 - **品牌正式更名为 Lime**：主程序名称、仓库链接、安装包命名、Tauri `productName` / `identifier`、深链 scheme、浏览器桥扩展目录与发布文案已统一从 `Proxycast` 切换到 `Lime`
+- **品牌图标与启动形象刷新**：应用图标、安装包图标、通知图标与启动页专用 Logo 已统一替换为新的青柠小龙虾主视觉，启动页继续保留独立图像资源
+- **ThemeWorkbench 侧边栏完成职责拆分**：上下文面板、工作流面板、执行日志与编排状态拆成独立构建模块，侧边栏主组件进一步收口
 - **版本事实源继续收口**：统一 `package.json`、Cargo workspace / package、两份 Tauri 配置与 `RELEASE_NOTES.md` 的版本入口，发布流程继续只读取这一套版本源
 - **运行时命名继续收口**：Tool Calling、Web Search、Durable Memory、workspace sandbox、真实测试与浏览器桥接等运行时环境变量统一以 `LIME_*` / `__LIME_*` 为现役事实源，旧 `PROXYCAST_*` 仅保留兼容读取
 - **生态入口同步完成**：README、插件升级入口、About 页、扩展说明与下载地址等对外入口统一使用 `Lime`
@@ -28,4 +30,4 @@
 
 ---
 
-**完整变更**: v0.88.0...v0.89.0
+**完整变更**: v0.89.0...v0.89.1

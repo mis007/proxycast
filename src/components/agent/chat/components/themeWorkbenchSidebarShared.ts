@@ -1,15 +1,3 @@
-export function formatThemeWorkbenchRunMetadata(raw: string | null): string {
-  if (!raw || !raw.trim()) {
-    return "-";
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    return raw;
-  }
-}
-
 export function formatThemeWorkbenchActionErrorMessage(
   prefix: string,
   error: unknown,

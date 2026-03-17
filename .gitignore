@@ -33,6 +33,8 @@ docs/prd/
 docs/roadmap/
 docs/gongzonghao/
 docs/bussniss/
+docs/oem/
+
 # Issues tracking (internal use only)
 .issues/
 
@@ -63,3 +65,8 @@ openspec
 
 # Build artifacts (alternate cargo target dirs)
 src-tauri/target*/
+
+logo-lime.png
+
+lime.db
+

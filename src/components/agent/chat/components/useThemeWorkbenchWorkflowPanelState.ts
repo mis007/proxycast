@@ -4,7 +4,9 @@ import type { SidebarActivityLog } from "../hooks/useThemeContextWorkspace";
 import {
   buildThemeWorkbenchActivityLogGroups,
   buildThemeWorkbenchCreationTaskGroups,
+  formatThemeWorkbenchRunMetadata,
   formatThemeWorkbenchStagesLabel,
+  parseThemeWorkbenchRunMetadataSummary,
   type ThemeWorkbenchCreationTaskEvent,
   type ThemeWorkbenchRunMetadataSummary,
 } from "./themeWorkbenchWorkflowData";
@@ -13,7 +15,7 @@ interface UseThemeWorkbenchWorkflowPanelStateParams {
   workflowSteps: Array<{ id: string; title: string; status: StepStatus }>;
   activityLogs: SidebarActivityLog[];
   creationTaskEvents: ThemeWorkbenchCreationTaskEvent[];
-  runMetadataSummary: ThemeWorkbenchRunMetadataSummary;
+  activeRunMetadata: string | null;
 }
 
 export interface ThemeWorkbenchWorkflowPanelState {
@@ -24,6 +26,8 @@ export interface ThemeWorkbenchWorkflowPanelState {
     typeof buildThemeWorkbenchCreationTaskGroups
   >;
   activeRunStagesLabel: string | null;
+  runMetadataText: string;
+  runMetadataSummary: ThemeWorkbenchRunMetadataSummary;
   showActivityLogs: boolean;
   showCreationTasks: boolean;
   toggleActivityLogs: () => void;
@@ -34,7 +38,7 @@ export function useThemeWorkbenchWorkflowPanelState({
   workflowSteps,
   activityLogs,
   creationTaskEvents,
-  runMetadataSummary,
+  activeRunMetadata,
 }: UseThemeWorkbenchWorkflowPanelStateParams): ThemeWorkbenchWorkflowPanelState {
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [showCreationTasks, setShowCreationTasks] = useState(true);
@@ -57,6 +61,16 @@ export function useThemeWorkbenchWorkflowPanelState({
     [creationTaskEvents],
   );
 
+  const runMetadataSummary = useMemo(
+    () => parseThemeWorkbenchRunMetadataSummary(activeRunMetadata),
+    [activeRunMetadata],
+  );
+
+  const runMetadataText = useMemo(
+    () => formatThemeWorkbenchRunMetadata(activeRunMetadata),
+    [activeRunMetadata],
+  );
+
   const activeRunStagesLabel = useMemo(
     () => formatThemeWorkbenchStagesLabel(runMetadataSummary.stages),
     [runMetadataSummary.stages],
@@ -76,6 +90,8 @@ export function useThemeWorkbenchWorkflowPanelState({
     groupedActivityLogs,
     groupedCreationTaskEvents,
     activeRunStagesLabel,
+    runMetadataText,
+    runMetadataSummary,
     showActivityLogs,
     showCreationTasks,
     toggleActivityLogs,

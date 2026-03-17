@@ -21,17 +21,17 @@ import {
   resolveThemeWorkbenchFileNameFromPath,
 } from "./themeWorkbenchSidebarShared";
 
-type AddTextContextHandler = (payload: {
+export type ThemeWorkbenchAddTextContextAction = (payload: {
   content: string;
   name?: string;
 }) => Promise<void> | void;
 
-type AddLinkContextHandler = (payload: {
+export type ThemeWorkbenchAddLinkContextAction = (payload: {
   url: string;
   name?: string;
 }) => Promise<void> | void;
 
-type AddFileContextHandler = (payload: {
+export type ThemeWorkbenchAddFileContextAction = (payload: {
   path: string;
   name?: string;
 }) => Promise<void> | void;
@@ -41,9 +41,9 @@ interface UseThemeWorkbenchContextPanelStateParams {
   contextSearchQuery: string;
   contextSearchLoading: boolean;
   contextSearchBlockedReason?: string | null;
-  onAddTextContext?: AddTextContextHandler;
-  onAddLinkContext?: AddLinkContextHandler;
-  onAddFileContext?: AddFileContextHandler;
+  onAddTextContext?: ThemeWorkbenchAddTextContextAction;
+  onAddLinkContext?: ThemeWorkbenchAddLinkContextAction;
+  onAddFileContext?: ThemeWorkbenchAddFileContextAction;
 }
 
 export interface ThemeWorkbenchContextPanelState {
