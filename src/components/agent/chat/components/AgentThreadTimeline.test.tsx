@@ -152,6 +152,19 @@ function renderTimeline(
   return container;
 }
 
+function clickTimelineToggle(container: HTMLElement) {
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-testid="agent-thread-details-toggle"]',
+  );
+  if (!button) {
+    throw new Error("未找到执行细节切换按钮");
+  }
+
+  act(() => {
+    button.click();
+  });
+}
+
 describe("AgentThreadTimeline", () => {
   it("应渲染本回合概览与按时序组织的分组块", () => {
     const items: AgentThreadItem[] = [
@@ -195,13 +208,23 @@ describe("AgentThreadTimeline", () => {
     const container = renderTimeline(items, { isCurrentTurn: true });
 
     expect(
+      container.querySelector('[data-testid="agent-thread-details-inline-text"]')
+        ?.textContent,
+    ).toContain("已完成页面检查");
+    expect(
+      container.querySelector('[data-testid="agent-thread-flow"]'),
+    ).toBeNull();
+
+    clickTimelineToggle(container);
+
+    expect(
       container.querySelector('[data-testid="agent-thread-summary"]'),
     ).not.toBeNull();
+    expect(container.textContent).toContain("本回合摘要");
     expect(
       container.querySelector('[data-testid="agent-thread-summary-shell"]'),
     ).not.toBeNull();
-    expect(container.textContent).toContain("本回合摘要");
-    expect(container.textContent).toContain("4 段流程");
+
     expect(
       container.querySelector('[data-testid="agent-thread-goal"]')?.textContent,
     ).toContain("请检查并发布文章");
@@ -236,6 +259,13 @@ describe("AgentThreadTimeline", () => {
     ];
 
     const container = renderTimeline(items);
+
+    expect(
+      container.querySelector('[data-testid="agent-thread-flow"]'),
+    ).toBeNull();
+
+    clickTimelineToggle(container);
+
     const approvalGroup = container.querySelector<HTMLElement>(
       '[data-testid="agent-thread-block:1:approval"]',
     );
@@ -283,6 +313,7 @@ describe("AgentThreadTimeline", () => {
     ];
 
     const container = renderTimeline(items);
+    clickTimelineToggle(container);
     const blockIds = Array.from(
       container.querySelectorAll<HTMLElement>(
         "details[data-testid^='agent-thread-block:']",
@@ -296,6 +327,44 @@ describe("AgentThreadTimeline", () => {
       "agent-thread-block:2:thinking",
       "agent-thread-block:3:search",
     ]);
+  });
+
+  it("完成后折叠条仍应保留最近的思考过程", () => {
+    const items: AgentThreadItem[] = [
+      {
+        ...createBaseItem("browser-1", 1),
+        type: "tool_call",
+        tool_name: "browser_navigate",
+        arguments: { url: "https://example.com" },
+      },
+      {
+        ...createBaseItem("plan-1", 2),
+        type: "plan",
+        text: "先梳理问题背景，再给出三套方案。",
+      },
+      {
+        ...createBaseItem("browser-2", 3),
+        type: "tool_call",
+        tool_name: "browser_click",
+        arguments: { selector: "#submit" },
+      },
+    ];
+
+    const container = renderTimeline(items, {
+      isCurrentTurn: true,
+      turn: {
+        status: "completed",
+      },
+    });
+
+    expect(
+      container.querySelector('[data-testid="agent-thread-details-inline-text"]')
+        ?.textContent,
+    ).toContain("阶段 02");
+    expect(
+      container.querySelector('[data-testid="agent-thread-details-inline-text"]')
+        ?.textContent,
+    ).toContain("先梳理问题背景");
   });
 
   it("运行中的块应被高亮，已完成块应降噪", () => {
@@ -323,6 +392,17 @@ describe("AgentThreadTimeline", () => {
     ];
 
     const container = renderTimeline(items, { isCurrentTurn: true });
+
+    expect(
+      container.querySelector('[data-testid="agent-thread-details-inline-icon"]')
+        ?.getAttribute("data-state"),
+    ).toBe("running");
+    expect(
+      container.querySelector('[data-testid="agent-thread-details-inline-text"]')
+        ?.textContent,
+    ).toContain("Mac mini 最新价格");
+
+    clickTimelineToggle(container);
     const browserBlock = container.querySelector<HTMLElement>(
       '[data-testid="agent-thread-block:1:browser"]',
     );
@@ -372,6 +452,9 @@ describe("AgentThreadTimeline", () => {
     expect(container.textContent).toContain("待继续");
     expect(container.textContent).toContain("完成登录");
     expect(container.textContent).not.toContain("已中断");
+
+    clickTimelineToggle(container);
+
     expect(
       container
         .querySelector<HTMLElement>('[data-testid="agent-thread-block:1:browser"]')
@@ -413,6 +496,12 @@ describe("AgentThreadTimeline", () => {
         status: "completed",
       },
     });
+
+    expect(
+      container.querySelector('[data-testid="agent-thread-flow"]'),
+    ).toBeNull();
+
+    clickTimelineToggle(container);
 
     expect(
       container
@@ -462,6 +551,12 @@ describe("AgentThreadTimeline", () => {
     });
 
     expect(
+      container.querySelector('[data-testid="agent-thread-flow"]'),
+    ).toBeNull();
+
+    clickTimelineToggle(container);
+
+    expect(
       container.querySelector('[data-testid="timeline-a2ui-card"]'),
     ).not.toBeNull();
     expect(container.textContent).toContain("请先确认以下选项：");
@@ -491,6 +586,8 @@ describe("AgentThreadTimeline", () => {
         status: "completed",
       },
     });
+
+    clickTimelineToggle(container);
 
     expect(
       container.querySelector('[data-testid="timeline-a2ui-card"]'),

@@ -23,6 +23,23 @@ use std::sync::{Arc, Mutex};
 /// - 如果调用方已经拿到了 `&Connection`，优先沿用该连接向下传递。
 pub type DbConnection = Arc<Mutex<Connection>>;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ConversationWindowSummary {
+    pub session_count: i64,
+    pub message_count: i64,
+    pub content_chars: i64,
+}
+
+impl ConversationWindowSummary {
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            session_count: self.session_count + other.session_count,
+            message_count: self.message_count + other.message_count,
+            content_chars: self.content_chars + other.content_chars,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingGeneralMessage {
     pub id: String,
@@ -128,6 +145,18 @@ pub fn sum_pending_general_message_chars(
     })
 }
 
+pub fn summarize_pending_general(
+    conn: &Connection,
+    from_timestamp_ms: Option<i64>,
+    to_timestamp_ms: Option<i64>,
+) -> Result<ConversationWindowSummary, rusqlite::Error> {
+    Ok(ConversationWindowSummary {
+        session_count: count_pending_general_sessions(conn, from_timestamp_ms, to_timestamp_ms)?,
+        message_count: count_pending_general_messages(conn, from_timestamp_ms, to_timestamp_ms)?,
+        content_chars: sum_pending_general_message_chars(conn, from_timestamp_ms, to_timestamp_ms)?,
+    })
+}
+
 /// 获取数据库连接锁（自动处理 poisoned lock）
 pub fn lock_db(db: &DbConnection) -> Result<std::sync::MutexGuard<'_, Connection>, String> {
     match db.lock() {
@@ -201,11 +230,13 @@ mod tests {
         let session_count = count_pending_general_sessions(&conn, None, None).unwrap();
         let message_count = count_pending_general_messages(&conn, None, None).unwrap();
         let char_count = sum_pending_general_message_chars(&conn, None, None).unwrap();
+        let summary = summarize_pending_general(&conn, None, None).unwrap();
 
         assert!(messages.is_empty());
         assert!(session_messages.is_empty());
         assert_eq!(session_count, 0);
         assert_eq!(message_count, 0);
         assert_eq!(char_count, 0);
+        assert_eq!(summary, ConversationWindowSummary::default());
     }
 }

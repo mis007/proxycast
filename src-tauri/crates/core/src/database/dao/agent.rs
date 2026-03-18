@@ -5,6 +5,7 @@
 use crate::agent::types::{
     AgentMessage, AgentSession, ContentPart, FunctionCall, MessageContent, ToolCall,
 };
+use crate::database::ConversationWindowSummary;
 use chrono::{Local, TimeZone};
 use rusqlite::{params, Connection};
 
@@ -621,6 +622,54 @@ impl AgentDao {
         )
     }
 
+    pub fn summarize_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        from_datetime: Option<&str>,
+        to_datetime: Option<&str>,
+    ) -> Result<ConversationWindowSummary, rusqlite::Error> {
+        let sql = format!(
+            "SELECT
+                (
+                    SELECT COUNT(*)
+                    FROM agent_sessions s
+                    WHERE s.model {0} ?1
+                      AND (?2 IS NULL OR datetime(s.created_at) >= datetime(?2))
+                      AND (?3 IS NULL OR datetime(s.created_at) < datetime(?3))
+                ) AS session_count,
+                (
+                    SELECT COUNT(*)
+                    FROM agent_messages m
+                    JOIN agent_sessions s ON s.id = m.session_id
+                    WHERE s.model {0} ?1
+                      AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
+                      AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))
+                ) AS message_count,
+                (
+                    SELECT COALESCE(SUM(LENGTH(m.content_json)), 0)
+                    FROM agent_messages m
+                    JOIN agent_sessions s ON s.id = m.session_id
+                    WHERE s.model {0} ?1
+                      AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
+                      AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))
+                ) AS content_chars",
+            match_mode.sql_operator()
+        );
+
+        conn.query_row(
+            &sql,
+            params![model_pattern, from_datetime, to_datetime],
+            |row| {
+                Ok(ConversationWindowSummary {
+                    session_count: row.get(0)?,
+                    message_count: row.get(1)?,
+                    content_chars: row.get(2)?,
+                })
+            },
+        )
+    }
+
     pub fn count_messages_by_model_pattern(
         conn: &Connection,
         model_pattern: &str,
@@ -956,8 +1005,41 @@ impl AgentDao {
 #[cfg(test)]
 mod tests {
     use crate::agent::types::MessageContent;
+    use rusqlite::{params, Connection};
 
-    use super::{parse_message_content, parse_tool_calls, JSON_RECURSION_LIMIT};
+    use super::{
+        parse_message_content, parse_tool_calls, AgentDao, AgentModelPatternMatch,
+        JSON_RECURSION_LIMIT,
+    };
+
+    fn setup_pattern_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("打开内存数据库");
+        conn.execute_batch(
+            "
+            CREATE TABLE agent_sessions (
+                id TEXT PRIMARY KEY,
+                model TEXT NOT NULL,
+                system_prompt TEXT,
+                title TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                working_dir TEXT,
+                execution_strategy TEXT
+            );
+            CREATE TABLE agent_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content_json TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                tool_calls_json TEXT,
+                tool_call_id TEXT
+            );
+            ",
+        )
+        .expect("创建测试 schema");
+        conn
+    }
 
     #[test]
     fn parse_tool_calls_should_compat_with_legacy_missing_type() {
@@ -1054,5 +1136,145 @@ mod tests {
 
         let parsed = parse_message_content(&payload.to_string());
         assert_eq!(parsed.as_text(), "");
+    }
+
+    #[test]
+    fn model_pattern_queries_should_filter_general_and_agent_records() {
+        let conn = setup_pattern_test_db();
+
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params!["general-1", "general:default", "通用 1", "2026-03-12T10:00:00+08:00", "2026-03-12T10:00:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params!["general-2", "general:helper", "通用 2", "2026-03-14T09:00:00+08:00", "2026-03-14T09:00:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params!["agent-1", "claude-sonnet-4", "Agent 1", "2026-03-12T11:00:00+08:00", "2026-03-12T11:00:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params!["agent-2", "gpt-4.1", "Agent 2", "2026-03-15T09:00:00+08:00", "2026-03-15T09:00:00+08:00"],
+        )
+        .unwrap();
+
+        let general_json_1 = r#"[{"type":"text","text":"第一条 general 消息"}]"#;
+        let general_json_2 = r#"[{"type":"text","text":"第二条 general 消息"}]"#;
+        let agent_json_1 = r#"[{"type":"text","text":"第一条 agent 消息"}]"#;
+        let agent_json_2 = r#"[{"type":"text","text":"第二条 agent 消息，比第一条更长一些"}]"#;
+        let agent_json_1_chars = agent_json_1.chars().count() as i64;
+        let agent_json_2_chars = agent_json_2.chars().count() as i64;
+
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params!["general-1", "user", general_json_1, "2026-03-12T10:01:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params!["general-2", "assistant", general_json_2, "2026-03-14T09:01:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params!["agent-1", "assistant", agent_json_1, "2026-03-12T11:01:00+08:00"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params!["agent-2", "assistant", agent_json_2, "2026-03-15T09:01:00+08:00"],
+        )
+        .unwrap();
+
+        let general_sessions = AgentDao::count_sessions_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::Like,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(general_sessions, 2);
+
+        let general_summary = AgentDao::summarize_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::Like,
+            None,
+            Some("2026-03-15 00:00:00"),
+        )
+        .unwrap();
+        assert_eq!(general_summary.session_count, 2);
+        assert_eq!(general_summary.message_count, 2);
+        assert_eq!(
+            general_summary.content_chars,
+            (general_json_1.chars().count() + general_json_2.chars().count()) as i64
+        );
+
+        let recent_agent_sessions = AgentDao::count_sessions_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::NotLike,
+            Some("2026-03-13 00:00:00"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(recent_agent_sessions, 1);
+
+        let general_messages = AgentDao::count_messages_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::Like,
+            None,
+            Some("2026-03-15 00:00:00"),
+        )
+        .unwrap();
+        assert_eq!(general_messages, 2);
+
+        let agent_chars = AgentDao::sum_message_chars_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::NotLike,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(agent_chars, agent_json_1_chars + agent_json_2_chars);
+
+        let agent_usage = AgentDao::list_model_usage_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::NotLike,
+            None,
+            10,
+        )
+        .unwrap();
+        assert_eq!(agent_usage.len(), 2);
+        assert_eq!(agent_usage[0].model, "gpt-4.1");
+        assert_eq!(agent_usage[0].conversations, 1);
+        assert_eq!(agent_usage[0].content_chars, agent_json_2_chars as u64);
+        assert_eq!(agent_usage[1].model, "claude-sonnet-4");
+        assert_eq!(agent_usage[1].conversations, 1);
+        assert_eq!(agent_usage[1].content_chars, agent_json_1_chars as u64);
+
+        let general_rows = AgentDao::list_message_text_rows_by_model_pattern(
+            &conn,
+            "general:%",
+            AgentModelPatternMatch::Like,
+            Some("2026-03-13 00:00:00"),
+            None,
+            10,
+        )
+        .unwrap();
+        assert_eq!(general_rows.len(), 1);
+        assert_eq!(general_rows[0].session_id, "general-2");
+        assert_eq!(general_rows[0].role, "assistant");
+        assert_eq!(general_rows[0].content, "第二条 general 消息");
+        assert!(general_rows[0].timestamp_ms > 0);
     }
 }

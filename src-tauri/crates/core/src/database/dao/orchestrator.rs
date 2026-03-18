@@ -63,6 +63,12 @@ pub struct ModelUsageAggregate {
 /// Orchestrator DAO
 pub struct OrchestratorDao;
 
+fn is_missing_model_usage_stats_table(error: &rusqlite::Error) -> bool {
+    error
+        .to_string()
+        .contains("no such table: model_usage_stats")
+}
+
 impl OrchestratorDao {
     // ========================================================================
     // 模型元数据操作
@@ -546,11 +552,14 @@ impl OrchestratorDao {
     }
 
     pub fn has_model_usage_stats(conn: &Connection) -> Result<bool, String> {
-        let row_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM model_usage_stats", [], |row| {
+        let row_count: i64 =
+            match conn.query_row("SELECT COUNT(*) FROM model_usage_stats", [], |row| {
                 row.get(0)
-            })
-            .map_err(|e| e.to_string())?;
+            }) {
+                Ok(count) => count,
+                Err(error) if is_missing_model_usage_stats_table(&error) => return Ok(false),
+                Err(error) => return Err(error.to_string()),
+            };
         Ok(row_count > 0)
     }
 
@@ -867,5 +876,11 @@ mod tests {
         assert_eq!(filtered[0].model_id, "claude-3-opus");
         assert_eq!(filtered[0].request_count, 1);
         assert_eq!(filtered[0].total_tokens, 1200);
+    }
+
+    #[test]
+    fn test_has_model_usage_stats_returns_false_when_table_missing() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(!OrchestratorDao::has_model_usage_stats(&conn).unwrap());
     }
 }

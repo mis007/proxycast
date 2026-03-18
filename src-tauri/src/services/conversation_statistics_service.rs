@@ -4,10 +4,7 @@
 
 use crate::database::dao::agent::{AgentDao, AgentModelPatternMatch};
 use crate::database::dao::orchestrator::OrchestratorDao;
-use crate::database::{
-    count_pending_general_messages, count_pending_general_sessions,
-    sum_pending_general_message_chars,
-};
+use crate::database::{summarize_pending_general, ConversationWindowSummary};
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -74,6 +71,13 @@ struct ConversationStats {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+struct ConversationWindowTriplet {
+    total: ConversationWindowSummary,
+    monthly: ConversationWindowSummary,
+    today: ConversationWindowSummary,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 struct TokenStats {
     total_tokens: u64,
     monthly_tokens: u64,
@@ -98,11 +102,12 @@ pub fn get_usage_stats_from_db(
     let today_start = start_of_day(now);
     let month_start = start_of_month(now);
 
-    // 查询通用对话统计
-    let general_stats = query_general_chat_stats(conn, &today_start, &month_start)?;
-
-    // 查询 Agent 对话统计
-    let agent_stats = query_agent_chat_stats(conn, &today_start, &month_start)?;
+    let general_windows =
+        build_window_triplet(conn, summarize_general_window, &today_start, &month_start)?;
+    let agent_windows =
+        build_window_triplet(conn, summarize_agent_window, &today_start, &month_start)?;
+    let general_stats = build_conversation_stats(general_windows);
+    let agent_stats = build_conversation_stats(agent_windows);
 
     // 合并统计
     let total_conversations = general_stats.total_conversations + agent_stats.total_conversations;
@@ -116,7 +121,13 @@ pub fn get_usage_stats_from_db(
     let monthly_messages = general_stats.monthly_messages + agent_stats.monthly_messages;
 
     // Token 优先使用真实统计表；无记录时回退到基于消息内容长度的估算
-    let token_stats = query_token_stats(conn, &today_start, &month_start)?;
+    let token_stats = query_token_stats(
+        conn,
+        &today_start,
+        &month_start,
+        general_windows,
+        agent_windows,
+    )?;
     let total_tokens = token_stats.total_tokens;
     let monthly_tokens = token_stats.monthly_tokens;
     let today_tokens = token_stats.today_tokens;
@@ -204,191 +215,122 @@ fn format_sqlite_datetime(timestamp_ms: i64) -> String {
         .unwrap_or_else(|| Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
 }
 
-fn query_general_session_count(
+fn summarize_unified_window(
     conn: &Connection,
+    match_mode: AgentModelPatternMatch,
     from_timestamp_ms: Option<i64>,
     to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
+) -> Result<ConversationWindowSummary, String> {
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    let unified_count = AgentDao::count_sessions_by_model_pattern(
+    AgentDao::summarize_by_model_pattern(
         conn,
         GENERAL_MODE_PATTERN,
+        match_mode,
+        from_text.as_deref(),
+        to_text.as_deref(),
+    )
+    .map_err(|e| match match_mode {
+        AgentModelPatternMatch::Like => format!("查询 unified general 摘要失败: {e}"),
+        AgentModelPatternMatch::NotLike => format!("查询非通用 unified 摘要失败: {e}"),
+    })
+}
+
+fn summarize_general_window(
+    conn: &Connection,
+    from_timestamp_ms: Option<i64>,
+    to_timestamp_ms: Option<i64>,
+) -> Result<ConversationWindowSummary, String> {
+    let unified = summarize_unified_window(
+        conn,
         AgentModelPatternMatch::Like,
-        from_text.as_deref(),
-        to_text.as_deref(),
-    )
-    .map_err(|e| format!("查询 unified general 会话数失败: {e}"))?;
+        from_timestamp_ms,
+        to_timestamp_ms,
+    )?;
+    let pending = summarize_pending_general(conn, from_timestamp_ms, to_timestamp_ms)
+        .map_err(|e| format!("查询待迁移 general 摘要失败: {e}"))?;
 
-    let pending_count = count_pending_general_sessions(conn, from_timestamp_ms, to_timestamp_ms)
-        .map_err(|e| format!("查询待迁移 general 会话数失败: {e}"))?;
-
-    Ok(unified_count + pending_count)
+    Ok(unified.merge(pending))
 }
 
-fn query_general_message_count(
+fn summarize_agent_window(
     conn: &Connection,
     from_timestamp_ms: Option<i64>,
     to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
-    let from_text = from_timestamp_ms.map(format_sqlite_datetime);
-    let to_text = to_timestamp_ms.map(format_sqlite_datetime);
-
-    let unified_count = AgentDao::count_messages_by_model_pattern(
+) -> Result<ConversationWindowSummary, String> {
+    summarize_unified_window(
         conn,
-        GENERAL_MODE_PATTERN,
-        AgentModelPatternMatch::Like,
-        from_text.as_deref(),
-        to_text.as_deref(),
-    )
-    .map_err(|e| format!("查询 unified general 消息数失败: {e}"))?;
-
-    let pending_count = count_pending_general_messages(conn, from_timestamp_ms, to_timestamp_ms)
-        .map_err(|e| format!("查询待迁移 general 消息数失败: {e}"))?;
-
-    Ok(unified_count + pending_count)
-}
-
-fn sum_general_message_chars(
-    conn: &Connection,
-    from_timestamp_ms: Option<i64>,
-    to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
-    let from_text = from_timestamp_ms.map(format_sqlite_datetime);
-    let to_text = to_timestamp_ms.map(format_sqlite_datetime);
-
-    let unified_chars = AgentDao::sum_message_chars_by_model_pattern(
-        conn,
-        GENERAL_MODE_PATTERN,
-        AgentModelPatternMatch::Like,
-        from_text.as_deref(),
-        to_text.as_deref(),
-    )
-    .map_err(|e| format!("估算 unified general Token 失败: {e}"))?;
-
-    let pending_chars = sum_pending_general_message_chars(conn, from_timestamp_ms, to_timestamp_ms)
-        .map_err(|e| format!("估算待迁移 general Token 失败: {e}"))?;
-
-    Ok(unified_chars + pending_chars)
-}
-
-fn query_non_general_session_count(
-    conn: &Connection,
-    from_timestamp_ms: Option<i64>,
-    to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
-    let from_text = from_timestamp_ms.map(format_sqlite_datetime);
-    let to_text = to_timestamp_ms.map(format_sqlite_datetime);
-
-    AgentDao::count_sessions_by_model_pattern(
-        conn,
-        GENERAL_MODE_PATTERN,
         AgentModelPatternMatch::NotLike,
-        from_text.as_deref(),
-        to_text.as_deref(),
+        from_timestamp_ms,
+        to_timestamp_ms,
     )
-    .map_err(|e| format!("查询非通用 unified 会话数失败: {e}"))
 }
 
-fn query_non_general_message_count(
+fn build_window_triplet(
     conn: &Connection,
-    from_timestamp_ms: Option<i64>,
-    to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
-    let from_text = from_timestamp_ms.map(format_sqlite_datetime);
-    let to_text = to_timestamp_ms.map(format_sqlite_datetime);
+    summarize_window: impl Fn(
+        &Connection,
+        Option<i64>,
+        Option<i64>,
+    ) -> Result<ConversationWindowSummary, String>,
+    today_start: &DateTime<Local>,
+    month_start: &DateTime<Local>,
+) -> Result<ConversationWindowTriplet, String> {
+    let today_ts = today_start.timestamp_millis();
+    let month_ts = month_start.timestamp_millis();
 
-    AgentDao::count_messages_by_model_pattern(
-        conn,
-        GENERAL_MODE_PATTERN,
-        AgentModelPatternMatch::NotLike,
-        from_text.as_deref(),
-        to_text.as_deref(),
-    )
-    .map_err(|e| format!("查询非通用 unified 消息数失败: {e}"))
+    Ok(ConversationWindowTriplet {
+        total: summarize_window(conn, None, None)?,
+        monthly: summarize_window(conn, Some(month_ts), None)?,
+        today: summarize_window(conn, Some(today_ts), None)?,
+    })
 }
 
-fn sum_non_general_message_chars(
-    conn: &Connection,
-    from_timestamp_ms: Option<i64>,
-    to_timestamp_ms: Option<i64>,
-) -> Result<i64, String> {
-    let from_text = from_timestamp_ms.map(format_sqlite_datetime);
-    let to_text = to_timestamp_ms.map(format_sqlite_datetime);
-
-    AgentDao::sum_message_chars_by_model_pattern(
-        conn,
-        GENERAL_MODE_PATTERN,
-        AgentModelPatternMatch::NotLike,
-        from_text.as_deref(),
-        to_text.as_deref(),
-    )
-    .map_err(|e| format!("估算非通用 unified Token 失败: {e}"))
+fn build_conversation_stats(windows: ConversationWindowTriplet) -> ConversationStats {
+    ConversationStats {
+        total_conversations: clamp_i64_to_u32(windows.total.session_count),
+        total_messages: clamp_i64_to_u32(windows.total.message_count),
+        monthly_conversations: clamp_i64_to_u32(windows.monthly.session_count),
+        monthly_messages: clamp_i64_to_u32(windows.monthly.message_count),
+        today_conversations: clamp_i64_to_u32(windows.today.session_count),
+        today_messages: clamp_i64_to_u32(windows.today.message_count),
+    }
 }
 
-/// 查询通用对话统计
 fn query_general_chat_stats(
     conn: &Connection,
     today_start: &DateTime<Local>,
     month_start: &DateTime<Local>,
 ) -> Result<ConversationStats, String> {
-    let today_ts = today_start.timestamp_millis();
-    let month_ts = month_start.timestamp_millis();
-
-    let today_conversations = query_general_session_count(conn, Some(today_ts), None)?;
-    let today_messages = query_general_message_count(conn, Some(today_ts), None)?;
-    let monthly_conversations = query_general_session_count(conn, Some(month_ts), None)?;
-    let monthly_messages = query_general_message_count(conn, Some(month_ts), None)?;
-    let total_conversations = query_general_session_count(conn, None, None)?;
-    let total_messages = query_general_message_count(conn, None, None)?;
-
-    Ok(ConversationStats {
-        total_conversations: clamp_i64_to_u32(total_conversations),
-        total_messages: clamp_i64_to_u32(total_messages),
-        monthly_conversations: clamp_i64_to_u32(monthly_conversations),
-        monthly_messages: clamp_i64_to_u32(monthly_messages),
-        today_conversations: clamp_i64_to_u32(today_conversations),
-        today_messages: clamp_i64_to_u32(today_messages),
-    })
+    build_window_triplet(conn, summarize_general_window, today_start, month_start)
+        .map(build_conversation_stats)
 }
 
-/// 查询 Agent 对话统计
 fn query_agent_chat_stats(
     conn: &Connection,
     today_start: &DateTime<Local>,
     month_start: &DateTime<Local>,
 ) -> Result<ConversationStats, String> {
-    let today_ts = today_start.timestamp_millis();
-    let month_ts = month_start.timestamp_millis();
-
-    let today_conversations = query_non_general_session_count(conn, Some(today_ts), None)?;
-    let today_messages = query_non_general_message_count(conn, Some(today_ts), None)?;
-    let monthly_conversations = query_non_general_session_count(conn, Some(month_ts), None)?;
-    let monthly_messages = query_non_general_message_count(conn, Some(month_ts), None)?;
-    let total_conversations = query_non_general_session_count(conn, None, None)?;
-    let total_messages = query_non_general_message_count(conn, None, None)?;
-
-    Ok(ConversationStats {
-        total_conversations: clamp_i64_to_u32(total_conversations),
-        total_messages: clamp_i64_to_u32(total_messages),
-        monthly_conversations: clamp_i64_to_u32(monthly_conversations),
-        monthly_messages: clamp_i64_to_u32(monthly_messages),
-        today_conversations: clamp_i64_to_u32(today_conversations),
-        today_messages: clamp_i64_to_u32(today_messages),
-    })
+    build_window_triplet(conn, summarize_agent_window, today_start, month_start)
+        .map(build_conversation_stats)
 }
 
 fn query_token_stats(
     conn: &Connection,
     today_start: &DateTime<Local>,
     month_start: &DateTime<Local>,
+    general_windows: ConversationWindowTriplet,
+    agent_windows: ConversationWindowTriplet,
 ) -> Result<TokenStats, String> {
     if let Some(actual_tokens) = query_model_usage_table_tokens(conn, today_start, month_start)? {
         return Ok(actual_tokens);
     }
 
-    query_estimated_tokens_from_messages(conn, today_start, month_start)
+    Ok(query_estimated_tokens_from_windows(
+        general_windows,
+        agent_windows,
+    ))
 }
 
 fn query_model_usage_table_tokens(
@@ -421,27 +363,21 @@ fn query_model_usage_table_tokens(
     }))
 }
 
-fn query_estimated_tokens_from_messages(
-    conn: &Connection,
-    today_start: &DateTime<Local>,
-    month_start: &DateTime<Local>,
-) -> Result<TokenStats, String> {
-    let today_ts = today_start.timestamp_millis();
-    let month_ts = month_start.timestamp_millis();
-
-    let general_total_chars = sum_general_message_chars(conn, None, None)?;
-    let general_monthly_chars = sum_general_message_chars(conn, Some(month_ts), None)?;
-    let general_today_chars = sum_general_message_chars(conn, Some(today_ts), None)?;
-
-    let agent_total_chars = sum_non_general_message_chars(conn, None, None)?;
-    let agent_monthly_chars = sum_non_general_message_chars(conn, Some(month_ts), None)?;
-    let agent_today_chars = sum_non_general_message_chars(conn, Some(today_ts), None)?;
-
-    Ok(TokenStats {
-        total_tokens: chars_to_estimated_tokens(general_total_chars + agent_total_chars),
-        monthly_tokens: chars_to_estimated_tokens(general_monthly_chars + agent_monthly_chars),
-        today_tokens: chars_to_estimated_tokens(general_today_chars + agent_today_chars),
-    })
+fn query_estimated_tokens_from_windows(
+    general_windows: ConversationWindowTriplet,
+    agent_windows: ConversationWindowTriplet,
+) -> TokenStats {
+    TokenStats {
+        total_tokens: chars_to_estimated_tokens(
+            general_windows.total.content_chars + agent_windows.total.content_chars,
+        ),
+        monthly_tokens: chars_to_estimated_tokens(
+            general_windows.monthly.content_chars + agent_windows.monthly.content_chars,
+        ),
+        today_tokens: chars_to_estimated_tokens(
+            general_windows.today.content_chars + agent_windows.today.content_chars,
+        ),
+    }
 }
 
 /// 获取模型使用排行
@@ -463,6 +399,12 @@ fn query_model_usage_from_stats_table(
     conn: &Connection,
     range_start: Option<DateTime<Local>>,
 ) -> Result<Vec<RawModelUsage>, String> {
+    if !OrchestratorDao::has_model_usage_stats(conn)
+        .map_err(|e| format!("检查模型统计表失败: {e}"))?
+    {
+        return Ok(Vec::new());
+    }
+
     let start_key = range_start.map(|start| start.format("%Y-%m-%d").to_string());
     let rows = OrchestratorDao::list_model_usage_aggregates(conn, start_key.as_deref(), 20)
         .map_err(|e| format!("执行模型统计查询失败: {e}"))?;
@@ -559,15 +501,12 @@ pub fn get_daily_usage_trends_from_db(
         let day_start_ts = day_start.timestamp_millis();
         let day_end_ts = day_end.timestamp_millis();
         let day_key = day_start.format("%Y-%m-%d").to_string();
+        let general_window = summarize_general_window(conn, Some(day_start_ts), Some(day_end_ts))
+            .map_err(|e| format!("查询通用日摘要失败: {e}"))?;
+        let agent_window = summarize_agent_window(conn, Some(day_start_ts), Some(day_end_ts))
+            .map_err(|e| format!("查询 Agent 日摘要失败: {e}"))?;
 
-        let conversations = query_general_session_count(conn, Some(day_start_ts), Some(day_end_ts))
-            .map_err(|e| format!("查询通用会话日统计失败: {e}"))?;
-
-        let agent_conversations =
-            query_non_general_session_count(conn, Some(day_start_ts), Some(day_end_ts))
-                .map_err(|e| format!("查询 Agent 会话日统计失败: {e}"))?;
-
-        let total_conversations = conversations + agent_conversations;
+        let total_conversations = general_window.session_count + agent_window.session_count;
 
         let tokens = if use_actual_tokens {
             let day_tokens = OrchestratorDao::get_model_usage_tokens_on(conn, &day_key)
@@ -575,15 +514,7 @@ pub fn get_daily_usage_trends_from_db(
 
             clamp_i64_to_u64(day_tokens)
         } else {
-            let general_chars =
-                sum_general_message_chars(conn, Some(day_start_ts), Some(day_end_ts))
-                    .map_err(|e| format!("估算通用消息日 Token 失败: {e}"))?;
-
-            let agent_chars =
-                sum_non_general_message_chars(conn, Some(day_start_ts), Some(day_end_ts))
-                    .map_err(|e| format!("估算 Agent 消息日 Token 失败: {e}"))?;
-
-            chars_to_estimated_tokens(general_chars + agent_chars)
+            chars_to_estimated_tokens(general_window.content_chars + agent_window.content_chars)
         };
 
         daily_usage.push(DailyUsage {
