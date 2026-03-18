@@ -26,6 +26,7 @@ export interface AgentRuntimeTurnRequest {
   sessionId: string;
   eventName: string;
   workspaceId: string;
+  turnId?: string;
   images?: ImageInput[];
   providerConfig?: AsterProviderConfig;
   executionStrategy?: AsterExecutionStrategy;
@@ -107,6 +108,7 @@ export const defaultAgentRuntimeAdapter: AgentRuntimeAdapter = {
       session_id: request.sessionId,
       event_name: request.eventName,
       workspace_id: request.workspaceId,
+      turn_id: request.turnId,
       images: request.images,
       turn_config: {
         provider_config: request.providerConfig,

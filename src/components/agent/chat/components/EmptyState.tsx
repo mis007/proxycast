@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import styled, { keyframes } from "styled-components";
 import {
   Lightbulb,
   ImageIcon,
@@ -10,12 +11,14 @@ import {
   Globe,
   Music,
   ListChecks,
+  Settings2,
   Workflow,
 } from "lucide-react";
 import { getConfig } from "@/lib/api/appConfig";
 import type { CreationMode, EntryTaskSlotValues, EntryTaskType } from "./types";
 import { CREATION_MODE_CONFIG } from "./constants";
 import { Button } from "@/components/ui/button";
+import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { toast } from "sonner";
 import {
   composeEntryPrompt,
@@ -55,6 +58,77 @@ import capabilityAgentTeamsPlaceholder from "@/assets/claw-home/capability-agent
 import capabilityBrowserAssistPlaceholder from "@/assets/claw-home/capability-browser-assist-placeholder.svg";
 
 const SOCIAL_ARTICLE_SKILL_KEY = "social_post_with_cover";
+
+const backgroundOrbDrift = keyframes`
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: translate3d(18px, -14px, 0) scale(1.05);
+    opacity: 1;
+  }
+`;
+
+const backgroundOrbPulse = keyframes`
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate3d(-16px, 18px, 0) scale(1.08);
+    opacity: 1;
+  }
+`;
+
+const contentReveal = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+`;
+
+const PageContainer = styled.div.attrs({
+  className: EMPTY_STATE_PAGE_CONTAINER_CLASSNAME,
+})`
+  isolation: isolate;
+`;
+
+const BackgroundOrbLeft = styled.div.attrs({
+  className: EMPTY_STATE_BACKGROUND_ORB_LEFT_CLASSNAME,
+})`
+  animation: ${backgroundOrbDrift} 18s ease-in-out infinite;
+  will-change: transform, opacity;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const BackgroundOrbRight = styled.div.attrs({
+  className: EMPTY_STATE_BACKGROUND_ORB_RIGHT_CLASSNAME,
+})`
+  animation: ${backgroundOrbPulse} 22s ease-in-out infinite;
+  will-change: transform, opacity;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const ContentWrapper = styled.div.attrs({
+  className: EMPTY_STATE_CONTENT_WRAPPER_CLASSNAME,
+})`
+  animation: ${contentReveal} 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
 
 interface EmptyStateProps {
   input: string;
@@ -112,6 +186,12 @@ interface EmptyStateProps {
   onLaunchBrowserAssist?: () => void | Promise<void>;
   /** 浏览器协助启动中 */
   browserAssistLoading?: boolean;
+  /** 当前项目 ID */
+  projectId?: string | null;
+  /** 项目切换 */
+  onProjectChange?: (projectId: string) => void;
+  /** 打开设置 */
+  onOpenSettings?: () => void;
 }
 
 const ENTRY_THEME_ID = "social-media";
@@ -180,12 +260,15 @@ const THEME_WORKBENCH_COPY: Record<
   {
     title: string;
     description: string;
+    supportingDescription?: string;
   }
 > = {
   general: {
-    title: "Claw 工作台",
+    title: "青柠一下，灵感即来",
     description:
-      "围绕一个目标持续对话、检索网页、补充素材，并把结果沉淀到右侧画布，而不是只发一条一次性提问。",
+      "从一句想法，到成稿、成图、成片、成事。",
+    supportingDescription:
+      "Claw 工作台会围绕一个目标持续对话、检索网页、补充素材，并把结果沉淀到右侧画布，而不是只停留在一次性提问。",
   },
   "social-media": {
     title: "社媒内容工作台",
@@ -273,6 +356,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onRefreshSkills,
   onLaunchBrowserAssist,
   browserAssistLoading = false,
+  projectId = null,
+  onProjectChange,
+  onOpenSettings,
 }) => {
   const { activeSkill, setActiveSkill, clearActiveSkill, wrapTextWithSkill } =
     useActiveSkill();
@@ -988,23 +1074,68 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     />
   );
 
+  const headerControls =
+    onProjectChange ? (
+      <div className="flex w-full justify-start sm:w-auto sm:justify-end">
+        <div className="inline-flex max-w-full items-center rounded-[24px] border border-white/85 bg-white/84 p-1 shadow-sm shadow-slate-950/5 backdrop-blur-sm">
+          <ProjectSelector
+            value={projectId ?? null}
+            onChange={onProjectChange}
+            workspaceType={activeTheme}
+            placeholder="选择项目"
+            dropdownSide="bottom"
+            dropdownAlign="end"
+            enableManagement={activeTheme === "general"}
+            density="compact"
+            chrome="embedded"
+            className="min-w-[180px] max-w-[260px]"
+          />
+          {onOpenSettings ? (
+            <>
+              <div
+                className="mx-1 h-6 w-px shrink-0 bg-slate-200/80"
+                aria-hidden="true"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-[18px] text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                onClick={onOpenSettings}
+                aria-label="打开设置"
+                title="打开设置"
+              >
+                <Settings2 size={18} />
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    ) : null;
+
   return (
-    <div className={EMPTY_STATE_PAGE_CONTAINER_CLASSNAME}>
-      <div className={EMPTY_STATE_BACKGROUND_ORB_LEFT_CLASSNAME} />
-      <div className={EMPTY_STATE_BACKGROUND_ORB_RIGHT_CLASSNAME} />
-      <div className={EMPTY_STATE_CONTENT_WRAPPER_CLASSNAME}>
+    <PageContainer>
+      <BackgroundOrbLeft />
+      <BackgroundOrbRight />
+      <ContentWrapper>
         <EmptyStateHero
-          eyebrow="CLAW WORKSPACE"
+          eyebrow={
+            activeTheme === "general"
+              ? "CLAW WORKSPACE · Claw 工作台"
+              : "CLAW WORKSPACE"
+          }
           title={workbenchCopy.title}
           description={workbenchCopy.description}
+          supportingDescription={workbenchCopy.supportingDescription}
           badges={workspaceBadges}
           cards={workspaceCards}
           features={workspaceFeatures}
           prioritySlot={composerPanel}
           supportingSlot={quickActionsPanel}
           themeTabs={themeTabs}
+          headerControls={headerControls}
         />
-      </div>
-    </div>
+      </ContentWrapper>
+    </PageContainer>
   );
 };

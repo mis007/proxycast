@@ -87,7 +87,7 @@ const AmbientOrb = styled.div<{
 const Stage = styled.div`
   position: relative;
   z-index: 1;
-  width: min(720px, calc(100vw - 40px));
+  width: min(860px, calc(100vw - 40px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -128,7 +128,15 @@ const Logo = styled.img`
   }
 `;
 
-const Slogan = styled.p`
+const CopyBlock = styled.div`
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+`;
+
+const Slogan = styled.h1`
   margin: 22px 0 0;
   max-width: 18em;
   font-size: clamp(28px, 4vw, 38px);
@@ -138,12 +146,27 @@ const Slogan = styled.p`
   color: hsl(var(--foreground));
   text-wrap: balance;
   text-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+  @media (max-width: 640px) {
+    margin-top: 16px;
+  }
+`;
+
+const Subtitle = styled.p`
+  margin: 0;
+  max-width: min(33em, calc(100vw - 56px));
+  font-size: clamp(15px, 2vw, 18px);
+  line-height: 1.72;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: hsl(var(--muted-foreground));
+  text-wrap: balance;
 `;
 
 const ProgressTrack = styled.div`
   position: relative;
   overflow: hidden;
-  margin-top: 28px;
+  margin-top: 30px;
   width: min(320px, 72vw);
   height: 8px;
   border-radius: 999px;
@@ -227,7 +250,10 @@ export function SplashScreen({
           <LogoGlow />
           <Logo src="/logo-splash.png" alt="Lime" />
         </LogoStack>
-        <Slogan>青柠一下，灵感即来。</Slogan>
+        <CopyBlock>
+          <Slogan>青柠一下，灵感即来</Slogan>
+          <Subtitle>从一句想法，到成稿、成图、成片、成事</Subtitle>
+        </CopyBlock>
         <ProgressTrack aria-hidden>
           <ProgressBar />
         </ProgressTrack>

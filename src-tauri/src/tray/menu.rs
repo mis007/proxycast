@@ -2,15 +2,20 @@
 //!
 //! 定义菜单项 ID 和菜单构建函数
 
-use super::format::{format_credential_status, format_request_count, format_server_status};
+use super::format::{
+    format_credential_status, format_current_model_status, format_request_count,
+    format_server_status,
+};
 use super::state::TrayStateSnapshot;
 use tauri::{
-    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     AppHandle, Runtime,
 };
 
 pub use lime_core::tray_menu_meta::menu_ids;
-pub use lime_core::tray_menu_meta::{get_menu_item_ids, parse_server_address};
+pub use lime_core::tray_menu_meta::{
+    build_quick_model_item_id, get_menu_item_ids, parse_server_address,
+};
 
 /// 托盘菜单构建错误
 #[derive(Debug, thiserror::Error)]
@@ -19,6 +24,68 @@ pub enum MenuBuildError {
     MenuItemError(String),
     #[error("无法创建菜单: {0}")]
     MenuError(String),
+}
+
+fn build_quick_model_submenu<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &TrayStateSnapshot,
+) -> Result<Option<Submenu<R>>, MenuBuildError> {
+    let non_empty_groups: Vec<_> = state
+        .quick_model_groups
+        .iter()
+        .filter(|group| !group.models.is_empty())
+        .collect();
+
+    if non_empty_groups.is_empty() {
+        return Ok(None);
+    }
+
+    let mut provider_submenus: Vec<Submenu<R>> = Vec::new();
+
+    for group in non_empty_groups {
+        let mut model_items: Vec<CheckMenuItem<R>> = Vec::new();
+
+        for item in &group.models {
+            let checked = item.provider_type == state.current_model_provider_type
+                && item.model == state.current_model;
+            let menu_item = CheckMenuItem::with_id(
+                app,
+                build_quick_model_item_id(&item.provider_type, &item.model),
+                &item.model,
+                true,
+                checked,
+                None::<&str>,
+            )
+            .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
+            model_items.push(menu_item);
+        }
+
+        let model_item_refs: Vec<&dyn IsMenuItem<R>> = model_items
+            .iter()
+            .map(|item| item as &dyn IsMenuItem<R>)
+            .collect();
+
+        let provider_submenu =
+            Submenu::with_items(app, &group.provider_label, true, &model_item_refs)
+                .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
+        provider_submenus.push(provider_submenu);
+    }
+
+    let provider_refs: Vec<&dyn IsMenuItem<R>> = provider_submenus
+        .iter()
+        .map(|submenu| submenu as &dyn IsMenuItem<R>)
+        .collect();
+
+    let submenu = Submenu::with_id_and_items(
+        app,
+        menu_ids::QUICK_MODEL_ROOT,
+        "快速切换模型",
+        true,
+        &provider_refs,
+    )
+    .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
+
+    Ok(Some(submenu))
 }
 
 /// 构建托盘菜单
@@ -44,6 +111,28 @@ pub fn build_tray_menu<R: Runtime>(
 ) -> Result<Menu<R>, MenuBuildError> {
     // 解析服务器地址
     let (host, port) = parse_server_address(&state.server_address);
+
+    // === 当前模型信息 ===
+    let current_model_text = format_current_model_status(
+        &state.current_model_provider_label,
+        &state.current_model,
+        if state.current_theme_label.trim().is_empty() {
+            None
+        } else {
+            Some(state.current_theme_label.as_str())
+        },
+    );
+    let current_model_info = MenuItem::with_id(
+        app,
+        menu_ids::CURRENT_MODEL_INFO,
+        &current_model_text,
+        false,
+        None::<&str>,
+    )
+    .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
+    let quick_model_submenu = build_quick_model_submenu(app, state)?;
+    let separator_0 = PredefinedMenuItem::separator(app)
+        .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
 
     // === 状态信息区域 ===
     let status_text = format_server_status(state.server_running, &host, port);
@@ -86,7 +175,7 @@ pub fn build_tray_menu<R: Runtime>(
     let start_server = MenuItem::with_id(
         app,
         menu_ids::START_SERVER,
-        "▶️ 开启团队共享",
+        "启动 Lime 网关",
         !state.server_running,
         None::<&str>,
     )
@@ -96,7 +185,7 @@ pub fn build_tray_menu<R: Runtime>(
     let stop_server = MenuItem::with_id(
         app,
         menu_ids::STOP_SERVER,
-        "⏹️ 关闭团队共享",
+        "停止 Lime 网关",
         state.server_running,
         None::<&str>,
     )
@@ -106,7 +195,7 @@ pub fn build_tray_menu<R: Runtime>(
     let refresh_tokens = MenuItem::with_id(
         app,
         menu_ids::REFRESH_TOKENS,
-        "🔄 刷新所有 Token",
+        "同步账号凭证",
         true,
         None::<&str>,
     )
@@ -116,7 +205,7 @@ pub fn build_tray_menu<R: Runtime>(
     let health_check = MenuItem::with_id(
         app,
         menu_ids::HEALTH_CHECK,
-        "🩺 健康检查",
+        "执行健康检查",
         true,
         None::<&str>,
     )
@@ -127,19 +216,14 @@ pub fn build_tray_menu<R: Runtime>(
         .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
 
     // === 快捷工具区域 ===
-    let open_window = MenuItem::with_id(
-        app,
-        menu_ids::OPEN_WINDOW,
-        "🖥️ 打开主窗口",
-        true,
-        None::<&str>,
-    )
-    .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
+    let open_window =
+        MenuItem::with_id(app, menu_ids::OPEN_WINDOW, "打开 Lime", true, None::<&str>)
+            .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
 
     let copy_api_address = MenuItem::with_id(
         app,
         menu_ids::COPY_API_ADDRESS,
-        "📋 复制 API 地址",
+        "复制网关地址",
         state.server_running,
         None::<&str>,
     )
@@ -148,7 +232,7 @@ pub fn build_tray_menu<R: Runtime>(
     let open_log_dir = MenuItem::with_id(
         app,
         menu_ids::OPEN_LOG_DIR,
-        "📁 打开日志目录",
+        "打开 Lime 日志",
         true,
         None::<&str>,
     )
@@ -162,7 +246,7 @@ pub fn build_tray_menu<R: Runtime>(
     let auto_start = CheckMenuItem::with_id(
         app,
         menu_ids::AUTO_START,
-        "🚀 开机自启",
+        "登录时启动 Lime",
         true,
         state.auto_start_enabled,
         None::<&str>,
@@ -174,32 +258,35 @@ pub fn build_tray_menu<R: Runtime>(
         .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
 
     // === 退出 ===
-    let quit = MenuItem::with_id(app, menu_ids::QUIT, "❌ 退出", true, None::<&str>)
+    let quit = MenuItem::with_id(app, menu_ids::QUIT, "退出 Lime", true, None::<&str>)
         .map_err(|e| MenuBuildError::MenuItemError(e.to_string()))?;
 
     // 构建菜单
-    Menu::with_items(
-        app,
-        &[
-            &status_info,
-            &credential_info,
-            &request_info,
-            &separator_1,
-            &start_server,
-            &stop_server,
-            &refresh_tokens,
-            &health_check,
-            &separator_2,
-            &open_window,
-            &copy_api_address,
-            &open_log_dir,
-            &separator_3,
-            &auto_start,
-            &separator_4,
-            &quit,
-        ],
-    )
-    .map_err(|e| MenuBuildError::MenuError(e.to_string()))
+    let mut items: Vec<&dyn IsMenuItem<R>> = vec![&current_model_info];
+    if let Some(submenu) = quick_model_submenu.as_ref() {
+        items.push(submenu);
+    }
+    items.extend([
+        &separator_0 as &dyn IsMenuItem<R>,
+        &status_info,
+        &credential_info,
+        &request_info,
+        &separator_1,
+        &start_server,
+        &stop_server,
+        &refresh_tokens,
+        &health_check,
+        &separator_2,
+        &open_window,
+        &copy_api_address,
+        &open_log_dir,
+        &separator_3,
+        &auto_start,
+        &separator_4,
+        &quit,
+    ]);
+
+    Menu::with_items(app, &items).map_err(|e| MenuBuildError::MenuError(e.to_string()))
 }
 
 #[cfg(test)]

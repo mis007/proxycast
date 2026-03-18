@@ -20,6 +20,7 @@ use crate::workspace::{
     Workspace, WorkspaceManager, WorkspaceSettings, WorkspaceType, WorkspaceUpdate,
 };
 use lime_core::app_paths;
+use lime_core::database::lock_db;
 use lime_services::project_context_builder::ProjectContextBuilder;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -427,7 +428,7 @@ pub async fn get_project_context(
     db: State<'_, DbConnection>,
     project_id: String,
 ) -> Result<ProjectContext, String> {
-    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    let conn = lock_db(&db).map_err(|e| format!("数据库锁定失败: {e}"))?;
     ProjectContextBuilder::build_context(&conn, &project_id).map_err(|e| e.to_string())
 }
 
@@ -447,8 +448,7 @@ pub async fn build_project_system_prompt(
     db: State<'_, DbConnection>,
     project_id: String,
 ) -> Result<String, String> {
-    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-    let context =
-        ProjectContextBuilder::build_context(&conn, &project_id).map_err(|e| e.to_string())?;
-    Ok(ProjectContextBuilder::build_system_prompt(&context))
+    let conn = lock_db(&db).map_err(|e| format!("数据库锁定失败: {e}"))?;
+    ProjectContextBuilder::build_system_prompt_for_project(&conn, &project_id)
+        .map_err(|e| e.to_string())
 }

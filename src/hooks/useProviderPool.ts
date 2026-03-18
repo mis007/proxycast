@@ -14,18 +14,25 @@ import {
   subscribeProviderDataChanged,
 } from "@/lib/providerDataEvents";
 
-export function useProviderPool() {
+interface UseProviderPoolOptions {
+  autoLoad?: boolean;
+}
+
+export function useProviderPool(options: UseProviderPoolOptions = {}) {
+  const { autoLoad = true } = options;
   const [overview, setOverview] = useState<ProviderPoolOverview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkingHealth, setCheckingHealth] = useState<string | null>(null);
   const [refreshingToken, setRefreshingToken] = useState<string | null>(null);
 
-  const fetchOverview = useCallback(async () => {
+  const fetchOverview = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await providerPoolApi.getOverview();
+      const data = await providerPoolApi.getOverview(
+        forceRefresh ? { forceRefresh: true } : undefined,
+      );
       setOverview(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -35,29 +42,34 @@ export function useProviderPool() {
   }, []);
 
   const refreshAndNotify = useCallback(async () => {
-    await fetchOverview();
+    await fetchOverview(true);
     emitProviderDataChanged("provider_pool");
   }, [fetchOverview]);
 
   useEffect(() => {
-    fetchOverview();
+    if (!autoLoad) {
+      setLoading(false);
+      return;
+    }
+
+    void fetchOverview();
 
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
     }
 
     const handleFocus = () => {
-      void fetchOverview();
+      void fetchOverview(true);
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        void fetchOverview();
+        void fetchOverview(true);
       }
     };
 
     const unsubscribe = subscribeProviderDataChanged(() => {
-      void fetchOverview();
+      void fetchOverview(true);
     });
 
     window.addEventListener("focus", handleFocus);
@@ -68,7 +80,7 @@ export function useProviderPool() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsubscribe();
     };
-  }, [fetchOverview]);
+  }, [autoLoad, fetchOverview]);
 
   // Add Kiro OAuth credential
   const addKiroOAuth = async (credsFilePath: string, name?: string) => {

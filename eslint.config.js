@@ -4,6 +4,7 @@ import tsparser from "@typescript-eslint/parser";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
+import agentCommandCatalog from "./src/lib/governance/agentCommandCatalog.json" with { type: "json" };
 
 const legacyChatRestrictedPatterns = [
   "@/components/chat",
@@ -13,6 +14,33 @@ const legacyChatRestrictedPatterns = [
   "**/components/chat/*",
   "**/components/chat/**",
 ];
+
+const agentCompatRestrictedPatterns = [
+  {
+    group: [
+      "@/components/agent/chat/hooks/useAgentChat",
+      "@/components/agent/chat/hooks/useAgentChat.*",
+      "**/useAgentChat",
+      "**/useAgentChat.*",
+    ],
+    message:
+      "useAgentChat 属于零引用 compat Hook，请改用 useAgentChatUnified 或 useAsterAgentChat；仅兼容回归测试允许引用。",
+  },
+  {
+    group: [
+      "@/stores/agentStore",
+      "@/stores/agentStore.*",
+      "**/agentStore",
+      "**/agentStore.*",
+    ],
+    message:
+      "agentStore 属于零引用遗留状态容器，请改用 useAgentChatUnified / useAsterAgentChat；仅兼容回归测试允许引用。",
+  },
+];
+
+const deprecatedAgentRuntimeHelperNames = Object.keys(
+  agentCommandCatalog.deprecatedHelperReplacements,
+);
 
 const generalChatRestrictedPaths = [
   {
@@ -93,7 +121,7 @@ const generalChatRestrictedPaths = [
   {
     name: "@/lib/api/agent",
     message:
-      "agent.ts 现在只是兼容门面；新代码请改用 @/lib/api/agentRuntime、@/lib/api/agentStream 或 @/lib/api/agentCompat。",
+      "agent.ts 已删除；请直接使用 @/lib/api/agentRuntime 或 @/lib/api/agentStream。",
   },
   {
     name: "@/lib/terminal-api",
@@ -341,7 +369,7 @@ const generalChatRestrictedPaths = [
   {
     name: "@/stores/agentStore",
     message:
-      "agentStore 属于遗留状态容器，请改用现役 useAgentChat / useAsterAgentChat 链路。",
+      "agentStore 属于零引用遗留状态容器，请改用现役 useAgentChatUnified / useAsterAgentChat 链路。",
   },
   {
     name: "@/stores",
@@ -353,7 +381,7 @@ const generalChatRestrictedPaths = [
       "usePendingActions",
     ],
     message:
-      "agentStore 相关导出属于遗留状态容器，请改用现役 useAgentChat / useAsterAgentChat 链路。",
+      "agentStore 相关导出属于零引用遗留状态容器，请改用现役 useAgentChatUnified / useAsterAgentChat 链路。",
   },
   {
     name: "@/lib/api/agentCompat",
@@ -363,7 +391,14 @@ const generalChatRestrictedPaths = [
   {
     name: "@/lib/api/agent",
     importNames: ["sendAgentMessage", "sendAgentMessageStream"],
-    message: "旧 Agent 发送 API 已废弃，请优先使用 sendAsterMessageStream。",
+    message:
+      "agent.ts 已删除；旧 Agent 发送 API 请改用 submitAgentRuntimeTurn() 或 useAsterAgentChat().sendMessage()。",
+  },
+  {
+    name: "@/lib/api/agentRuntime",
+    importNames: deprecatedAgentRuntimeHelperNames,
+    message:
+      "agentRuntime 中这些旧命名 helper 只允许留在兼容层或兼容测试；业务层请改用 agent_runtime_* 对应 API 或 useAsterAgentChat。",
   },
   {
     name: "@/lib/api/agent",
@@ -376,7 +411,7 @@ const generalChatRestrictedPaths = [
       "listasterProviders",
     ],
     message:
-      "旧 aster 命名 API 已废弃，请使用现役 Aster API 或 Provider 配置流程。",
+      "agent.ts 已删除；旧 aster 命名 API 请改用现役 Aster API 或 Provider 配置流程。",
   },
 ];
 
@@ -385,19 +420,30 @@ const generalChatRestrictedPathsWithoutCompatApi =
     (entry) => entry.name !== "@/lib/api/generalChatCompat",
   );
 
-const createLegacyChatImportRule = (paths) => [
-  "error",
-  {
-    paths,
-    patterns: [
-      {
-        group: legacyChatRestrictedPatterns,
-        message:
-          "components/chat 为遗留聊天模块，禁止新增依赖；请优先使用现役聊天入口。",
-      },
-    ],
-  },
-];
+const createLegacyChatImportRule = (
+  paths,
+  { includeAgentCompatPatterns = true } = {},
+) => {
+  const patterns = [
+    {
+      group: legacyChatRestrictedPatterns,
+      message:
+        "components/chat 为遗留聊天模块，禁止新增依赖；请优先使用现役聊天入口。",
+    },
+  ];
+
+  if (includeAgentCompatPatterns) {
+    patterns.push(...agentCompatRestrictedPatterns);
+  }
+
+  return [
+    "error",
+    {
+      paths,
+      patterns,
+    },
+  ];
+};
 
 const generalChatCompatCommandSelectors = [
   "general_chat_get_session",
@@ -413,36 +459,14 @@ const generalChatCompatCommandSelectors = [
 }));
 
 const agentRuntimeCommandSelectors = [
-  "agent_start_process",
-  "agent_stop_process",
-  "agent_get_process_status",
-  "agent_create_session",
-  "agent_list_sessions",
-  "agent_get_session",
-  "agent_delete_session",
-  "agent_get_session_messages",
-  "agent_rename_session",
-  "agent_generate_title",
-  "agent_terminal_command_response",
-  "agent_term_scrollback_response",
-  "aster_agent_init",
-  "aster_agent_status",
-  "aster_agent_chat_stream",
-  "aster_agent_stop",
-  "aster_agent_confirm",
-  "aster_agent_submit_elicitation_response",
-  "aster_agent_configure_provider",
-  "aster_agent_reset",
-  "aster_session_create",
-  "aster_session_list",
-  "aster_session_get",
-  "aster_session_rename",
-  "aster_session_set_execution_strategy",
-  "aster_session_delete",
+  ...new Set([
+    ...agentCommandCatalog.runtimeGatewayCommands,
+    ...Object.keys(agentCommandCatalog.deprecatedCommandReplacements),
+  ]),
 ].map((command) => ({
   selector: `CallExpression[callee.name='safeInvoke'][arguments.0.value='${command}'], CallExpression[callee.name='invoke'][arguments.0.value='${command}']`,
   message:
-    "agent_/aster_ 命令只允许集中放在 `src/lib/api/agentRuntime.ts` / `src/lib/api/agentCompat.ts` 或历史兼容 store 中，禁止在其他业务模块直接扩散。",
+    "agent runtime 命令只允许集中放在 `src/lib/api/agentRuntime.ts`；旧 agent_/aster_ 命令已废弃，禁止在业务模块直接扩散。",
 }));
 
 const projectGatewayCommandSelectors = [
@@ -1111,6 +1135,19 @@ export default [
     files: ["src/lib/api/generalChatCompat.ts"],
     rules: {
       "no-restricted-syntax": "off",
+    },
+  },
+  {
+    files: [
+      "src/lib/api/agent.test.ts",
+      "src/components/agent/chat/hooks/useAgentChat.test.tsx",
+      "src/stores/agentStore.test.ts",
+    ],
+    rules: {
+      "no-restricted-imports": createLegacyChatImportRule(
+        generalChatRestrictedPaths,
+        { includeAgentCompatPatterns: false },
+      ),
     },
   },
   {

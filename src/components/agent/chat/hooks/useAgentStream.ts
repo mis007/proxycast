@@ -138,6 +138,8 @@ export function useAgentStream(options: UseAgentStreamOptions) {
     assistantMsgId: string;
     eventName: string;
     sessionId: string;
+    optimisticTurnId?: string;
+    optimisticItemId?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -156,6 +158,8 @@ export function useAgentStream(options: UseAgentStreamOptions) {
         assistantMsgId: string;
         eventName: string;
         sessionId: string;
+        optimisticTurnId?: string;
+        optimisticItemId?: string;
       } | null,
     ) => {
       activeStreamRef.current = nextActive;
@@ -331,6 +335,8 @@ export function useAgentStream(options: UseAgentStreamOptions) {
                   activeStreamRef.current?.assistantMsgId || assistantMsgId,
                 eventName: skillEventName,
                 sessionId: sessionIdForStop,
+                optimisticTurnId: activeStreamRef.current?.optimisticTurnId,
+                optimisticItemId: activeStreamRef.current?.optimisticItemId,
               });
             },
             isExecutionCancelled: () =>
@@ -358,8 +364,8 @@ export function useAgentStream(options: UseAgentStreamOptions) {
       };
       let streamActivated = false;
       const optimisticStartedAt = assistantMsg.timestamp.toISOString();
-      const optimisticTurnId = `local-turn:${assistantMsgId}`;
-      const optimisticItemId = `local-item:${assistantMsgId}:turn-summary`;
+      const optimisticTurnId = crypto.randomUUID();
+      const optimisticItemId = `turn-summary:${optimisticTurnId}`;
       const optimisticThreadId =
         sessionIdRef.current || `local-thread:${assistantMsgId}`;
       const toolLogIdByToolId = new Map<string, string>();
@@ -483,6 +489,8 @@ export function useAgentStream(options: UseAgentStreamOptions) {
             assistantMsgId,
             eventName,
             sessionId: activeSessionId,
+            optimisticTurnId,
+            optimisticItemId,
           });
           setMessages((prev) =>
             prev.map((msg) =>
@@ -615,6 +623,7 @@ export function useAgentStream(options: UseAgentStreamOptions) {
           sessionId: activeSessionId,
           eventName,
           workspaceId: resolvedWorkspaceId,
+          turnId: optimisticTurnId,
           images: imagesToSend,
           providerConfig,
           executionStrategy: effectiveExecutionStrategy,
@@ -716,11 +725,19 @@ export function useAgentStream(options: UseAgentStreamOptions) {
     setQueuedTurns([]);
 
     if (activeStream?.assistantMsgId) {
-      const optimisticTurnId = `local-turn:${activeStream.assistantMsgId}`;
-      const optimisticItemId = `${`local-item:${activeStream.assistantMsgId}`}:turn-summary`;
-      setThreadItems((prev) => removeThreadItemState(prev, optimisticItemId));
-      setThreadTurns((prev) => removeThreadTurnState(prev, optimisticTurnId));
-      setCurrentTurnId((prev) => (prev === optimisticTurnId ? null : prev));
+      if (activeStream.optimisticItemId) {
+        setThreadItems((prev) =>
+          removeThreadItemState(prev, activeStream.optimisticItemId!),
+        );
+      }
+      if (activeStream.optimisticTurnId) {
+        setThreadTurns((prev) =>
+          removeThreadTurnState(prev, activeStream.optimisticTurnId!),
+        );
+        setCurrentTurnId((prev) =>
+          prev === activeStream.optimisticTurnId ? null : prev,
+        );
+      }
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === activeStream.assistantMsgId

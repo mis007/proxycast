@@ -53,6 +53,13 @@ pub struct ModelUsageStats {
     pub avg_latency_ms: Option<f64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelUsageAggregate {
+    pub model_id: String,
+    pub request_count: i64,
+    pub total_tokens: i64,
+}
+
 /// Orchestrator DAO
 pub struct OrchestratorDao;
 
@@ -538,6 +545,106 @@ impl OrchestratorDao {
             .map_err(|e| e.to_string())
     }
 
+    pub fn has_model_usage_stats(conn: &Connection) -> Result<bool, String> {
+        let row_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM model_usage_stats", [], |row| {
+                row.get(0)
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(row_count > 0)
+    }
+
+    pub fn get_total_model_usage_tokens(conn: &Connection) -> Result<i64, String> {
+        conn.query_row(
+            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn get_model_usage_tokens_since(
+        conn: &Connection,
+        start_date: &str,
+    ) -> Result<i64, String> {
+        conn.query_row(
+            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats WHERE date >= ?1",
+            [start_date],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn get_model_usage_tokens_on(conn: &Connection, date: &str) -> Result<i64, String> {
+        conn.query_row(
+            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats WHERE date = ?1",
+            [date],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn list_model_usage_aggregates(
+        conn: &Connection,
+        start_date: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ModelUsageAggregate>, String> {
+        let rows = if let Some(start_date) = start_date {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT model_id,
+                            COALESCE(SUM(request_count), 0) AS request_count,
+                            COALESCE(SUM(total_tokens), 0) AS total_tokens
+                     FROM model_usage_stats
+                     WHERE date >= ?1
+                     GROUP BY model_id
+                     ORDER BY total_tokens DESC, request_count DESC
+                     LIMIT ?2",
+                )
+                .map_err(|e| e.to_string())?;
+
+            let rows = stmt
+                .query_map(params![start_date, limit as i64], |row| {
+                    Ok(ModelUsageAggregate {
+                        model_id: row.get(0)?,
+                        request_count: row.get(1)?,
+                        total_tokens: row.get(2)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?;
+
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?
+        } else {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT model_id,
+                            COALESCE(SUM(request_count), 0) AS request_count,
+                            COALESCE(SUM(total_tokens), 0) AS total_tokens
+                     FROM model_usage_stats
+                     GROUP BY model_id
+                     ORDER BY total_tokens DESC, request_count DESC
+                     LIMIT ?1",
+                )
+                .map_err(|e| e.to_string())?;
+
+            let rows = stmt
+                .query_map(params![limit as i64], |row| {
+                    Ok(ModelUsageAggregate {
+                        model_id: row.get(0)?,
+                        request_count: row.get(1)?,
+                        total_tokens: row.get(2)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?;
+
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?
+        };
+
+        Ok(rows)
+    }
+
     /// 清理旧的使用统计
     pub fn cleanup_old_usage_stats(conn: &Connection, days: i32) -> Result<usize, String> {
         let days_param = format!("-{days} days");
@@ -552,12 +659,47 @@ impl OrchestratorDao {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rusqlite::Connection;
+    use rusqlite::{params, Connection};
 
     fn setup_test_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         crate::database::schema::create_tables(&conn).unwrap();
         conn
+    }
+
+    fn insert_model_usage_stat(
+        conn: &Connection,
+        model_id: &str,
+        credential_id: &str,
+        date: &str,
+        request_count: i64,
+        success_count: i64,
+        error_count: i64,
+        total_tokens: i64,
+        total_latency_ms: i64,
+    ) {
+        conn.execute(
+            "INSERT INTO model_usage_stats (
+                model_id, credential_id, date, request_count, success_count,
+                error_count, total_tokens, total_latency_ms, avg_latency_ms
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                model_id,
+                credential_id,
+                date,
+                request_count,
+                success_count,
+                error_count,
+                total_tokens,
+                total_latency_ms,
+                if request_count > 0 {
+                    total_latency_ms as f64 / request_count as f64
+                } else {
+                    0.0
+                },
+            ],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -643,5 +785,87 @@ mod tests {
         assert_eq!(stats[0].success_count, 2);
         assert_eq!(stats[0].error_count, 1);
         assert_eq!(stats[0].total_tokens, 3000);
+    }
+
+    #[test]
+    fn test_model_usage_aggregate_queries() {
+        let conn = setup_test_db();
+
+        assert!(!OrchestratorDao::has_model_usage_stats(&conn).unwrap());
+        assert_eq!(
+            OrchestratorDao::get_total_model_usage_tokens(&conn).unwrap(),
+            0
+        );
+        assert_eq!(
+            OrchestratorDao::get_model_usage_tokens_since(&conn, "2026-03-10").unwrap(),
+            0
+        );
+        assert_eq!(
+            OrchestratorDao::get_model_usage_tokens_on(&conn, "2026-03-10").unwrap(),
+            0
+        );
+        assert!(
+            OrchestratorDao::list_model_usage_aggregates(&conn, None, 20)
+                .unwrap()
+                .is_empty()
+        );
+
+        insert_model_usage_stat(
+            &conn,
+            "claude-3-opus",
+            "cred-1",
+            "2026-03-10",
+            2,
+            2,
+            0,
+            2000,
+            1000,
+        );
+        insert_model_usage_stat(
+            &conn,
+            "claude-3-opus",
+            "cred-2",
+            "2026-03-11",
+            1,
+            1,
+            0,
+            1200,
+            600,
+        );
+        insert_model_usage_stat(&conn, "gpt-4.1", "cred-3", "2026-03-12", 3, 2, 1, 900, 450);
+
+        assert!(OrchestratorDao::has_model_usage_stats(&conn).unwrap());
+        assert_eq!(
+            OrchestratorDao::get_total_model_usage_tokens(&conn).unwrap(),
+            4100
+        );
+        assert_eq!(
+            OrchestratorDao::get_model_usage_tokens_since(&conn, "2026-03-11").unwrap(),
+            2100
+        );
+        assert_eq!(
+            OrchestratorDao::get_model_usage_tokens_on(&conn, "2026-03-10").unwrap(),
+            2000
+        );
+        assert_eq!(
+            OrchestratorDao::get_model_usage_tokens_on(&conn, "2026-03-15").unwrap(),
+            0
+        );
+
+        let aggregates = OrchestratorDao::list_model_usage_aggregates(&conn, None, 20).unwrap();
+        assert_eq!(aggregates.len(), 2);
+        assert_eq!(aggregates[0].model_id, "claude-3-opus");
+        assert_eq!(aggregates[0].request_count, 3);
+        assert_eq!(aggregates[0].total_tokens, 3200);
+        assert_eq!(aggregates[1].model_id, "gpt-4.1");
+        assert_eq!(aggregates[1].request_count, 3);
+        assert_eq!(aggregates[1].total_tokens, 900);
+
+        let filtered =
+            OrchestratorDao::list_model_usage_aggregates(&conn, Some("2026-03-11"), 1).unwrap();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].model_id, "claude-3-opus");
+        assert_eq!(filtered[0].request_count, 1);
+        assert_eq!(filtered[0].total_tokens, 1200);
     }
 }

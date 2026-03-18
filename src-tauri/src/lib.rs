@@ -54,6 +54,7 @@ mod data;
 #[allow(dead_code)]
 mod dev_bridge;
 mod logger;
+mod profiling;
 mod theme;
 use lime_core::models;
 

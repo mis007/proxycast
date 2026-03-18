@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import {
   ArrowRight,
   BrainCircuit,
@@ -56,6 +56,47 @@ import {
   getEmptyStateIconToolButtonClassName,
 } from "./emptyStateSurfaceTokens";
 
+const composerReveal = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const composerAura = keyframes`
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.78;
+  }
+  50% {
+    transform: translate3d(22px, -16px, 0) scale(1.08);
+    opacity: 1;
+  }
+`;
+
+const composerSheen = keyframes`
+  0% {
+    transform: translateX(-150%);
+  }
+  15%,
+  100% {
+    transform: translateX(170%);
+  }
+`;
+
+const buttonGlow = keyframes`
+  0%, 100% {
+    box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.28);
+  }
+  50% {
+    box-shadow: 0 18px 34px -18px rgba(15, 23, 42, 0.36);
+  }
+`;
+
 const InputCard = styled.div`
   width: 100%;
   position: relative;
@@ -72,6 +113,51 @@ const InputCard = styled.div`
   overflow: visible;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(14px);
+  animation: ${composerReveal} 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: -8%;
+    top: -18%;
+    width: 240px;
+    height: 240px;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle,
+      rgba(16, 185, 129, 0.1) 0%,
+      rgba(16, 185, 129, 0.04) 42%,
+      transparent 72%
+    );
+    filter: blur(26px);
+    animation: ${composerAura} 14s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -32%;
+    width: 26%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.34) 48%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    opacity: 0.55;
+    transform: translateX(-150%);
+    animation: ${composerSheen} 10s ease-in-out infinite;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
 
   &:hover {
     box-shadow:
@@ -85,6 +171,15 @@ const InputCard = styled.div`
     box-shadow:
       0 0 0 3px rgba(226, 232, 240, 0.78),
       0 20px 36px -24px rgba(15, 23, 42, 0.12);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+
+    &::before,
+    &::after {
+      animation: none;
+    }
   }
 `;
 
@@ -149,6 +244,58 @@ const ToolbarRight = styled.div`
   @media (max-width: 640px) {
     width: 100%;
     margin-left: 0;
+  }
+`;
+
+const LaunchButton = styled(Button).attrs({
+  className: EMPTY_STATE_PRIMARY_ACTION_BUTTON_CLASSNAME,
+})`
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.96) 0%,
+    rgba(71, 85, 105, 0.98) 100%
+  );
+  box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.28);
+  animation: ${buttonGlow} 3.2s ease-in-out infinite;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      rgba(255, 255, 255, 0) 24%,
+      rgba(255, 255, 255, 0.18) 48%,
+      rgba(255, 255, 255, 0) 72%
+    );
+    transform: translateX(-130%);
+    animation: ${composerSheen} 5.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 34px -18px rgba(15, 23, 42, 0.36);
+    filter: brightness(1.02);
+  }
+
+  &:disabled {
+    opacity: 0.62;
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+
+    &::before {
+      animation: none;
+    }
   }
 `;
 
@@ -845,17 +992,16 @@ export function EmptyStateComposerPanel({
         </ToolLoginLeft>
 
         <ToolbarRight>
-          <Button
+          <LaunchButton
             size="sm"
             onClick={onSend}
             disabled={
               !input.trim() && !isEntryTheme && pendingImagesCount === 0
             }
-            className={EMPTY_STATE_PRIMARY_ACTION_BUTTON_CLASSNAME}
           >
             开始生成
             <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          </LaunchButton>
         </ToolbarRight>
       </Toolbar>
     </InputCard>

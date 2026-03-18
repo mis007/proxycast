@@ -10,8 +10,8 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { requireDefaultProjectId } from "@/lib/api/project";
 import {
-  createAgentSession,
-  sendAsterMessageStream,
+  createAgentRuntimeSession,
+  submitAgentRuntimeTurn,
 } from "@/lib/api/agentRuntime";
 import type { ChatMessage, MessageImage, UseSmartInputReturn } from "./types";
 import { parseStreamEvent, type StreamEvent } from "@/lib/api/agentStream";
@@ -97,13 +97,11 @@ export function useSmartInput(): UseSmartInputReturn {
         workspaceIdRef.current = workspaceId;
       }
 
-      const response = await createAgentSession(
-        DEFAULT_SMART_INPUT_PROVIDER,
+      const createdSessionId = await createAgentRuntimeSession(
         workspaceId,
-        DEFAULT_SMART_INPUT_MODEL,
       );
-      sessionIdRef.current = response.session_id;
-      return response.session_id;
+      sessionIdRef.current = createdSessionId;
+      return createdSessionId;
     } catch (err) {
       console.error("创建会话失败:", err);
       return null;
@@ -241,23 +239,26 @@ export function useSmartInput(): UseSmartInputReturn {
         }
 
         // 发送流式请求（使用 Aster Agent）
-        await sendAsterMessageStream(
+        await submitAgentRuntimeTurn({
           message,
-          sessionId,
-          eventName,
-          workspaceId,
-          images.length > 0
-            ? images.map((img) => ({
-                data: img.data,
-                media_type: img.mediaType,
-              }))
-            : undefined,
-          {
-            provider_id: DEFAULT_SMART_INPUT_PROVIDER,
-            provider_name: DEFAULT_SMART_INPUT_PROVIDER,
-            model_name: DEFAULT_SMART_INPUT_MODEL,
+          session_id: sessionId,
+          event_name: eventName,
+          workspace_id: workspaceId,
+          images:
+            images.length > 0
+              ? images.map((img) => ({
+                  data: img.data,
+                  media_type: img.mediaType,
+                }))
+              : undefined,
+          turn_config: {
+            provider_config: {
+              provider_id: DEFAULT_SMART_INPUT_PROVIDER,
+              provider_name: DEFAULT_SMART_INPUT_PROVIDER,
+              model_name: DEFAULT_SMART_INPUT_MODEL,
+            },
           },
-        );
+        });
       } catch (err) {
         console.error("发送消息失败:", err);
         const errorMsg = err instanceof Error ? err.message : "发送失败";

@@ -105,6 +105,25 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
+    // Migration: 补齐历史 mcp_servers 表缺失的启用列与 created_at 字段
+    let _ = conn.execute(
+        "ALTER TABLE mcp_servers ADD COLUMN enabled_lime INTEGER DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE mcp_servers ADD COLUMN enabled_claude INTEGER DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE mcp_servers ADD COLUMN enabled_codex INTEGER DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE mcp_servers ADD COLUMN enabled_gemini INTEGER DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute("ALTER TABLE mcp_servers ADD COLUMN created_at INTEGER", []);
+
     // Prompts 表
     conn.execute(
         "CREATE TABLE IF NOT EXISTS prompts (
@@ -1504,6 +1523,36 @@ mod tests {
             upgraded.1.as_deref(),
             Some("/tmp/lime/chrome_profiles/shop_us")
         );
+    }
+
+    #[test]
+    fn should_upgrade_legacy_mcp_servers_table_with_enablement_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE mcp_servers (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                server_config TEXT NOT NULL,
+                description TEXT,
+                enabled_claude INTEGER DEFAULT 0
+            )",
+            [],
+        )
+        .unwrap();
+
+        create_tables(&conn).expect("应成功升级旧版 mcp_servers 表");
+
+        let mut columns = conn.prepare("PRAGMA table_info(mcp_servers)").unwrap();
+        let column_names = columns
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert!(column_names.iter().any(|name| name == "enabled_lime"));
+        assert!(column_names.iter().any(|name| name == "enabled_codex"));
+        assert!(column_names.iter().any(|name| name == "enabled_gemini"));
+        assert!(column_names.iter().any(|name| name == "created_at"));
     }
 }
 

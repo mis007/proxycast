@@ -45,7 +45,7 @@ use crate::mcp::{
 use crate::models::mcp_model::McpServer;
 use lime_services::mcp_service::McpService;
 use tauri::State;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, Instrument};
 
 #[tauri::command]
 pub fn get_mcp_servers(db: State<'_, DbConnection>) -> Result<Vec<McpServer>, String> {
@@ -172,6 +172,11 @@ pub async fn mcp_list_servers_with_status(
 /// # Requirements
 ///
 /// - **9.2**: THE mcp_start_server command SHALL start a specified MCP server
+#[tracing::instrument(
+    name = "mcp_start_server",
+    skip(db, mcp_manager),
+    fields(server_name = %name)
+)]
 #[tauri::command]
 pub async fn mcp_start_server(
     db: State<'_, DbConnection>,
@@ -191,7 +196,9 @@ pub async fn mcp_start_server(
     let config = parse_server_config(&server.server_config);
 
     // 3. 获取管理器锁并启动服务器
-    let manager = mcp_manager.lock().await;
+    let manager = async { mcp_manager.lock().await }
+        .instrument(tracing::debug_span!("mcp_start_server.acquire_manager"))
+        .await;
     manager.start_server(&name, &config).await.map_err(|e| {
         error!(server_name = %name, error = %e, "启动 MCP 服务器失败");
         e.to_string()
@@ -311,17 +318,24 @@ fn parse_server_config(config_value: &serde_json::Value) -> McpServerConfig {
 /// # Requirements
 ///
 /// - **9.4**: THE mcp_list_tools command SHALL return all available tools from running servers
+#[tracing::instrument(name = "mcp_list_tools", skip(mcp_manager))]
 #[tauri::command]
 pub async fn mcp_list_tools(
     mcp_manager: State<'_, McpManagerState>,
 ) -> Result<Vec<McpToolDefinition>, String> {
     info!("获取所有 MCP 工具列表");
 
-    let manager = mcp_manager.lock().await;
-    let tools = manager.list_tools().await.map_err(|e| {
-        error!(error = %e, "获取工具列表失败");
-        e.to_string()
-    })?;
+    let manager = async { mcp_manager.lock().await }
+        .instrument(tracing::debug_span!("mcp_list_tools.acquire_manager"))
+        .await;
+    let tools = manager
+        .list_tools()
+        .instrument(tracing::info_span!("mcp_list_tools.list_tools"))
+        .await
+        .map_err(|e| {
+            error!(error = %e, "获取工具列表失败");
+            e.to_string()
+        })?;
 
     debug!(tool_count = tools.len(), "返回工具列表");
     Ok(tools)
@@ -382,6 +396,11 @@ pub async fn mcp_search_tools(
 /// # Requirements
 ///
 /// - **9.5**: THE mcp_call_tool command SHALL call a tool and return the result
+#[tracing::instrument(
+    name = "mcp_call_tool",
+    skip(mcp_manager, arguments),
+    fields(tool_name = %tool_name)
+)]
 #[tauri::command]
 pub async fn mcp_call_tool(
     mcp_manager: State<'_, McpManagerState>,
@@ -390,9 +409,12 @@ pub async fn mcp_call_tool(
 ) -> Result<McpToolResult, String> {
     info!(tool_name = %tool_name, "调用 MCP 工具命令");
 
-    let manager = mcp_manager.lock().await;
+    let manager = async { mcp_manager.lock().await }
+        .instrument(tracing::debug_span!("mcp_call_tool.acquire_manager"))
+        .await;
     let result = manager
         .call_tool(&tool_name, arguments)
+        .instrument(tracing::info_span!("mcp_call_tool.call_tool"))
         .await
         .map_err(|e| {
             error!(tool_name = %tool_name, error = %e, "调用工具失败");

@@ -9,6 +9,65 @@
 
 import { safeInvoke } from "@/lib/dev-bridge";
 
+interface ProviderQueryOptions {
+  forceRefresh?: boolean;
+}
+
+let providersCache: ProviderWithKeysDisplay[] | null = null;
+let providersLoadingPromise: Promise<ProviderWithKeysDisplay[]> | null = null;
+
+function cloneProviderList(
+  providers: ProviderWithKeysDisplay[],
+): ProviderWithKeysDisplay[] {
+  return providers.map((provider) => ({
+    ...provider,
+    api_keys: Array.isArray(provider.api_keys)
+      ? provider.api_keys.map((apiKey) => ({ ...apiKey }))
+      : [],
+    custom_models: Array.isArray(provider.custom_models)
+      ? [...provider.custom_models]
+      : [],
+  }));
+}
+
+export function invalidateApiKeyProviderCache(): void {
+  providersCache = null;
+  providersLoadingPromise = null;
+}
+
+async function loadProviders(
+  options: ProviderQueryOptions = {},
+): Promise<ProviderWithKeysDisplay[]> {
+  if (options.forceRefresh) {
+    invalidateApiKeyProviderCache();
+  }
+
+  if (providersCache) {
+    return cloneProviderList(providersCache);
+  }
+
+  if (!providersLoadingPromise) {
+    providersLoadingPromise = safeInvoke<ProviderWithKeysDisplay[]>(
+      "get_api_key_providers",
+    )
+      .then((providers) => {
+        providersCache = cloneProviderList(providers);
+        return providersCache;
+      })
+      .finally(() => {
+        providersLoadingPromise = null;
+      });
+  }
+
+  return cloneProviderList(await providersLoadingPromise);
+}
+
+async function invalidateAfterMutation<T>(promise: Promise<T>): Promise<T> {
+  const result = await promise;
+  invalidateApiKeyProviderCache();
+  return result;
+}
+
 // ============================================================================
 // 请求类型
 // ============================================================================
@@ -156,8 +215,10 @@ export const apiKeyProviderApi = {
   /**
    * 获取所有 API Key Provider（包含 API Keys）
    */
-  async getProviders(): Promise<ProviderWithKeysDisplay[]> {
-    return safeInvoke("get_api_key_providers");
+  async getProviders(
+    options: ProviderQueryOptions = {},
+  ): Promise<ProviderWithKeysDisplay[]> {
+    return loadProviders(options);
   },
 
   /**
@@ -173,7 +234,9 @@ export const apiKeyProviderApi = {
   async addCustomProvider(
     request: AddCustomProviderRequest,
   ): Promise<ProviderDisplay> {
-    return safeInvoke("add_custom_api_key_provider", { request });
+    return invalidateAfterMutation(
+      safeInvoke("add_custom_api_key_provider", { request }),
+    );
   },
 
   /**
@@ -183,35 +246,41 @@ export const apiKeyProviderApi = {
     id: string,
     request: UpdateProviderRequest,
   ): Promise<ProviderDisplay> {
-    return safeInvoke("update_api_key_provider", { id, request });
+    return invalidateAfterMutation(
+      safeInvoke("update_api_key_provider", { id, request }),
+    );
   },
 
   /**
    * 删除自定义 Provider
    */
   async deleteCustomProvider(id: string): Promise<boolean> {
-    return safeInvoke("delete_custom_api_key_provider", { id });
+    return invalidateAfterMutation(
+      safeInvoke("delete_custom_api_key_provider", { id }),
+    );
   },
 
   /**
    * 添加 API Key
    */
   async addApiKey(request: AddApiKeyRequest): Promise<ApiKeyDisplay> {
-    return safeInvoke("add_api_key", { request });
+    return invalidateAfterMutation(safeInvoke("add_api_key", { request }));
   },
 
   /**
    * 删除 API Key
    */
   async deleteApiKey(keyId: string): Promise<boolean> {
-    return safeInvoke("delete_api_key", { keyId });
+    return invalidateAfterMutation(safeInvoke("delete_api_key", { keyId }));
   },
 
   /**
    * 切换 API Key 启用状态
    */
   async toggleApiKey(keyId: string, enabled: boolean): Promise<ApiKeyDisplay> {
-    return safeInvoke("toggle_api_key", { keyId, enabled });
+    return invalidateAfterMutation(
+      safeInvoke("toggle_api_key", { keyId, enabled }),
+    );
   },
 
   /**
@@ -221,7 +290,9 @@ export const apiKeyProviderApi = {
     keyId: string,
     alias?: string,
   ): Promise<ApiKeyDisplay> {
-    return safeInvoke("update_api_key_alias", { keyId, alias });
+    return invalidateAfterMutation(
+      safeInvoke("update_api_key_alias", { keyId, alias }),
+    );
   },
 
   /**
@@ -264,7 +335,9 @@ export const apiKeyProviderApi = {
    * **Validates: Requirements 8.4**
    */
   async updateSortOrders(sortOrders: [string, number][]): Promise<void> {
-    return safeInvoke("update_provider_sort_orders", { sortOrders });
+    return invalidateAfterMutation(
+      safeInvoke("update_provider_sort_orders", { sortOrders }),
+    );
   },
 
   /**
@@ -278,7 +351,9 @@ export const apiKeyProviderApi = {
    * 导入 Provider 配置
    */
   async importConfig(configJson: string): Promise<ImportResult> {
-    return safeInvoke("import_api_key_providers", { configJson });
+    return invalidateAfterMutation(
+      safeInvoke("import_api_key_providers", { configJson }),
+    );
   },
 
   // ============================================================================

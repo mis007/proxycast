@@ -35,6 +35,7 @@ use lime_agent::{
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
+use tracing::Instrument;
 
 const CODE_EXECUTION_EXTENSION_NAME: &str = "code_execution";
 
@@ -321,6 +322,15 @@ pub async fn chat_get_messages(
 /// 发送消息并获取流式响应
 ///
 /// 统一的消息发送入口，根据会话模式选择处理方式
+#[tracing::instrument(
+    name = "chat_send_message",
+    skip(app, db, agent_state, config_manager, request),
+    fields(
+        session_id = %request.session_id,
+        event_name = %request.event_name,
+        image_count = request.images.as_ref().map(|items| items.len()).unwrap_or(0)
+    )
+)]
 #[tauri::command]
 pub async fn chat_send_message(
     app: AppHandle,
@@ -368,6 +378,7 @@ pub async fn chat_send_message(
                 .map_err(|e| format!("获取会话失败: {e}"))?
                 .ok_or_else(|| "会话不存在".to_string())
         })
+        .instrument(tracing::info_span!("chat_send_message.load_session"))
         .await
         .map_err(|e| format!("任务执行失败: {e}"))??
     };
@@ -378,15 +389,18 @@ pub async fn chat_send_message(
     let config = config_manager.config();
     apply_web_search_runtime_env(&config);
     let working_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let merged_system_prompt = merge_system_prompt_with_web_search(
-        merge_system_prompt_with_memory_sources(
-            merge_system_prompt_with_memory_profile(session.system_prompt.clone(), &config),
-            &config,
-            &working_dir,
-            None,
-        ),
-        &config,
-    );
+    let merged_system_prompt = tracing::debug_span!("chat_send_message.prepare_system_prompt")
+        .in_scope(|| {
+            merge_system_prompt_with_web_search(
+                merge_system_prompt_with_memory_sources(
+                    merge_system_prompt_with_memory_profile(session.system_prompt.clone(), &config),
+                    &config,
+                    &working_dir,
+                    None,
+                ),
+                &config,
+            )
+        });
 
     let mode_default_web_search = false;
     let request_tool_policy = resolve_request_tool_policy_with_mode(
@@ -416,6 +430,11 @@ pub async fn chat_send_message(
         config.memory.enabled,
         &request_tool_policy,
     )
+    .instrument(tracing::info_span!(
+        "chat_send_message.dispatch_agent",
+        effective_web_search = request_tool_policy.effective_web_search,
+        search_mode = %request_tool_policy.search_mode.as_str()
+    ))
     .await;
 
     let total_elapsed = start_time.elapsed();
@@ -429,6 +448,17 @@ pub async fn chat_send_message(
 }
 
 /// 使用 Aster Agent 发送消息
+#[tracing::instrument(
+    name = "send_message_with_aster",
+    skip(app, db, agent_state, message, system_prompt, request_tool_policy),
+    fields(
+        session_id = %session_id,
+        event_name = %event_name,
+        message_len = message.len(),
+        include_context_trace = include_context_trace,
+        effective_web_search = request_tool_policy.effective_web_search
+    )
+)]
 async fn send_message_with_aster(
     app: &AppHandle,
     db: &DbConnection,
@@ -449,16 +479,29 @@ async fn send_message_with_aster(
 
     // 确保 Agent 已初始化
     let init_start = std::time::Instant::now();
-    if !agent_state.is_initialized().await {
-        agent_state.init_agent_with_db(db).await?;
+    async {
+        if !agent_state.is_initialized().await {
+            agent_state.init_agent_with_db(db).await?;
+        }
+        ensure_browser_mcp_tools_registered(agent_state).await?;
+        Ok::<(), String>(())
     }
-    ensure_browser_mcp_tools_registered(agent_state).await?;
+    .instrument(tracing::info_span!(
+        "send_message_with_aster.ensure_agent_ready"
+    ))
+    .await?;
     let init_elapsed = init_start.elapsed();
     tracing::debug!("[UnifiedChat] Agent 初始化检查耗时: {:?}", init_elapsed);
 
     // 检查 Provider 是否已配置
     let provider_check_start = std::time::Instant::now();
-    if !agent_state.is_provider_configured().await {
+    let is_provider_configured =
+        async { Ok::<bool, String>(agent_state.is_provider_configured().await) }
+            .instrument(tracing::debug_span!(
+                "send_message_with_aster.check_provider_config"
+            ))
+            .await?;
+    if !is_provider_configured {
         return Err("Provider 未配置，请先配置凭证".to_string());
     }
     let provider_check_elapsed = provider_check_start.elapsed();
@@ -533,6 +576,9 @@ async fn send_message_with_aster(
         request_tool_policy,
         &mut web_search_tracker,
     )
+    .instrument(tracing::info_span!(
+        "send_message_with_aster.web_search_preflight"
+    ))
     .await;
     match preflight {
         Ok(preflight_execution) => {
@@ -578,6 +624,7 @@ async fn send_message_with_aster(
 
     let stream_result = agent
         .reply(user_message, session_config, Some(cancel_token.clone()))
+        .instrument(tracing::info_span!("send_message_with_aster.reply"))
         .await;
 
     let mut first_chunk_time: Option<std::time::Instant> = None;
@@ -588,7 +635,13 @@ async fn send_message_with_aster(
 
     match stream_result {
         Ok(mut stream) => {
-            while let Some(event_result) = stream.next().await {
+            while let Some(event_result) = stream
+                .next()
+                .instrument(tracing::trace_span!(
+                    "send_message_with_aster.next_stream_event"
+                ))
+                .await
+            {
                 match event_result {
                     Ok(agent_event) => {
                         // 记录首个 chunk 时间（TTFB）

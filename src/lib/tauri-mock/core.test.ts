@@ -76,4 +76,15 @@ describe("tauri-mock/core invoke", () => {
       }),
     );
   });
+
+  it("旧 Agent 命令别名应直接报废弃错误，不再静默返回 mock 成功结果", async () => {
+    mocks.isDevBridgeAvailable.mockReturnValue(false);
+
+    await expect(invoke("list_agent_sessions")).rejects.toThrow(
+      "命令 list_agent_sessions 已废弃，请迁移到 agent_runtime_list_sessions",
+    );
+    await expect(invoke("get_agent_process_status")).rejects.toThrow(
+      "命令 get_agent_process_status 已废弃，请迁移到 agent_get_process_status",
+    );
+  });
 });

@@ -19,7 +19,7 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// 托盘初始化错误
 #[derive(Debug, thiserror::Error)]
@@ -151,13 +151,17 @@ impl TrayIcons {
 
     /// 从 PNG 文件加载图标
     fn load_png_file(path: &PathBuf) -> Option<Image<'static>> {
+        if !path.is_file() {
+            debug!("图标文件不存在，跳过加载: {:?}", path);
+            return None;
+        }
+
         match Image::from_path(path) {
             Ok(image) => {
                 info!("成功加载图标: {:?}", path);
                 Some(image)
             }
             Err(e) => {
-                // 文件不存在是正常情况（图标尚未创建）
                 warn!("无法加载图标文件 {:?}: {}", path, e);
                 None
             }
@@ -223,7 +227,7 @@ impl<R: Runtime> TrayManager<R> {
             .icon(initial_icon.clone())
             .menu(&menu)
             .show_menu_on_left_click(false)
-            .tooltip("Lime - AI API 代理")
+            .tooltip("Lime | 青柠一下，灵感即来")
             .on_tray_icon_event(|tray, event| {
                 let app = tray.app_handle();
                 handle_tray_icon_event(app, event);
@@ -406,6 +410,7 @@ mod tests {
             total_credentials: 5,
             today_requests: 100,
             auto_start_enabled: true,
+            ..Default::default()
         };
 
         manager.update_state(new_state.clone()).await;

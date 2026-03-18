@@ -4,13 +4,15 @@
  * 参考成熟产品的信息架构：用户区、搜索、主导航、助手分组、底部快捷入口
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
 import styled from "styled-components";
 import {
   Image,
   Moon,
   Sun,
   Search,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenTool,
   Video,
   Music,
@@ -18,7 +20,6 @@ import {
   Lightbulb,
   CalendarRange,
   FileType,
-  ChevronDown,
   Activity,
   LucideIcon,
 } from "lucide-react";
@@ -49,6 +50,12 @@ import {
   DEFAULT_ENABLED_CONTENT_THEME_IDS,
   resolveEnabledContentThemes,
 } from "@/lib/contentCreator/themeDefaults";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AppSidebarProps {
   currentPage: Page;
@@ -58,25 +65,67 @@ interface AppSidebarProps {
 
 type SidebarNavItem = SidebarNavItemDefinition;
 
-const Container = styled.aside`
+const APP_SIDEBAR_COLLAPSED_STORAGE_KEY = "lime.app-sidebar.collapsed";
+const SIDEBAR_PLUGIN_IDLE_TIMEOUT_MS = 1200;
+const SIDEBAR_PLUGIN_FALLBACK_DELAY_MS = 180;
+
+function scheduleSidebarPluginLoad(task: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(() => task(), {
+      timeout: SIDEBAR_PLUGIN_IDLE_TIMEOUT_MS,
+    });
+    return () => {
+      if (typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }
+
+  const timeoutId = window.setTimeout(task, SIDEBAR_PLUGIN_FALLBACK_DELAY_MS);
+  return () => {
+    window.clearTimeout(timeoutId);
+  };
+}
+
+const Container = styled.aside<{ $collapsed?: boolean }>`
   display: flex;
   flex-direction: column;
-  width: 248px;
-  min-width: 248px;
+  width: ${({ $collapsed }) => ($collapsed ? "72px" : "248px")};
+  min-width: ${({ $collapsed }) => ($collapsed ? "72px" : "248px")};
   height: 100vh;
-  padding: 12px 10px;
+  padding: ${({ $collapsed }) => ($collapsed ? "12px 6px" : "12px 10px")};
   background-color: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
+  transition:
+    width 180ms ease,
+    min-width 180ms ease,
+    padding 180ms ease;
 `;
 
-const HeaderArea = styled.div`
+const HeaderArea = styled.div<{ $collapsed?: boolean }>`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: ${({ $collapsed }) => ($collapsed ? "8px" : "10px")};
   margin-bottom: 12px;
 `;
 
-const UserButton = styled.button`
+const HeaderTopRow = styled.div<{ $collapsed?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  ${({ $collapsed }) =>
+    $collapsed
+      ? `
+        flex-direction: column;
+      `
+      : ""}
+`;
+
+const UserButton = styled.button<{ $collapsed?: boolean }>`
   display: flex;
   align-items: center;
   gap: 10px;
@@ -84,9 +133,10 @@ const UserButton = styled.button`
   border: none;
   background: transparent;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: ${({ $collapsed }) => ($collapsed ? "8px" : "8px 10px")};
   cursor: pointer;
   color: hsl(var(--foreground));
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
 
   &:hover {
     background: hsl(var(--muted) / 0.55);
@@ -107,7 +157,7 @@ const Avatar = styled.div`
   }
 `;
 
-const UserName = styled.div`
+const UserName = styled.div<{ $collapsed?: boolean }>`
   flex: 1;
   font-size: 14px;
   font-weight: 600;
@@ -115,9 +165,10 @@ const UserName = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: ${({ $collapsed }) => ($collapsed ? "none" : "block")};
 `;
 
-const SearchButton = styled.button`
+const SearchButton = styled.button<{ $collapsed?: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
@@ -127,8 +178,9 @@ const SearchButton = styled.button`
   border: 1px solid hsl(var(--border));
   background: hsl(var(--background));
   color: hsl(var(--muted-foreground));
-  padding: 0 10px;
+  padding: ${({ $collapsed }) => ($collapsed ? "0" : "0 10px")};
   cursor: pointer;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
 
   &:hover {
     border-color: hsl(var(--primary) / 0.35);
@@ -137,6 +189,7 @@ const SearchButton = styled.button`
 
   span {
     font-size: 13px;
+    display: ${({ $collapsed }) => ($collapsed ? "none" : "inline")};
   }
 `;
 
@@ -161,36 +214,38 @@ const MenuScroll = styled.div`
   }
 `;
 
-const Section = styled.div`
+const Section = styled.div<{ $collapsed?: boolean }>`
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 14px;
 `;
 
-const SectionTitle = styled.div`
+const SectionTitle = styled.div<{ $collapsed?: boolean }>`
   padding: 0 10px;
   font-size: 12px;
   font-weight: 500;
   color: hsl(var(--muted-foreground));
   opacity: 0.9;
+  display: ${({ $collapsed }) => ($collapsed ? "none" : "block")};
 `;
 
-const NavButton = styled.button<{ $active?: boolean }>`
+const NavButton = styled.button<{ $active?: boolean; $collapsed?: boolean }>`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: ${({ $collapsed }) => ($collapsed ? "0" : "10px")};
   width: 100%;
   height: 38px;
   border: none;
   border-radius: 10px;
-  padding: 0 10px;
+  padding: ${({ $collapsed }) => ($collapsed ? "0" : "0 10px")};
   background: ${({ $active }) =>
     $active ? "hsl(var(--accent))" : "transparent"};
   color: ${({ $active }) =>
     $active ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"};
   cursor: pointer;
   transition: all 0.18s ease;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "flex-start")};
 
   &:hover {
     background: hsl(var(--accent));
@@ -205,7 +260,7 @@ const NavButton = styled.button<{ $active?: boolean }>`
   }
 `;
 
-const NavLabel = styled.span`
+const NavLabel = styled.span<{ $collapsed?: boolean }>`
   flex: 1;
   text-align: left;
   font-size: 14px;
@@ -213,9 +268,10 @@ const NavLabel = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: ${({ $collapsed }) => ($collapsed ? "none" : "inline")};
 `;
 
-const FooterArea = styled.div`
+const FooterArea = styled.div<{ $collapsed?: boolean }>`
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid hsl(var(--border));
@@ -224,10 +280,10 @@ const FooterArea = styled.div`
   gap: 8px;
 `;
 
-const ActionRow = styled.div`
+const ActionRow = styled.div<{ $collapsed?: boolean }>`
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: ${({ $collapsed }) => ($collapsed ? "center" : "space-between")};
   padding: 0 2px;
 `;
 
@@ -336,6 +392,15 @@ export function AppSidebar({
   currentPageParams,
   onNavigate,
 }: AppSidebarProps) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return (
+      window.localStorage.getItem(APP_SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
+    );
+  });
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       return document.documentElement.classList.contains("dark")
@@ -408,16 +473,36 @@ export function AppSidebar({
   }, [enabledThemes]);
 
   useEffect(() => {
-    const loadSidebarPlugins = async () => {
+    let cancelled = false;
+
+    const loadSidebarPlugins = async (forceRefresh = false) => {
       try {
-        const plugins = await getPluginsForSurface("sidebar");
-        setSidebarPlugins(plugins);
+        const plugins = await getPluginsForSurface("sidebar", { forceRefresh });
+        if (!cancelled) {
+          setSidebarPlugins(plugins);
+        }
       } catch (error) {
-        console.error("加载侧边栏插件失败:", error);
+        if (!cancelled) {
+          console.error("加载侧边栏插件失败:", error);
+        }
       }
     };
 
-    loadSidebarPlugins();
+    if (refreshTrigger > 0) {
+      void loadSidebarPlugins(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const cancelScheduledLoad = scheduleSidebarPluginLoad(() => {
+      void loadSidebarPlugins();
+    });
+
+    return () => {
+      cancelled = true;
+      cancelScheduledLoad();
+    };
   }, [refreshTrigger]);
 
   useEffect(() => {
@@ -448,6 +533,17 @@ export function AppSidebar({
     }
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      APP_SIDEBAR_COLLAPSED_STORAGE_KEY,
+      collapsed ? "true" : "false",
+    );
+  }, [collapsed]);
 
   useEffect(() => {
     if (isThemeWorkspacePage(currentPage)) {
@@ -510,93 +606,164 @@ export function AppSidebar({
     onNavigate(item.page, params);
   };
 
+  const maybeWrapWithTooltip = (node: ReactElement, label: string) => {
+    if (!collapsed) {
+      return node;
+    }
+
+    return (
+      <Tooltip key={node.key ?? label}>
+        <TooltipTrigger asChild>{node}</TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   return (
-    <Container>
-      <HeaderArea>
-        <UserButton onClick={() => onNavigate("agent", buildHomeAgentParams())}>
-          <Avatar>
-            <img src="/logo.png" alt="Lime" />
-          </Avatar>
-          <UserName>Lime</UserName>
-          <ChevronDown size={14} />
-        </UserButton>
-
-        <SearchButton
-          onClick={() => onNavigate("agent", buildHomeAgentParams())}
-        >
-          <Search size={14} />
-          <span>搜索任务</span>
-        </SearchButton>
-      </HeaderArea>
-
-      <MenuScroll>
-        <Section>
-          {filteredMainMenuItems.map((item) => (
-            <NavButton
-              key={item.id}
-              $active={isActive(item)}
-              onClick={() => handleNavigate(item)}
-            >
-              <item.icon />
-              <NavLabel>{item.label}</NavLabel>
-            </NavButton>
-          ))}
-        </Section>
-
-        <Section>
-          <SectionTitle>创作主题</SectionTitle>
-          {filteredThemeMenuItems.map((item) => (
-            <NavButton
-              key={item.id}
-              $active={isActive(item)}
-              onClick={() => handleNavigate(item)}
-            >
-              <item.icon />
-              <NavLabel>{item.label}</NavLabel>
-            </NavButton>
-          ))}
-        </Section>
-
-        {assistantItems.length > 0 && (
-          <Section>
-            <SectionTitle>助手</SectionTitle>
-            {assistantItems.map((item) => (
-              <NavButton
-                key={item.id}
-                $active={isActive(item)}
-                onClick={() => handleNavigate(item)}
+    <TooltipProvider>
+      <Container $collapsed={collapsed}>
+        <HeaderArea $collapsed={collapsed}>
+          <HeaderTopRow $collapsed={collapsed}>
+            {maybeWrapWithTooltip(
+              <UserButton
+                $collapsed={collapsed}
+                onClick={() => onNavigate("agent", buildHomeAgentParams())}
+                title="返回 Lime 首页"
               >
-                <item.icon />
-                <NavLabel>{item.label}</NavLabel>
-              </NavButton>
-            ))}
-          </Section>
-        )}
-      </MenuScroll>
+                <Avatar>
+                  <img src="/logo.png" alt="Lime" />
+                </Avatar>
+                <UserName $collapsed={collapsed}>Lime</UserName>
+              </UserButton>,
+              "Lime 首页",
+            )}
 
-      <FooterArea>
-        <Section>
-          {filteredFooterMenuItems.map((item) => (
-            <NavButton
-              key={item.id}
-              $active={isActive(item)}
-              onClick={() => handleNavigate(item)}
+            {maybeWrapWithTooltip(
+              <IconActionButton
+                onClick={() => setCollapsed((value) => !value)}
+                title={collapsed ? "展开导航栏" : "折叠导航栏"}
+                aria-label={collapsed ? "展开导航栏" : "折叠导航栏"}
+              >
+                {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+              </IconActionButton>,
+              collapsed ? "展开导航栏" : "折叠导航栏",
+            )}
+          </HeaderTopRow>
+
+          {maybeWrapWithTooltip(
+            <SearchButton
+              $collapsed={collapsed}
+              onClick={() => onNavigate("agent", buildHomeAgentParams())}
+              title="搜索任务"
+              aria-label="搜索任务"
             >
-              <item.icon />
-              <NavLabel>{item.label}</NavLabel>
-            </NavButton>
-          ))}
-        </Section>
+              <Search size={14} />
+              <span>搜索任务</span>
+            </SearchButton>,
+            "搜索任务",
+          )}
+        </HeaderArea>
 
-        <ActionRow>
-          <IconActionButton
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title={theme === "dark" ? "深色模式" : "浅色模式"}
-          >
-            {theme === "dark" ? <Moon /> : <Sun />}
-          </IconActionButton>
-        </ActionRow>
-      </FooterArea>
-    </Container>
+        <MenuScroll>
+          <Section $collapsed={collapsed}>
+            {filteredMainMenuItems.map((item) =>
+              maybeWrapWithTooltip(
+                <NavButton
+                  key={item.id}
+                  $active={isActive(item)}
+                  $collapsed={collapsed}
+                  onClick={() => handleNavigate(item)}
+                  title={item.label}
+                  aria-label={item.label}
+                >
+                  <item.icon />
+                  <NavLabel $collapsed={collapsed}>{item.label}</NavLabel>
+                </NavButton>,
+                item.label,
+              ),
+            )}
+          </Section>
+
+          <Section $collapsed={collapsed}>
+            <SectionTitle $collapsed={collapsed}>创作主题</SectionTitle>
+            {filteredThemeMenuItems.map((item) =>
+              maybeWrapWithTooltip(
+                <NavButton
+                  key={item.id}
+                  $active={isActive(item)}
+                  $collapsed={collapsed}
+                  onClick={() => handleNavigate(item)}
+                  title={item.label}
+                  aria-label={item.label}
+                >
+                  <item.icon />
+                  <NavLabel $collapsed={collapsed}>{item.label}</NavLabel>
+                </NavButton>,
+                item.label,
+              ),
+            )}
+          </Section>
+
+          {assistantItems.length > 0 && (
+            <Section $collapsed={collapsed}>
+              <SectionTitle $collapsed={collapsed}>助手</SectionTitle>
+              {assistantItems.map((item) =>
+                maybeWrapWithTooltip(
+                  <NavButton
+                    key={item.id}
+                    $active={isActive(item)}
+                    $collapsed={collapsed}
+                    onClick={() => handleNavigate(item)}
+                    title={item.label}
+                    aria-label={item.label}
+                  >
+                    <item.icon />
+                    <NavLabel $collapsed={collapsed}>{item.label}</NavLabel>
+                  </NavButton>,
+                  item.label,
+                ),
+              )}
+            </Section>
+          )}
+        </MenuScroll>
+
+        <FooterArea $collapsed={collapsed}>
+          <Section $collapsed={collapsed}>
+            {filteredFooterMenuItems.map((item) =>
+              maybeWrapWithTooltip(
+                <NavButton
+                  key={item.id}
+                  $active={isActive(item)}
+                  $collapsed={collapsed}
+                  onClick={() => handleNavigate(item)}
+                  title={item.label}
+                  aria-label={item.label}
+                >
+                  <item.icon />
+                  <NavLabel $collapsed={collapsed}>{item.label}</NavLabel>
+                </NavButton>,
+                item.label,
+              ),
+            )}
+          </Section>
+
+          <ActionRow $collapsed={collapsed}>
+            {!collapsed ? <div /> : null}
+            {maybeWrapWithTooltip(
+              <IconActionButton
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                title={theme === "dark" ? "深色模式" : "浅色模式"}
+                aria-label={
+                  theme === "dark" ? "切换到浅色模式" : "切换到深色模式"
+                }
+              >
+                {theme === "dark" ? <Moon /> : <Sun />}
+              </IconActionButton>,
+              theme === "dark" ? "切换到浅色模式" : "切换到深色模式",
+            )}
+          </ActionRow>
+        </FooterArea>
+      </Container>
+    </TooltipProvider>
   );
 }

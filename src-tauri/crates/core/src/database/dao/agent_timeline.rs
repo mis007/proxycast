@@ -267,6 +267,36 @@ impl AgentTimelineDao {
         Ok(())
     }
 
+    pub fn upsert_turn(conn: &Connection, turn: &AgentThreadTurn) -> Result<(), rusqlite::Error> {
+        conn.execute(
+            "INSERT INTO agent_thread_turns (
+                id, session_id, prompt_text, status, started_at, completed_at,
+                error_message, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            ON CONFLICT(id) DO UPDATE SET
+                session_id = excluded.session_id,
+                prompt_text = excluded.prompt_text,
+                status = excluded.status,
+                started_at = excluded.started_at,
+                completed_at = excluded.completed_at,
+                error_message = excluded.error_message,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at",
+            params![
+                turn.id,
+                turn.thread_id,
+                turn.prompt_text,
+                turn.status.as_str(),
+                turn.started_at,
+                turn.completed_at,
+                turn.error_message,
+                turn.created_at,
+                turn.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
     pub fn update_turn_status(
         conn: &Connection,
         turn_id: &str,

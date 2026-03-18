@@ -46,6 +46,7 @@ import { ConnectConfirmDialog } from "./components/connect";
 import { showRegistryLoadError } from "./lib/utils/connectError";
 import { useDeepLink } from "./hooks/useDeepLink";
 import { useRelayRegistry } from "./hooks/useRelayRegistry";
+import { useGlobalTrayModelSync } from "./hooks/useGlobalTrayModelSync";
 import { ComponentDebugProvider } from "./contexts/ComponentDebugContext";
 import { SoundProvider } from "./contexts/SoundProvider";
 import { ComponentDebugOverlay } from "./components/dev";
@@ -68,6 +69,7 @@ import {
 import { toast } from "sonner";
 import { recordWorkspaceRepair } from "@/lib/workspaceHealthTelemetry";
 import { buildHomeAgentParams } from "@/lib/workspace/navigation";
+import { hasTauriInvokeCapability } from "@/lib/tauri-runtime";
 
 const AppContainer = styled.div`
   display: flex;
@@ -115,12 +117,7 @@ const THEME_WORKSPACE_PAGES: ThemeWorkspacePage[] = [
 ];
 
 function isTauriDesktopEnvironment(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const tauri = (window as any).__TAURI__;
-  return !!(tauri?.core?.invoke || tauri?.invoke);
+  return hasTauriInvokeCapability();
 }
 
 function isWindowsNavigatorPlatform(): boolean {
@@ -149,6 +146,11 @@ function AppContent() {
     projectType: ProjectType;
     projectName: string;
   } | null>(null);
+
+  useGlobalTrayModelSync({
+    currentPage,
+    pageParams,
+  });
 
   const resolveWorkspacePage = useCallback(
     (workspaceTheme?: WorkspaceTheme): ThemeWorkspacePage => {
@@ -447,124 +449,165 @@ function AppContent() {
     );
   };
 
-  const renderAllPages = () => {
-    return (
-      <>
+  const renderCurrentPage = () => {
+    if (currentPage === "image-gen") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "image-gen" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
           <ImageGenPage onNavigate={handleNavigate} />
         </div>
+      );
+    }
 
+    if (currentPage === "automation") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "automation" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
           <AutomationPage onNavigate={handleNavigate} />
         </div>
+      );
+    }
 
+    if (currentPage === "agent") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "agent" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
-          {currentPage === "agent" ? (
-            <AgentChatPage
-              key={`${(pageParams as AgentPageParams).projectId || ""}:${(pageParams as AgentPageParams).contentId || ""}:${(pageParams as AgentPageParams).theme || ""}:${(pageParams as AgentPageParams).lockTheme ? "1" : "0"}:${(pageParams as AgentPageParams).agentEntry || "claw"}:${(pageParams as AgentPageParams).immersiveHome ? "immersive" : "standard"}:${(pageParams as AgentPageParams).newChatAt ?? 0}`}
-              onNavigate={handleNavigate}
-              projectId={(pageParams as AgentPageParams).projectId}
-              contentId={(pageParams as AgentPageParams).contentId}
-              initialUserPrompt={
-                (pageParams as AgentPageParams).initialUserPrompt
-              }
-              initialSessionName={
-                (pageParams as AgentPageParams).initialSessionName
-              }
-              entryBannerMessage={
-                (pageParams as AgentPageParams).entryBannerMessage
-              }
-              theme={(pageParams as AgentPageParams).theme}
-              lockTheme={(pageParams as AgentPageParams).lockTheme}
-              fromResources={(pageParams as AgentPageParams).fromResources}
-              agentEntry={(pageParams as AgentPageParams).agentEntry}
-              showChatPanel={
-                (pageParams as AgentPageParams).agentEntry !== "new-task" &&
-                !(pageParams as AgentPageParams).immersiveHome
-              }
-              newChatAt={(pageParams as AgentPageParams).newChatAt}
-              onHasMessagesChange={setAgentHasMessages}
-            />
-          ) : null}
-        </div>
-
-        {renderThemeWorkspaces()}
-
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: currentPage === "terminal" ? "flex" : "none",
-            flexDirection: "column",
-          }}
-        >
-          <TerminalWorkspace
+          <AgentChatPage
+            key={`${(pageParams as AgentPageParams).projectId || ""}:${(pageParams as AgentPageParams).contentId || ""}:${(pageParams as AgentPageParams).theme || ""}:${(pageParams as AgentPageParams).lockTheme ? "1" : "0"}:${(pageParams as AgentPageParams).agentEntry || "claw"}:${(pageParams as AgentPageParams).immersiveHome ? "immersive" : "standard"}:${(pageParams as AgentPageParams).newChatAt ?? 0}`}
             onNavigate={handleNavigate}
-            isActive={currentPage === "terminal"}
+            projectId={(pageParams as AgentPageParams).projectId}
+            contentId={(pageParams as AgentPageParams).contentId}
+            initialUserPrompt={
+              (pageParams as AgentPageParams).initialUserPrompt
+            }
+            initialSessionName={
+              (pageParams as AgentPageParams).initialSessionName
+            }
+            entryBannerMessage={
+              (pageParams as AgentPageParams).entryBannerMessage
+            }
+            theme={(pageParams as AgentPageParams).theme}
+            lockTheme={(pageParams as AgentPageParams).lockTheme}
+            fromResources={(pageParams as AgentPageParams).fromResources}
+            agentEntry={(pageParams as AgentPageParams).agentEntry}
+            showChatPanel={
+              (pageParams as AgentPageParams).agentEntry !== "new-task" &&
+              !(pageParams as AgentPageParams).immersiveHome
+            }
+            newChatAt={(pageParams as AgentPageParams).newChatAt}
+            onHasMessagesChange={setAgentHasMessages}
           />
         </div>
+      );
+    }
 
-        <FullscreenWrapper $isActive={currentPage === "sysinfo"}>
-          <SysinfoView />
-        </FullscreenWrapper>
+    if (isThemeWorkspacePage(currentPage)) {
+      return renderThemeWorkspaces();
+    }
 
-        <FullscreenWrapper $isActive={currentPage === "files"}>
-          <FileBrowserView />
-        </FullscreenWrapper>
-
-        <FullscreenWrapper $isActive={currentPage === "web"}>
-          <WebView />
-        </FullscreenWrapper>
-
+    if (currentPage === "terminal") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "resources" ? "flex" : "none",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <TerminalWorkspace onNavigate={handleNavigate} isActive />
+        </div>
+      );
+    }
+
+    if (currentPage === "sysinfo") {
+      return (
+        <FullscreenWrapper $isActive={true}>
+          <SysinfoView />
+        </FullscreenWrapper>
+      );
+    }
+
+    if (currentPage === "files") {
+      return (
+        <FullscreenWrapper $isActive={true}>
+          <FileBrowserView />
+        </FullscreenWrapper>
+      );
+    }
+
+    if (currentPage === "web") {
+      return (
+        <FullscreenWrapper $isActive={true}>
+          <WebView />
+        </FullscreenWrapper>
+      );
+    }
+
+    if (currentPage === "resources") {
+      return (
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
             flexDirection: "column",
           }}
         >
           <ResourcesPage onNavigate={handleNavigate} />
         </div>
+      );
+    }
 
-        <PageWrapper $isActive={currentPage === "tools"}>
+    if (currentPage === "tools") {
+      return (
+        <PageWrapper $isActive={true}>
           <ToolsPage onNavigate={handleNavigate} />
         </PageWrapper>
+      );
+    }
 
-        <PageWrapper $isActive={currentPage === "browser-runtime"}>
-          <BrowserRuntimeWorkspace active={currentPage === "browser-runtime"} />
+    if (currentPage === "browser-runtime") {
+      return (
+        <PageWrapper $isActive={true}>
+          <BrowserRuntimeWorkspace active={true} />
         </PageWrapper>
+      );
+    }
 
-        <PageWrapper $isActive={currentPage === "plugins"}>
+    if (currentPage === "plugins") {
+      return (
+        <PageWrapper $isActive={true}>
           <PluginsPage onNavigate={handleNavigate} />
         </PageWrapper>
+      );
+    }
 
+    if (currentPage === "style") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "style" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
@@ -573,12 +616,16 @@ function AppContent() {
             pageParams={pageParams as StylePageParams}
           />
         </div>
+      );
+    }
 
+    if (currentPage === "memory") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "memory" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
@@ -587,28 +634,36 @@ function AppContent() {
             pageParams={pageParams as MemoryPageParams}
           />
         </div>
+      );
+    }
 
+    if (currentPage === "openclaw") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            display: currentPage === "openclaw" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
           <OpenClawPage
             onNavigate={handleNavigate}
             pageParams={pageParams as OpenClawPageParams}
-            isActive={currentPage === "openclaw"}
+            isActive={true}
           />
         </div>
+      );
+    }
 
+    if (currentPage === "settings") {
+      return (
         <div
           style={{
             flex: 1,
             minHeight: 0,
-            display: currentPage === "settings" ? "flex" : "none",
+            display: "flex",
             flexDirection: "column",
           }}
         >
@@ -617,8 +672,10 @@ function AppContent() {
             initialTab={(pageParams as SettingsPageParams).tab}
           />
         </div>
-      </>
-    );
+      );
+    }
+
+    return null;
   };
 
   const handleOnboardingComplete = useCallback(() => {
@@ -669,7 +726,7 @@ function AppContent() {
             />
           )}
           <MainContent $withSidebarGap={shouldAddMainContentGap}>
-            {renderAllPages()}
+            {renderCurrentPage()}
           </MainContent>
           <RecentImageInsertFloating onNavigate={handleNavigate} />
 

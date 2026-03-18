@@ -432,7 +432,7 @@ pub async fn aster_agent_theme_context_search(
     };
 
     state.remove_cancel_token(&session_id).await;
-    if let Err(error) = AsterAgentWrapper::delete_session_sync(&db, &session_id) {
+    if let Err(error) = AsterAgentWrapper::delete_session(&db, &session_id).await {
         tracing::warn!(
             "[ThemeContextSearch] 删除临时会话失败: session={}, error={}",
             session_id,

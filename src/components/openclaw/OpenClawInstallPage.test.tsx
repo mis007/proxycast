@@ -97,6 +97,18 @@ function renderPage(
   return container;
 }
 
+function findButton(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll("button")).find((item) =>
+    item.textContent?.includes(text),
+  );
+
+  if (!button) {
+    throw new Error(`未找到按钮：${text}`);
+  }
+
+  return button as HTMLButtonElement;
+}
+
 beforeEach(() => {
   (
     globalThis as typeof globalThis & {
@@ -260,9 +272,81 @@ describe("OpenClawInstallPage", () => {
     );
     expect(container.textContent).toContain("检测诊断");
     expect(container.textContent).toContain("C:/Program Files/nodejs/npm.cmd");
-    expect(container.textContent).toContain("C:/Users/demo/AppData/Roaming/npm");
+    expect(container.textContent).toContain("~/AppData/Roaming/npm");
+
+    act(() => {
+      findButton(container, "查看详细诊断").click();
+    });
+
+    expect(container.textContent).toContain("收起详细诊断");
     expect(container.textContent).toContain(
       "C:/Users/demo/AppData/Roaming/npm/openclaw.cmd",
     );
+  });
+
+  it("长路径应在执行环境与诊断摘要中压缩显示，并通过折叠入口展开详情", () => {
+    const runtimeNodePath =
+      "/Users/demo/Library/Application Support/lime/runtime/node/versions/very-long-version/bin/node";
+    const diagnosticsNpmPath =
+      "/Users/demo/Library/Application Support/lime/runtime/npm/prefix/very-long-segment/bin/npm";
+
+    const container = renderPage({
+      environmentStatus: buildEnvironmentStatus({
+        diagnostics: {
+          npmPath: diagnosticsNpmPath,
+          npmGlobalPrefix:
+            "/Users/demo/Library/Application Support/lime/runtime/npm/prefix/very-long-segment",
+          openclawPackagePath:
+            "/Users/demo/Library/Application Support/lime/runtime/openclaw/node_modules/@qingchencloud/openclaw-zh/package.json",
+          whereCandidates: [],
+          supplementalSearchDirs: [],
+          supplementalCommandCandidates: [],
+        },
+      }),
+      runtimeCandidates: [
+        {
+          id: "runtime-demo",
+          source: "nvm",
+          binDir:
+            "/Users/demo/Library/Application Support/lime/runtime/node/versions/very-long-version/bin",
+          nodePath: runtimeNodePath,
+          nodeVersion: "22.12.0",
+          npmPath:
+            "/Users/demo/Library/Application Support/lime/runtime/node/versions/very-long-version/bin/npm",
+          npmGlobalPrefix:
+            "/Users/demo/Library/Application Support/lime/runtime/npm/prefix/very-long-segment",
+          openclawPath:
+            "/Users/demo/Library/Application Support/lime/runtime/node/versions/very-long-version/bin/openclaw",
+          openclawVersion: "2026.3.18",
+          openclawPackagePath:
+            "/Users/demo/Library/Application Support/lime/runtime/openclaw/node_modules/@qingchencloud/openclaw-zh/package.json",
+          isActive: true,
+          isPreferred: false,
+        },
+      ],
+    });
+
+    const titledElements = Array.from(container.querySelectorAll("[title]"));
+    const runtimeSummary = titledElements.find(
+      (item) => item.getAttribute("title") === runtimeNodePath,
+    );
+    const diagnosticsSummary = titledElements.find(
+      (item) => item.getAttribute("title") === diagnosticsNpmPath,
+    );
+
+    expect(runtimeSummary?.textContent).toContain("...");
+    expect(runtimeSummary?.textContent).not.toBe(runtimeNodePath);
+    expect(diagnosticsSummary?.textContent).toContain("...");
+    expect(diagnosticsSummary?.textContent).not.toBe(diagnosticsNpmPath);
+
+    act(() => {
+      findButton(container, "查看详情").click();
+    });
+    expect(container.textContent).toContain("收起详情");
+
+    act(() => {
+      findButton(container, "查看详细诊断").click();
+    });
+    expect(container.textContent).toContain("收起详细诊断");
   });
 });

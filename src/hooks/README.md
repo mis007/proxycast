@@ -11,7 +11,7 @@
 
 ## useUnifiedChat
 
-统一的对话逻辑 Hook，替代原有分散的 `useAgentChat` 和 `useChat`。
+统一的对话逻辑 Hook，统一收口 Agent / General / Creator 三类对话入口。
 
 ### 使用示例
 

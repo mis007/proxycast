@@ -4,9 +4,10 @@
 //! Lime Skills 加载与 Agent 身份配置。
 
 use aster::agents::{AgentIdentity, SessionConfig};
+use aster::session::TurnContextOverride;
 use aster::skills::{global_registry, load_skills_from_directory, SkillSource};
 use aster::tools::ToolRegistrationConfig;
-use lime_core::database::DbConnection;
+use lime_core::database::{lock_db, DbConnection};
 use lime_services::project_context_builder::ProjectContextBuilder;
 
 /// 重新加载 Lime Skills
@@ -76,10 +77,9 @@ fn load_lime_skills() {
 
 /// 构建带项目上下文的 System Prompt
 pub fn build_project_system_prompt(db: &DbConnection, project_id: &str) -> Result<String, String> {
-    let conn = db.lock().map_err(|e| format!("获取数据库连接失败: {e}"))?;
-    let context = ProjectContextBuilder::build_context(&conn, project_id)
-        .map_err(|e| format!("构建项目上下文失败: {e}"))?;
-    Ok(ProjectContextBuilder::build_system_prompt(&context))
+    let conn = lock_db(db).map_err(|e| format!("获取数据库连接失败: {e}"))?;
+    ProjectContextBuilder::build_system_prompt_for_project(&conn, project_id)
+        .map_err(|e| format!("构建项目上下文失败: {e}"))
 }
 
 /// 创建带项目上下文的会话配置
@@ -98,19 +98,35 @@ pub fn create_session_config_with_project(
 /// 会话配置构建器
 pub struct SessionConfigBuilder {
     id: String,
+    thread_id: Option<String>,
+    turn_id: Option<String>,
     max_turns: Option<u32>,
     system_prompt: Option<String>,
     include_context_trace: Option<bool>,
+    turn_context: Option<TurnContextOverride>,
 }
 
 impl SessionConfigBuilder {
     pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
+            thread_id: None,
+            turn_id: None,
             max_turns: None,
             system_prompt: None,
             include_context_trace: None,
+            turn_context: None,
         }
+    }
+
+    pub fn thread_id(mut self, thread_id: impl Into<String>) -> Self {
+        self.thread_id = Some(thread_id.into());
+        self
+    }
+
+    pub fn turn_id(mut self, turn_id: impl Into<String>) -> Self {
+        self.turn_id = Some(turn_id.into());
+        self
     }
 
     pub fn max_turns(mut self, turns: u32) -> Self {
@@ -128,14 +144,22 @@ impl SessionConfigBuilder {
         self
     }
 
+    pub fn turn_context(mut self, turn_context: TurnContextOverride) -> Self {
+        self.turn_context = Some(turn_context);
+        self
+    }
+
     pub fn build(self) -> SessionConfig {
         SessionConfig {
             id: self.id,
+            thread_id: self.thread_id,
+            turn_id: self.turn_id,
             schedule_id: None,
             max_turns: self.max_turns,
             retry_config: None,
             system_prompt: self.system_prompt,
             include_context_trace: self.include_context_trace,
+            turn_context: self.turn_context,
         }
     }
 }

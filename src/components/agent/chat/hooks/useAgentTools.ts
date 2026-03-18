@@ -23,6 +23,7 @@ interface UseAgentToolsOptions {
   runtime: AgentRuntimeAdapter;
   sessionIdRef: MutableRefObject<string | null>;
   currentStreamingSessionIdRef: MutableRefObject<string | null>;
+  messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setThreadItems: Dispatch<SetStateAction<AgentThreadItem[]>>;
 }
@@ -32,6 +33,7 @@ export function useAgentTools(options: UseAgentToolsOptions) {
     runtime,
     sessionIdRef,
     currentStreamingSessionIdRef,
+    messages,
     setMessages,
     setThreadItems,
   } = options;
@@ -53,7 +55,12 @@ export function useAgentTools(options: UseAgentToolsOptions) {
         const pendingAction = pendingActions.find(
           (item) => item.requestId === response.requestId,
         );
-        const actionType = response.actionType || pendingAction?.actionType;
+        const persistedAction =
+          pendingAction ||
+          messages
+            .flatMap((message) => message.actionRequests || [])
+            .find((item) => item.requestId === response.requestId);
+        const actionType = response.actionType || persistedAction?.actionType;
         if (!actionType) {
           throw new Error("缺少 actionType，无法提交确认");
         }
@@ -62,7 +69,7 @@ export function useAgentTools(options: UseAgentToolsOptions) {
           typeof response.response === "string" ? response.response.trim() : "";
         let submittedUserData: unknown = response.userData;
         let effectiveRequestId = response.requestId;
-        let metadataAction = pendingAction;
+        let metadataAction = persistedAction;
         const acknowledgedRequestIds = new Set<string>([response.requestId]);
 
         if (actionType === "elicitation" || actionType === "ask_user") {
@@ -94,13 +101,13 @@ export function useAgentTools(options: UseAgentToolsOptions) {
 
           submittedUserData = userData;
 
-          if (pendingAction?.isFallback) {
-            const fallbackPromptKey = resolveActionPromptKey(pendingAction);
+          if (persistedAction?.isFallback) {
+            const fallbackPromptKey = resolveActionPromptKey(persistedAction);
             if (fallbackPromptKey) {
               const resolvedAction = pendingActions.find((item) => {
-                if (item.requestId === pendingAction.requestId) return false;
+                if (item.requestId === persistedAction.requestId) return false;
                 if (item.isFallback) return false;
-                if (item.actionType !== pendingAction.actionType) return false;
+                if (item.actionType !== persistedAction.actionType) return false;
                 return resolveActionPromptKey(item) === fallbackPromptKey;
               });
 
@@ -108,12 +115,12 @@ export function useAgentTools(options: UseAgentToolsOptions) {
                 queuedFallbackResponsesRef.current.set(fallbackPromptKey, {
                   ...response,
                   actionType,
-                  requestId: pendingAction.requestId,
+                  requestId: persistedAction.requestId,
                   userData,
                 });
                 setPendingActions((prev) =>
                   prev.map((item) =>
-                    item.requestId === pendingAction.requestId
+                    item.requestId === persistedAction.requestId
                       ? {
                           ...item,
                           status: "queued",
@@ -127,7 +134,7 @@ export function useAgentTools(options: UseAgentToolsOptions) {
                   prev.map((msg) => ({
                     ...msg,
                     actionRequests: msg.actionRequests?.map((item) =>
-                      item.requestId === pendingAction.requestId
+                      item.requestId === persistedAction.requestId
                         ? {
                             ...item,
                             status: "queued" as const,
@@ -138,7 +145,7 @@ export function useAgentTools(options: UseAgentToolsOptions) {
                     ),
                     contentParts: msg.contentParts?.map((part) =>
                       part.type === "action_required" &&
-                      part.actionRequired.requestId === pendingAction.requestId
+                      part.actionRequired.requestId === persistedAction.requestId
                         ? {
                             ...part,
                             actionRequired: {
@@ -249,6 +256,7 @@ export function useAgentTools(options: UseAgentToolsOptions) {
     },
     [
       currentStreamingSessionIdRef,
+      messages,
       pendingActions,
       runtime,
       sessionIdRef,

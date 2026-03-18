@@ -1,7 +1,7 @@
 {
   "name": "lime",
   "private": true,
-  "version": "0.89.1",
+  "version": "0.90.0",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -20,6 +20,13 @@
     "tauri:dev": "CARGO_TARGET_DIR=target tauri dev",
     "tauri:dev:headless": "CARGO_TARGET_DIR=target tauri dev --config src-tauri/tauri.conf.headless.json",
     "tauri:dev:nowatch": "CARGO_TARGET_DIR=target tauri dev --no-watch",
+    "tauri:dev:profile:trace": "node scripts/run-tauri-profile.mjs trace",
+    "tauri:dev:profile:trace:devtools": "node scripts/run-tauri-profile.mjs trace --open-devtools",
+    "tauri:dev:profile:trace:headless": "node scripts/run-tauri-profile.mjs trace --headless",
+    "tauri:dev:profile:console": "node scripts/run-tauri-profile.mjs console",
+    "tauri:dev:profile:console:devtools": "node scripts/run-tauri-profile.mjs console --open-devtools",
+    "tauri:dev:profile:trace-console": "node scripts/run-tauri-profile.mjs trace-console",
+    "tauri:dev:profile:trace-console:devtools": "node scripts/run-tauri-profile.mjs trace-console --open-devtools",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "prepare": "husky",

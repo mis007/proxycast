@@ -39,6 +39,7 @@ export function useSkills(app: AppType = "lime") {
     async (refreshRemote = false) => {
       try {
         setLoading(true);
+        setRemoteLoading(true);
         setError(null);
         const data = await skillsApi.getAll(app, { refreshRemote });
         setSkills(data);
@@ -46,6 +47,7 @@ export function useSkills(app: AppType = "lime") {
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
+        setRemoteLoading(false);
         setLoading(false);
       }
     },
@@ -72,29 +74,17 @@ export function useSkills(app: AppType = "lime") {
     }
     initializedRef.current = true;
 
-    // 阶段 1：快速拿本地+内置技能（同步接口，不走网络）
-    skillsApi.getLocal(app).then((localData) => {
-      setSkills(localData);
-      setLoading(false);
-      // 阶段 2：后台拉取全部（含远程仓库）
-      setRemoteLoading(true);
-      skillsApi
-        .getAll(app, { refreshRemote: false })
-        .then((allData) => {
-          setSkills(allData);
-          updateCache(allData);
-        })
-        .catch(() => {
-          // 远程失败，保留本地数据
-          updateCache(localData);
-        })
-        .finally(() => {
-          setRemoteLoading(false);
-        });
-    }).catch((e) => {
-      setError(e instanceof Error ? e.message : String(e));
-      setLoading(false);
-    });
+    skillsApi
+      .getLocal(app)
+      .then((localData) => {
+        setSkills(localData);
+        updateCache(localData);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setLoading(false);
+      });
 
     fetchRepos();
   }, [app, isCacheFresh, fetchAllSkills, fetchRepos, updateCache]);

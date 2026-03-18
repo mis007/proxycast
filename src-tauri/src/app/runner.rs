@@ -31,6 +31,8 @@ fn should_minimize_to_tray(window_label: &str, minimize_to_tray: bool) -> bool {
 /// 5. 启动应用
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _profiling_guard = crate::profiling::init();
+
     // 加载并验证配置
     let config = match bootstrap::load_and_validate_config() {
         Ok(cfg) => cfg,
@@ -221,6 +223,12 @@ pub fn run() {
                 }
                 if let Err(e) = main_window.show() {
                     tracing::warn!("[启动] 主窗口显示失败: {}", e);
+                }
+
+                #[cfg(debug_assertions)]
+                if crate::profiling::should_open_webview_devtools() {
+                    main_window.open_devtools();
+                    tracing::info!("[Profiling] 已自动打开主窗口 WebView DevTools");
                 }
             }
 
@@ -641,6 +649,9 @@ pub fn run() {
             let shared_logger = shared_logger_clone.clone();
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                let mut available_credentials = 0usize;
+                let mut total_credentials = 0usize;
+
                 // 先加载凭证池中的凭证
                 {
                     logs.write().await.add("info", "[启动] 正在加载凭证池...");
@@ -649,12 +660,19 @@ pub fn run() {
                     match pool_service.get_overview(&db) {
                         Ok(overview) => {
                             let mut loaded_types = Vec::new();
-                            let mut total_credentials = 0;
-
                             for provider_overview in overview {
-                                let count = provider_overview.stats.total_count;
+                                let enabled_credentials: Vec<_> = provider_overview
+                                    .credentials
+                                    .iter()
+                                    .filter(|credential| !credential.is_disabled)
+                                    .collect();
+                                let count = enabled_credentials.len();
                                 if count > 0 {
                                     total_credentials += count;
+                                    available_credentials += enabled_credentials
+                                        .iter()
+                                        .filter(|credential| credential.is_healthy)
+                                        .count();
                                     let provider_name =
                                         match provider_overview.provider_type.as_str() {
                                             "kiro" => "Kiro",
@@ -742,22 +760,31 @@ pub fn run() {
                 if let Some(tray_state) = app_handle.try_state::<TrayManagerState<tauri::Wry>>() {
                     let tray_guard = tray_state.0.read().await;
                     if let Some(tray_manager) = tray_guard.as_ref() {
-                        // 计算初始图标状态
-                        // 服务器刚启动时，假设凭证健康（后续会通过状态同步更新）
-                        let icon_status = if server_started {
-                            TrayIconStatus::Running
-                        } else {
+                        let current_state = tray_manager.get_state().await;
+                        let icon_status = if !server_started {
                             TrayIconStatus::Stopped
+                        } else if total_credentials > 0 && available_credentials == 0 {
+                            TrayIconStatus::Error
+                        } else if available_credentials < total_credentials {
+                            TrayIconStatus::Warning
+                        } else {
+                            TrayIconStatus::Running
                         };
 
                         let snapshot = TrayStateSnapshot {
                             icon_status,
                             server_running: server_started,
                             server_address,
-                            available_credentials: 0, // 初始值，后续通过状态同步更新
-                            total_credentials: 0,
-                            today_requests: 0,
-                            auto_start_enabled: false, // 后续通过状态同步更新
+                            available_credentials,
+                            total_credentials,
+                            today_requests: current_state.today_requests,
+                            auto_start_enabled: current_state.auto_start_enabled,
+                            current_model_provider_type: current_state.current_model_provider_type,
+                            current_model_provider_label: current_state
+                                .current_model_provider_label,
+                            current_model: current_state.current_model,
+                            current_theme_label: current_state.current_theme_label,
+                            quick_model_groups: current_state.quick_model_groups,
                         };
 
                         if let Err(e) = tray_manager.update_state(snapshot).await {
@@ -1019,6 +1046,7 @@ pub fn run() {
             app_commands::clear_logs,
             app_commands::clear_diagnostic_log_history,
             app_commands::report_frontend_crash,
+            app_commands::report_frontend_debug_log,
             // API test commands (from app::commands)
             app_commands::test_api,
             app_commands::get_available_models,
@@ -1283,6 +1311,7 @@ pub fn run() {
             commands::tray_cmd::get_tray_state,
             commands::tray_cmd::refresh_tray_menu,
             commands::tray_cmd::refresh_tray_with_stats,
+            commands::tray_cmd::sync_tray_model_shortcuts,
             // Plugin commands
             commands::plugin_cmd::get_plugin_status,
             commands::plugin_cmd::get_plugins,
@@ -1348,13 +1377,6 @@ pub fn run() {
             commands::agent_cmd::agent_start_process,
             commands::agent_cmd::agent_stop_process,
             commands::agent_cmd::agent_get_process_status,
-            commands::agent_cmd::agent_create_session,
-            commands::agent_cmd::agent_send_message,
-            commands::agent_cmd::agent_list_sessions,
-            commands::agent_cmd::agent_get_session,
-            commands::agent_cmd::agent_delete_session,
-            commands::agent_cmd::agent_get_session_messages,
-            commands::agent_cmd::agent_rename_session,
             commands::agent_cmd::agent_generate_title,
             // TODO: 重新启用这些命令，适配 aster-rust 工具系统
             // commands::agent_cmd::agent_terminal_command_response,
@@ -1365,24 +1387,14 @@ pub fn run() {
             commands::aster_agent_cmd::aster_agent_reset,
             commands::aster_agent_cmd::aster_agent_configure_provider,
             commands::aster_agent_cmd::aster_agent_configure_from_pool,
-            commands::aster_agent_cmd::aster_agent_chat_stream,
-            commands::aster_agent_cmd::aster_agent_stop,
             commands::aster_agent_cmd::agent_runtime_submit_turn,
             commands::aster_agent_cmd::agent_runtime_interrupt_turn,
             commands::aster_agent_cmd::agent_runtime_remove_queued_turn,
-            commands::aster_agent_cmd::aster_session_create,
-            commands::aster_agent_cmd::aster_session_set_execution_strategy,
-            commands::aster_agent_cmd::aster_session_list,
-            commands::aster_agent_cmd::aster_session_get,
-            commands::aster_agent_cmd::aster_session_rename,
-            commands::aster_agent_cmd::aster_session_delete,
             commands::aster_agent_cmd::agent_runtime_create_session,
             commands::aster_agent_cmd::agent_runtime_list_sessions,
             commands::aster_agent_cmd::agent_runtime_get_session,
             commands::aster_agent_cmd::agent_runtime_update_session,
             commands::aster_agent_cmd::agent_runtime_delete_session,
-            commands::aster_agent_cmd::aster_agent_confirm,
-            commands::aster_agent_cmd::aster_agent_submit_elicitation_response,
             commands::aster_agent_cmd::agent_runtime_respond_action,
             commands::aster_agent_cmd::social_generate_cover_image_cmd,
             commands::theme_context_cmd::aster_agent_theme_context_search,

@@ -423,7 +423,9 @@ impl AsterAgentState {
 
             // 创建 Agent（启用 Ask/LSP 回调）并注入 SessionStore
             let tool_config = crate::create_lime_tool_config();
-            let agent = Agent::with_tool_config(tool_config).with_session_store(session_store);
+            let agent = Agent::with_tool_config(tool_config)
+                .with_session_store(session_store)
+                .with_thread_runtime_store(aster::session::shared_thread_runtime_store());
 
             // 验证 session_store 是否被正确设置
             let has_store = agent.session_store().is_some();
@@ -476,7 +478,8 @@ impl AsterAgentState {
     pub async fn init_agent(&self) -> Result<(), String> {
         let mut agent_guard = self.agent.write().await;
         if agent_guard.is_none() {
-            let agent = Agent::new();
+            let agent = Agent::new()
+                .with_thread_runtime_store(aster::session::shared_thread_runtime_store());
             *agent_guard = Some(agent);
             tracing::warn!(
                 "[AsterAgent] Agent 初始化（无 SessionStore），消息将存储到 Aster 默认数据库"

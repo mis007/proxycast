@@ -15,7 +15,6 @@ use crate::commands::webview_cmd::{
     BrowserBackendType,
 };
 use crate::config::{GlobalConfigManager, GlobalConfigManagerState};
-use crate::database::dao::agent::AgentDao;
 use crate::database::dao::agent_runtime_queue::{
     AgentRuntimeQueuedTurnDao, NewAgentRuntimeQueuedTurnRecord,
 };
@@ -47,6 +46,7 @@ use aster::permission::{Permission, PermissionConfirmation, PrincipalType};
 use aster::sandbox::{
     detect_best_sandbox, execute_in_sandbox, ResourceLimits, SandboxConfig as ProcessSandboxConfig,
 };
+use aster::session::{SessionRuntimeSnapshot, TurnContextOverride};
 use aster::tools::task_output_tool::TaskOutputInput;
 use aster::tools::{
     BashTool, KillShellTool, PermissionBehavior, PermissionCheckResult, TaskManager,
@@ -62,10 +62,11 @@ use lime_agent::request_tool_policy::{
     stream_reply_with_policy, ReplyAttemptError, RequestToolPolicy, RequestToolPolicyMode,
 };
 use lime_agent::{
-    durable_memory_permission_pattern, is_virtual_memory_path, message_suggests_news_expansion,
-    resolve_virtual_memory_path, virtual_memory_relative_path, TauriRuntimeStatus,
-    DURABLE_MEMORY_VIRTUAL_ROOT,
+    convert_item_runtime, convert_turn_runtime, durable_memory_permission_pattern,
+    is_virtual_memory_path, message_suggests_news_expansion, resolve_virtual_memory_path,
+    virtual_memory_relative_path, TauriRuntimeStatus, DURABLE_MEMORY_VIRTUAL_ROOT,
 };
+use lime_core::database::dao::agent_timeline::{AgentThreadItem, AgentThreadTurn};
 use lime_services::api_key_provider_service::ApiKeyProviderService;
 use lime_services::mcp_service::McpService;
 use lime_services::video_generation_service::{
@@ -75,7 +76,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -214,6 +215,19 @@ fn workspace_sandbox_platform_hint() -> &'static str {
 
 fn build_workspace_sandbox_warning_message(reason: &str) -> String {
     format!("已启用 workspace 本地 sandbox，但当前环境不可用，已自动降级为普通执行。原因: {reason}")
+}
+
+fn build_turn_context_override(
+    metadata: Option<&serde_json::Value>,
+) -> Option<TurnContextOverride> {
+    let serde_json::Value::Object(map) = metadata?.clone() else {
+        return None;
+    };
+
+    Some(TurnContextOverride {
+        metadata: map.into_iter().collect(),
+        ..TurnContextOverride::default()
+    })
 }
 
 /// Aster Agent 状态信息
@@ -419,6 +433,9 @@ pub struct AsterChatRequest {
     /// 请求级元数据（可选，用于 harness / 主题工作台状态对齐）
     #[serde(default)]
     pub metadata: Option<serde_json::Value>,
+    /// 回合 ID（可选，由前端提供时透传到 Aster runtime）
+    #[serde(default, alias = "turnId")]
+    pub turn_id: Option<String>,
     /// 会话忙时是否进入后端队列
     #[serde(default, alias = "queueIfBusy")]
     pub queue_if_busy: Option<bool>,
@@ -492,6 +509,7 @@ impl From<AgentRuntimeSubmitTurnRequest> for AsterChatRequest {
                 .as_ref()
                 .and_then(|config| config.system_prompt.clone()),
             metadata: turn_config.and_then(|config| config.metadata),
+            turn_id: request.turn_id,
             queue_if_busy: request.queue_if_busy,
             queued_turn_id: request.queued_turn_id,
         }
@@ -545,6 +563,77 @@ impl AgentRuntimeSessionDetail {
             queued_turns,
         }
     }
+}
+
+fn sort_runtime_turns(turns: &mut [AgentThreadTurn]) {
+    turns.sort_by(|left, right| {
+        left.started_at
+            .cmp(&right.started_at)
+            .then(left.created_at.cmp(&right.created_at))
+            .then(left.id.cmp(&right.id))
+    });
+}
+
+fn sort_runtime_items(items: &mut [AgentThreadItem], turn_started_at: &HashMap<String, String>) {
+    items.sort_by(|left, right| {
+        let left_turn_started = turn_started_at
+            .get(&left.turn_id)
+            .map(String::as_str)
+            .unwrap_or(left.started_at.as_str());
+        let right_turn_started = turn_started_at
+            .get(&right.turn_id)
+            .map(String::as_str)
+            .unwrap_or(right.started_at.as_str());
+
+        left_turn_started
+            .cmp(right_turn_started)
+            .then(left.sequence.cmp(&right.sequence))
+            .then(left.turn_id.cmp(&right.turn_id))
+            .then(left.started_at.cmp(&right.started_at))
+            .then(left.id.cmp(&right.id))
+    });
+}
+
+fn apply_aster_runtime_snapshot(detail: &mut SessionDetail, snapshot: &SessionRuntimeSnapshot) {
+    if let Some(thread) = snapshot.threads.first() {
+        detail.thread_id = thread.thread.id.clone();
+    }
+
+    if snapshot.threads.is_empty() {
+        return;
+    }
+
+    let mut turns_by_id = detail
+        .turns
+        .drain(..)
+        .map(|turn| (turn.id.clone(), turn))
+        .collect::<HashMap<_, _>>();
+    for thread in &snapshot.threads {
+        for turn in &thread.turns {
+            turns_by_id.insert(turn.id.clone(), convert_turn_runtime(turn.clone()));
+        }
+    }
+    detail.turns = turns_by_id.into_values().collect();
+    sort_runtime_turns(&mut detail.turns);
+
+    let turn_started_at = detail
+        .turns
+        .iter()
+        .map(|turn| (turn.id.clone(), turn.started_at.clone()))
+        .collect::<HashMap<_, _>>();
+
+    let mut items_by_id = detail
+        .items
+        .drain(..)
+        .map(|item| (item.id.clone(), item))
+        .collect::<HashMap<_, _>>();
+    for thread in &snapshot.threads {
+        for item in &thread.items {
+            items_by_id.insert(item.id.clone(), convert_item_runtime(item.clone()));
+        }
+    }
+    detail.items = items_by_id.into_values().collect();
+    sort_runtime_items(&mut detail.items, &turn_started_at);
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -5382,6 +5471,8 @@ async fn execute_aster_chat_request(
             tracing::warn!("[AsterAgent] session_store 存在: {}", has_store);
         }
     }
+    ensure_browser_mcp_tools_registered(state).await?;
+    ensure_tool_search_tool_registered(state).await?;
     ensure_social_image_tool_registered(state, config_manager).await?;
 
     // 直接使用前端传递的 session_id
@@ -5468,25 +5559,17 @@ async fn execute_aster_chat_request(
         }
     }
 
-    {
-        let db_conn = db.lock().map_err(|e| format!("获取数据库连接失败: {e}"))?;
-        if let Some(session) = AgentDao::get_session(&db_conn, session_id)
-            .map_err(|e| format!("读取 session 失败: {e}"))?
-        {
-            let session_dir = session.working_dir.unwrap_or_default();
-            if !session_dir.is_empty() && session_dir != workspace_root {
-                tracing::info!(
-                    "[AsterAgent] workspace 变更，自动更新 session working_dir: {} -> {}",
-                    session_dir,
-                    workspace_root
-                );
-                db_conn
-                    .execute(
-                        "UPDATE agent_sessions SET working_dir = ?1 WHERE id = ?2",
-                        rusqlite::params![&workspace_root, session_id],
-                    )
-                    .map_err(|e| format!("更新 session working_dir 失败: {e}"))?;
-            }
+    let persisted_session = AsterAgentWrapper::get_persisted_session_metadata_sync(db, session_id)?;
+
+    if let Some(session) = persisted_session.as_ref() {
+        let session_dir = session.working_dir.as_deref().unwrap_or_default();
+        if !session_dir.is_empty() && session_dir != workspace_root {
+            tracing::info!(
+                "[AsterAgent] workspace 变更，自动更新 session working_dir: {} -> {}",
+                session_dir,
+                workspace_root
+            );
+            AsterAgentWrapper::update_session_working_dir_sync(db, session_id, &workspace_root)?;
         }
     }
 
@@ -5539,14 +5622,24 @@ async fn execute_aster_chat_request(
 
     // 构建 system_prompt：优先使用项目上下文，其次使用 session 的 system_prompt
     // 同时读取会话已持久化的 execution_strategy
-    let (system_prompt, persisted_strategy) = {
-        let db_conn = db.lock().map_err(|e| format!("获取数据库连接失败: {e}"))?;
-        let session = AgentDao::get_session(&db_conn, session_id)
-            .map_err(|e| format!("读取 session 失败: {e}"))?;
-        let persisted = session
+    let (system_prompt, persisted_strategy, has_persisted_session) = {
+        let persisted = persisted_session
             .as_ref()
             .map(|s| AsterExecutionStrategy::from_db_value(s.execution_strategy.as_deref()))
             .unwrap_or_default();
+        let session_prompt = match persisted_session.as_ref() {
+            Some(session) => {
+                tracing::debug!(
+                    "[AsterAgent] 找到 session，system_prompt: {:?}",
+                    session.system_prompt.as_ref().map(|s| s.len())
+                );
+                session.system_prompt.clone()
+            }
+            None => {
+                tracing::debug!("[AsterAgent] Lime 数据库中未找到 session: {}", session_id);
+                None
+            }
+        };
 
         // 1. 如果提供了 project_id，构建项目上下文
         let project_prompt = if let Some(ref project_id) = request.project_id {
@@ -5576,19 +5669,6 @@ async fn execute_aster_chat_request(
         let resolved_prompt = if project_prompt.is_some() {
             project_prompt
         } else {
-            let session_prompt = match session {
-                Some(session) => {
-                    tracing::debug!(
-                        "[AsterAgent] 找到 session，system_prompt: {:?}",
-                        session.system_prompt.as_ref().map(|s| s.len())
-                    );
-                    session.system_prompt
-                }
-                None => {
-                    tracing::debug!("[AsterAgent] Lime 数据库中未找到 session: {}", session_id);
-                    None
-                }
-            };
             // fallback 到前端传入的 system_prompt
             if session_prompt.is_some() {
                 session_prompt
@@ -5624,17 +5704,16 @@ async fn execute_aster_chat_request(
             auto_continue_config.as_ref(),
         );
 
-        (merged_prompt, persisted)
+        (merged_prompt, persisted, persisted_session.is_some())
     };
 
     let requested_strategy = request.execution_strategy.unwrap_or(persisted_strategy);
     let effective_strategy = requested_strategy.effective_for_message(&request.message);
 
     if let Some(explicit_strategy) = request.execution_strategy {
-        let db_conn = db.lock().map_err(|e| format!("获取数据库连接失败: {e}"))?;
-        if AgentDao::session_exists(&db_conn, session_id).unwrap_or(false) {
-            if let Err(e) = AgentDao::update_execution_strategy(
-                &db_conn,
+        if has_persisted_session {
+            if let Err(error) = AsterAgentWrapper::update_session_execution_strategy_sync(
+                db,
                 session_id,
                 explicit_strategy.as_db_value(),
             ) {
@@ -5642,7 +5721,7 @@ async fn execute_aster_chat_request(
                     "[AsterAgent] 更新会话执行策略失败: session={}, strategy={}, error={}",
                     session_id,
                     explicit_strategy.as_db_value(),
-                    e
+                    error
                 );
             }
         }
@@ -5763,19 +5842,38 @@ async fn execute_aster_chat_request(
     let run_observation = Arc::new(Mutex::new(ChatRunObservation::default()));
     let run_observation_for_finalize = run_observation.clone();
     let run_start_metadata_for_finalize = run_start_metadata.clone();
+
+    let agent_arc = state.get_agent_arc();
+    let runtime_snapshot = {
+        let guard = agent_arc.read().await;
+        let agent = guard.as_ref().ok_or("Agent not initialized")?;
+        match agent.runtime_snapshot(session_id).await {
+            Ok(snapshot) => Some(snapshot),
+            Err(error) => {
+                tracing::warn!(
+                    "[AsterAgent] 提交 turn 前读取 runtime snapshot 失败: session_id={}, error={}",
+                    session_id,
+                    error
+                );
+                None
+            }
+        }
+    };
+    let resolved_thread_id = runtime_snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.threads.first())
+        .map(|thread| thread.thread.id.clone())
+        .unwrap_or_else(|| session_id.to_string());
+    let resolved_turn_id = request
+        .turn_id
+        .clone()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
     let timeline_recorder = Arc::new(Mutex::new(AgentTimelineRecorder::create(
         db.clone(),
-        session_id.to_string(),
+        resolved_thread_id.clone(),
+        resolved_turn_id.clone(),
         request.message.clone(),
     )?));
-
-    {
-        let mut recorder = match timeline_recorder.lock() {
-            Ok(guard) => guard,
-            Err(error) => error.into_inner(),
-        };
-        recorder.emit_start(app, &request.event_name)?;
-    }
 
     let (initial_runtime_status, decided_runtime_status) = build_turn_runtime_statuses(
         &request,
@@ -5796,23 +5894,30 @@ async fn execute_aster_chat_request(
             Err(error) => error.into_inner(),
         };
         if let Err(error) =
-            recorder.record_legacy_event(app, &request.event_name, &event, workspace_root.as_str())
+            recorder.record_runtime_event(app, &request.event_name, &event, workspace_root.as_str())
         {
             tracing::warn!("[AsterAgent] 记录 runtime_status 失败: {}", error);
         }
     }
 
     // 获取 Agent Arc 并保持 guard 在整个流处理期间存活
-    let agent_arc = state.get_agent_arc();
     let guard = agent_arc.read().await;
     let agent = guard.as_ref().ok_or("Agent not initialized")?;
 
     let include_context_trace = runtime_config.memory.enabled;
+    let turn_context = build_turn_context_override(request.metadata.as_ref());
+    let resolved_thread_id_for_session = resolved_thread_id.clone();
+    let resolved_turn_id_for_session = resolved_turn_id.clone();
 
     let build_session_config = || {
-        let mut session_config_builder = SessionConfigBuilder::new(session_id);
+        let mut session_config_builder = SessionConfigBuilder::new(session_id)
+            .thread_id(resolved_thread_id_for_session.clone())
+            .turn_id(resolved_turn_id_for_session.clone());
         if let Some(prompt) = system_prompt.clone() {
             session_config_builder = session_config_builder.system_prompt(prompt);
+        }
+        if let Some(turn_context) = turn_context.clone() {
+            session_config_builder = session_config_builder.turn_context(turn_context);
         }
         session_config_builder =
             session_config_builder.include_context_trace(include_context_trace);
@@ -5823,7 +5928,7 @@ async fn execute_aster_chat_request(
     let final_result = tracker
         .with_run_custom(
             RunSource::Chat,
-            Some("aster_agent_chat_stream".to_string()),
+            Some("agent_runtime_submit_turn".to_string()),
             Some(session_id.to_string()),
             Some(serde_json::Value::Object(run_start_metadata.clone())),
             async {
@@ -5867,7 +5972,7 @@ async fn execute_aster_chat_request(
                                 Ok(guard) => guard,
                                 Err(error) => error.into_inner(),
                             };
-                            if let Err(error) = recorder.record_legacy_event(
+                            if let Err(error) = recorder.record_runtime_event(
                                 &app,
                                 &event_name,
                                 event,
@@ -5939,7 +6044,7 @@ async fn execute_aster_chat_request(
                                         Ok(guard) => guard,
                                         Err(error) => error.into_inner(),
                                     };
-                                    if let Err(error) = recorder.record_legacy_event(
+                                    if let Err(error) = recorder.record_runtime_event(
                                         &app,
                                         &event_name,
                                         event,
@@ -6044,33 +6149,6 @@ async fn execute_aster_chat_request(
     state.remove_cancel_token(session_id).await;
 
     Ok(())
-}
-
-/// 发送消息并获取流式响应
-#[tauri::command]
-pub async fn aster_agent_chat_stream(
-    app: AppHandle,
-    state: State<'_, AsterAgentState>,
-    db: State<'_, DbConnection>,
-    api_key_provider_service: State<'_, ApiKeyProviderServiceState>,
-    logs: State<'_, LogState>,
-    config_manager: State<'_, GlobalConfigManagerState>,
-    mcp_manager: State<'_, McpManagerState>,
-    automation_state: State<'_, AutomationServiceState>,
-    request: AsterChatRequest,
-) -> Result<(), String> {
-    execute_aster_chat_request(
-        &app,
-        state.inner(),
-        db.inner(),
-        api_key_provider_service.inner(),
-        logs.inner(),
-        config_manager.inner(),
-        mcp_manager.inner(),
-        automation_state.inner(),
-        request,
-    )
-    .await
 }
 
 struct AgentRuntimeExecutionContext {
@@ -6460,16 +6538,6 @@ pub fn resume_persisted_runtime_queues_on_startup(
     Ok(resumed)
 }
 
-/// 停止当前会话
-#[tauri::command]
-pub async fn aster_agent_stop(
-    state: State<'_, AsterAgentState>,
-    session_id: String,
-) -> Result<bool, String> {
-    tracing::info!("[AsterAgent] 停止会话: {}", session_id);
-    Ok(state.cancel_session(&session_id).await)
-}
-
 /// 统一运行时：提交一个 turn。
 #[tauri::command]
 pub async fn agent_runtime_submit_turn(
@@ -6555,13 +6623,11 @@ pub async fn agent_runtime_create_session(
     name: Option<String>,
     execution_strategy: Option<AsterExecutionStrategy>,
 ) -> Result<String, String> {
-    aster_session_create(db, None, workspace_id, name, execution_strategy).await
+    create_runtime_session_internal(db.inner(), None, workspace_id, name, execution_strategy).await
 }
 
-/// 创建新会话
-#[tauri::command]
-pub async fn aster_session_create(
-    db: State<'_, DbConnection>,
+async fn create_runtime_session_internal(
+    db: &DbConnection,
     working_dir: Option<String>,
     workspace_id: String,
     name: Option<String>,
@@ -6574,7 +6640,7 @@ pub async fn aster_session_create(
         return Err("workspace_id 必填，请先选择项目工作区".to_string());
     }
 
-    let manager = WorkspaceManager::new(db.inner().clone());
+    let manager = WorkspaceManager::new(db.clone());
     let workspace = manager
         .get(&workspace_id)
         .map_err(|e| format!("读取 workspace 失败: {e}"))?
@@ -6602,7 +6668,7 @@ pub async fn aster_session_create(
         .or_else(|| Some(workspace_root.clone()));
 
     AsterAgentWrapper::create_session_sync(
-        &db,
+        db,
         name,
         resolved_working_dir,
         workspace_id,
@@ -6615,42 +6681,66 @@ pub async fn aster_session_create(
     )
 }
 
-/// 设置会话执行策略
-#[tauri::command]
-pub async fn aster_session_set_execution_strategy(
-    db: State<'_, DbConnection>,
-    session_id: String,
+fn update_runtime_session_execution_strategy_internal(
+    db: &DbConnection,
+    session_id: &str,
     execution_strategy: AsterExecutionStrategy,
 ) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-    AgentDao::update_execution_strategy(&conn, &session_id, execution_strategy.as_db_value())
-        .map_err(|e| format!("更新会话执行策略失败: {e}"))?;
-    Ok(())
+    AsterAgentWrapper::update_session_execution_strategy_sync(
+        db,
+        session_id,
+        execution_strategy.as_db_value(),
+    )
 }
 
 /// 统一运行时：列出会话。
 #[tauri::command]
 pub async fn agent_runtime_list_sessions(
     db: State<'_, DbConnection>,
+    logs: State<'_, LogState>,
 ) -> Result<Vec<SessionInfo>, String> {
-    aster_session_list(db).await
+    let started_at = Instant::now();
+    logs.write()
+        .await
+        .add("info", "[AgentDiag] agent_runtime_list_sessions.start");
+
+    match list_runtime_sessions_internal(db.inner()) {
+        Ok(sessions) => {
+            logs.write().await.add(
+                "info",
+                &format!(
+                    "[AgentDiag] agent_runtime_list_sessions.success duration_ms={} sessions={}",
+                    started_at.elapsed().as_millis(),
+                    sessions.len()
+                ),
+            );
+            Ok(sessions)
+        }
+        Err(error) => {
+            logs.write().await.add(
+                "error",
+                &format!(
+                    "[AgentDiag] agent_runtime_list_sessions.error duration_ms={} error={}",
+                    started_at.elapsed().as_millis(),
+                    crate::logger::sanitize_log_message(&error)
+                ),
+            );
+            Err(error)
+        }
+    }
 }
 
-/// 列出所有会话
-#[tauri::command]
-pub async fn aster_session_list(db: State<'_, DbConnection>) -> Result<Vec<SessionInfo>, String> {
+fn list_runtime_sessions_internal(db: &DbConnection) -> Result<Vec<SessionInfo>, String> {
     tracing::info!("[AsterAgent] 列出会话");
-    AsterAgentWrapper::list_sessions_sync(&db)
+    AsterAgentWrapper::list_sessions_sync(db)
 }
 
-/// 获取会话详情
-#[tauri::command]
-pub async fn aster_session_get(
-    db: State<'_, DbConnection>,
-    session_id: String,
+fn get_runtime_session_detail_internal(
+    db: &DbConnection,
+    session_id: &str,
 ) -> Result<SessionDetail, String> {
     tracing::info!("[AsterAgent] 获取会话: {}", session_id);
-    AsterAgentWrapper::get_session_sync(&db, &session_id)
+    AsterAgentWrapper::get_session_sync(db, session_id)
 }
 
 /// 统一运行时：获取会话详情。
@@ -6667,7 +6757,23 @@ pub async fn agent_runtime_get_session(
     session_id: String,
 ) -> Result<AgentRuntimeSessionDetail, String> {
     ensure_runtime_queue_loaded(state.inner(), db.inner(), &session_id)?;
-    let detail = AsterAgentWrapper::get_session_sync(db.inner(), &session_id)?;
+    let mut detail = get_runtime_session_detail_internal(db.inner(), &session_id)?;
+
+    let agent_arc = state.get_agent_arc();
+    let guard = agent_arc.read().await;
+    if let Some(agent) = guard.as_ref() {
+        match agent.runtime_snapshot(&session_id).await {
+            Ok(snapshot) => apply_aster_runtime_snapshot(&mut detail, &snapshot),
+            Err(error) => {
+                tracing::warn!(
+                    "[AsterAgent] 读取 Aster runtime snapshot 失败: session_id={}, error={}",
+                    session_id,
+                    error
+                );
+            }
+        }
+    }
+
     let queued_turns = state.inner().turn_queue().snapshot(&session_id);
     if !queued_turns.is_empty() && !state.inner().turn_queue().has_active(&session_id) {
         let context = AgentRuntimeExecutionContext::from_states(
@@ -6729,15 +6835,13 @@ pub async fn agent_runtime_remove_queued_turn(
     Ok(false)
 }
 
-/// 重命名会话
-#[tauri::command]
-pub async fn aster_session_rename(
-    db: State<'_, DbConnection>,
-    session_id: String,
-    name: String,
+fn rename_runtime_session_internal(
+    db: &DbConnection,
+    session_id: &str,
+    name: &str,
 ) -> Result<(), String> {
     tracing::info!("[AsterAgent] 重命名会话: {}", session_id);
-    AsterAgentWrapper::rename_session_sync(&db, &session_id, &name)
+    AsterAgentWrapper::rename_session_sync(db, session_id, name)
 }
 
 /// 统一运行时：更新会话元数据。
@@ -6754,30 +6858,28 @@ pub async fn agent_runtime_update_session(
     if let Some(name) = request.name.as_ref() {
         let normalized_name = name.trim();
         if !normalized_name.is_empty() {
-            aster_session_rename(
-                db.clone(),
-                trimmed_session_id.clone(),
-                normalized_name.to_string(),
-            )
-            .await?;
+            rename_runtime_session_internal(db.inner(), &trimmed_session_id, normalized_name)?;
         }
     }
 
     if let Some(execution_strategy) = request.execution_strategy {
-        aster_session_set_execution_strategy(db, trimmed_session_id, execution_strategy).await?;
+        update_runtime_session_execution_strategy_internal(
+            db.inner(),
+            &trimmed_session_id,
+            execution_strategy,
+        )?;
     }
 
     Ok(())
 }
 
-/// 删除会话
-#[tauri::command]
-pub async fn aster_session_delete(
-    db: State<'_, DbConnection>,
-    session_id: String,
+async fn delete_runtime_session_internal(
+    db: &DbConnection,
+    session_id: &str,
 ) -> Result<(), String> {
     tracing::info!("[AsterAgent] 删除会话: {}", session_id);
-    AsterAgentWrapper::delete_session_sync(&db, &session_id)
+    AsterAgentWrapper::delete_session(db, session_id).await?;
+    Ok(())
 }
 
 /// 统一运行时：删除会话。
@@ -6791,7 +6893,7 @@ pub async fn agent_runtime_delete_session(
     let trimmed_session_id = session_id.trim().to_string();
     let _ = state.cancel_session(&trimmed_session_id).await;
     let _ = clear_pending_runtime_queue(&app, state.inner(), db.inner(), &trimmed_session_id);
-    aster_session_delete(db, trimmed_session_id).await
+    delete_runtime_session_internal(db.inner(), &trimmed_session_id).await
 }
 
 /// 确认权限请求
@@ -6803,10 +6905,8 @@ pub struct ConfirmRequest {
     pub response: Option<String>,
 }
 
-/// 确认权限请求（用于工具调用确认等）
-#[tauri::command]
-pub async fn aster_agent_confirm(
-    state: State<'_, AsterAgentState>,
+async fn confirm_runtime_action_internal(
+    state: &AsterAgentState,
     request: ConfirmRequest,
 ) -> Result<(), String> {
     tracing::info!(
@@ -6891,8 +6991,8 @@ pub async fn agent_runtime_respond_action(
 
     let result = match request.action_type {
         AgentRuntimeActionType::ToolConfirmation => {
-            aster_agent_confirm(
-                state,
+            confirm_runtime_action_internal(
+                state.inner(),
                 ConfirmRequest {
                     request_id: request.request_id.clone(),
                     confirmed: request.confirmed,
@@ -6903,8 +7003,8 @@ pub async fn agent_runtime_respond_action(
         }
         AgentRuntimeActionType::AskUser | AgentRuntimeActionType::Elicitation => {
             let user_data = build_runtime_action_user_data(&request);
-            aster_agent_submit_elicitation_response(
-                state,
+            submit_runtime_elicitation_response_internal(
+                state.inner(),
                 request.session_id.clone(),
                 SubmitElicitationResponseRequest {
                     request_id: request.request_id.clone(),
@@ -6923,10 +7023,8 @@ pub async fn agent_runtime_respond_action(
     result
 }
 
-/// 提交 elicitation 回答（用于 ask/lsp 等需要用户输入的流程）
-#[tauri::command]
-pub async fn aster_agent_submit_elicitation_response(
-    state: State<'_, AsterAgentState>,
+async fn submit_runtime_elicitation_response_internal(
+    state: &AsterAgentState,
     session_id: String,
     request: SubmitElicitationResponseRequest,
 ) -> Result<(), String> {
@@ -7611,6 +7709,7 @@ mod tests {
                         "gate_key": "write_mode"
                     }
                 })),
+                turn_id: None,
                 queue_if_busy: None,
                 queued_turn_id: None,
             },

@@ -212,6 +212,95 @@ struct OpenClawDirectUpgradeResult {
     package_spec: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ResolvedOpenClawCommand {
+    Binary {
+        binary_path: PathBuf,
+    },
+    NodeCli {
+        node_path: PathBuf,
+        cli_path: PathBuf,
+        package_version: Option<String>,
+    },
+}
+
+impl ResolvedOpenClawCommand {
+    fn build_command(&self) -> Command {
+        let command_path = self.command_path();
+        let command_path_string = command_path.to_string_lossy().to_string();
+        let mut command = Command::new(command_path);
+        apply_binary_runtime_path(&mut command, &command_path_string);
+
+        if let Self::NodeCli { cli_path, .. } = self {
+            command.arg(cli_path);
+        }
+
+        command
+    }
+
+    fn command_path(&self) -> &Path {
+        match self {
+            Self::Binary { binary_path } => binary_path.as_path(),
+            Self::NodeCli { node_path, .. } => node_path.as_path(),
+        }
+    }
+
+    fn install_path_display(&self) -> String {
+        match self {
+            Self::Binary { binary_path } => binary_path.display().to_string(),
+            Self::NodeCli { cli_path, .. } => cli_path.display().to_string(),
+        }
+    }
+
+    fn invocation_display(&self) -> String {
+        match self {
+            Self::Binary { binary_path } => binary_path.display().to_string(),
+            Self::NodeCli {
+                node_path,
+                cli_path,
+                ..
+            } => {
+                format!("{} {}", node_path.display(), cli_path.display())
+            }
+        }
+    }
+
+    fn preview_invocation(&self) -> String {
+        match self {
+            Self::Binary { binary_path } => shell_escape(binary_path.to_string_lossy().as_ref()),
+            Self::NodeCli {
+                node_path,
+                cli_path,
+                ..
+            } => format!(
+                "{} {}",
+                shell_escape(node_path.to_string_lossy().as_ref()),
+                shell_escape(cli_path.to_string_lossy().as_ref())
+            ),
+        }
+    }
+
+    fn fallback_version(&self) -> Option<String> {
+        match self {
+            Self::Binary { .. } => None,
+            Self::NodeCli {
+                package_version, ..
+            } => package_version.clone(),
+        }
+    }
+
+    fn dedupe_key(&self) -> String {
+        match self {
+            Self::Binary { binary_path } => format!("binary:{}", binary_path.display()),
+            Self::NodeCli {
+                node_path,
+                cli_path,
+                ..
+            } => format!("node:{}:{}", node_path.display(), cli_path.display()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelInfo {
@@ -990,7 +1079,7 @@ impl OpenClawService {
             });
         }
 
-        let Some(binary) = find_command_in_shell("openclaw").await? else {
+        let Some(openclaw_command) = resolve_openclaw_command().await? else {
             self.gateway_status = GatewayStatus::Error;
             if let Some(app) = app {
                 emit_install_progress(app, "未检测到 OpenClaw 可执行文件，请先安装。", "error");
@@ -1011,9 +1100,8 @@ impl OpenClawService {
                 "info",
             );
         }
-        let mut command = Command::new(&binary);
+        let mut command = openclaw_command.build_command();
         let start_args = gateway_start_args(self.gateway_port, &self.gateway_auth_token);
-        apply_binary_runtime_path(&mut command, &binary);
         command
             .args(&start_args)
             .env(OPENCLAW_CONFIG_ENV, &config_path)
@@ -1162,8 +1250,8 @@ impl OpenClawService {
             });
         }
 
-        let stop_binaries = self.collect_gateway_stop_binaries().await?;
-        if stop_binaries.is_empty() {
+        let stop_commands = self.collect_gateway_stop_commands().await?;
+        if stop_commands.is_empty() {
             if let Some(app) = app {
                 emit_install_progress(
                     app,
@@ -1172,8 +1260,9 @@ impl OpenClawService {
                 );
             }
         } else {
-            for binary in &stop_binaries {
-                self.request_gateway_stop_via_binary(binary, app).await;
+            for command_spec in &stop_commands {
+                self.request_gateway_stop_via_command(command_spec, app)
+                    .await;
                 if self
                     .wait_for_gateway_shutdown(Duration::from_secs(4))
                     .await?
@@ -1271,7 +1360,7 @@ impl OpenClawService {
     }
 
     pub async fn check_update(&self) -> Result<UpdateInfo, String> {
-        let Some(binary) = find_command_in_shell("openclaw").await? else {
+        let Some(openclaw_command) = resolve_openclaw_command().await? else {
             return Ok(UpdateInfo {
                 has_update: false,
                 current_version: None,
@@ -1288,7 +1377,7 @@ impl OpenClawService {
             .await?
             .and_then(|value| parse_openclaw_release_version(&value).or(Some(value)));
 
-        let payload = match read_openclaw_update_status_payload(&binary).await {
+        let payload = match read_openclaw_update_status_payload(&openclaw_command).await {
             Ok(payload) => payload,
             Err(message) => {
                 return Ok(UpdateInfo {
@@ -1336,13 +1425,16 @@ impl OpenClawService {
     pub async fn perform_update(&mut self, app: &AppHandle) -> Result<ActionResult, String> {
         emit_install_progress(app, "开始执行 OpenClaw 升级。", "info");
 
-        let Some(binary) = find_command_in_shell("openclaw").await? else {
+        let Some(openclaw_command) = resolve_openclaw_command().await? else {
             return Ok(ActionResult {
                 success: false,
                 message: "未检测到 OpenClaw 可执行文件，请先安装。".to_string(),
             });
         };
-        let current_runtime_bin_dir = Path::new(&binary).parent().map(Path::to_path_buf);
+        let current_runtime_bin_dir = openclaw_command
+            .command_path()
+            .parent()
+            .map(Path::to_path_buf);
 
         self.refresh_process_state().await?;
         let gateway_was_running = self.gateway_status == GatewayStatus::Running;
@@ -1372,51 +1464,52 @@ impl OpenClawService {
             );
         }
 
-        let update_status_payload = match read_openclaw_update_status_payload(&binary).await {
-            Ok(payload) => payload,
-            Err(message) => {
-                emit_install_progress(app, &message, "warn");
-                match attempt_direct_openclaw_package_upgrade(
-                    app,
-                    current_runtime_bin_dir.as_deref(),
-                    None,
-                    None,
-                )
-                .await
-                {
-                    Ok(result) => {
-                        set_preferred_runtime_bin_dir(Some(result.runtime_bin_dir.clone()));
-                        emit_install_progress(
-                            app,
-                            &format!(
-                                "已自动切换后续执行环境到 {}。",
-                                result.runtime_bin_dir.display()
-                            ),
-                            "info",
-                        );
-                        return self
-                            .finalize_successful_openclaw_update(
+        let update_status_payload =
+            match read_openclaw_update_status_payload(&openclaw_command).await {
+                Ok(payload) => payload,
+                Err(message) => {
+                    emit_install_progress(app, &message, "warn");
+                    match attempt_direct_openclaw_package_upgrade(
+                        app,
+                        current_runtime_bin_dir.as_deref(),
+                        None,
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(result) => {
+                            set_preferred_runtime_bin_dir(Some(result.runtime_bin_dir.clone()));
+                            emit_install_progress(
                                 app,
-                                gateway_was_running,
-                                Some(format!(
-                                    "OpenClaw 已通过 {} 的 {} 全局升级完成（{}）。",
-                                    result.runtime_source,
-                                    result.package_manager,
-                                    result.package_spec
-                                )),
-                            )
-                            .await;
-                    }
-                    Err(fallback_error) => {
-                        emit_install_progress(app, &fallback_error, "error");
-                        return Ok(ActionResult {
-                            success: false,
-                            message,
-                        });
+                                &format!(
+                                    "已自动切换后续执行环境到 {}。",
+                                    result.runtime_bin_dir.display()
+                                ),
+                                "info",
+                            );
+                            return self
+                                .finalize_successful_openclaw_update(
+                                    app,
+                                    gateway_was_running,
+                                    Some(format!(
+                                        "OpenClaw 已通过 {} 的 {} 全局升级完成（{}）。",
+                                        result.runtime_source,
+                                        result.package_manager,
+                                        result.package_spec
+                                    )),
+                                )
+                                .await;
+                        }
+                        Err(fallback_error) => {
+                            emit_install_progress(app, &fallback_error, "error");
+                            return Ok(ActionResult {
+                                success: false,
+                                message,
+                            });
+                        }
                     }
                 }
-            }
-        };
+            };
         let update_context = extract_openclaw_update_execution_context(&update_status_payload);
         if let Some(root) = update_context.root.as_ref().filter(|root| root.is_dir()) {
             emit_install_progress(
@@ -1437,8 +1530,7 @@ impl OpenClawService {
             );
         }
 
-        let mut command = Command::new(&binary);
-        apply_binary_runtime_path(&mut command, &binary);
+        let mut command = openclaw_command.build_command();
         if let Some(root) = update_context.root.as_ref().filter(|root| root.is_dir()) {
             command.current_dir(root);
         }
@@ -1696,26 +1788,30 @@ impl OpenClawService {
         Ok(false)
     }
 
-    async fn collect_gateway_stop_binaries(&self) -> Result<Vec<PathBuf>, String> {
-        let mut binaries = Vec::new();
+    async fn collect_gateway_stop_commands(&self) -> Result<Vec<ResolvedOpenClawCommand>, String> {
+        let mut commands = Vec::new();
 
-        if let Some(binary) = find_command_in_shell("openclaw").await? {
-            binaries.push(PathBuf::from(binary));
+        if let Some(command) = resolve_openclaw_command().await? {
+            commands.push(command);
         }
 
         let mut runtime_candidates = list_openclaw_runtime_candidates().await?;
         runtime_candidates.sort_by(compare_openclaw_runtime_candidates);
-        binaries.extend(
+        commands.extend(
             runtime_candidates
-                .into_iter()
-                .filter_map(|candidate| candidate.openclaw_path.map(PathBuf::from)),
+                .iter()
+                .filter_map(resolve_openclaw_command_from_runtime_candidate),
         );
 
-        Ok(dedupe_paths(binaries))
+        Ok(dedupe_openclaw_commands(commands))
     }
 
-    async fn request_gateway_stop_via_binary(&self, binary_path: &Path, app: Option<&AppHandle>) {
-        let binary_label = binary_path.display().to_string();
+    async fn request_gateway_stop_via_command(
+        &self,
+        command_spec: &ResolvedOpenClawCommand,
+        app: Option<&AppHandle>,
+    ) {
+        let binary_label = command_spec.invocation_display();
         if let Some(app) = app {
             emit_install_progress(
                 app,
@@ -1724,12 +1820,7 @@ impl OpenClawService {
             );
         }
 
-        let mut command = Command::new(binary_path);
-        if let Some(binary) = binary_path.to_str() {
-            apply_binary_runtime_path(&mut command, binary);
-        } else {
-            apply_windows_no_window(&mut command);
-        }
+        let mut command = command_spec.build_command();
         let output = timeout(
             Duration::from_secs(8),
             command
@@ -1861,9 +1952,9 @@ impl OpenClawService {
             self.gateway_started_at = None;
         }
 
-        let binary = find_command_in_shell("openclaw").await?;
-        let running =
-            self.check_port_open().await || self.check_gateway_status(binary.as_deref()).await?;
+        let openclaw_command = resolve_openclaw_command().await?;
+        let running = self.check_port_open().await
+            || self.check_gateway_status(openclaw_command.as_ref()).await?;
 
         self.gateway_status = if running {
             GatewayStatus::Running
@@ -1891,13 +1982,15 @@ impl OpenClawService {
         .unwrap_or(false)
     }
 
-    async fn check_gateway_status(&self, binary: Option<&str>) -> Result<bool, String> {
-        let Some(openclaw_path) = binary else {
+    async fn check_gateway_status(
+        &self,
+        command_spec: Option<&ResolvedOpenClawCommand>,
+    ) -> Result<bool, String> {
+        let Some(command_spec) = command_spec else {
             return Ok(false);
         };
 
-        let mut command = Command::new(openclaw_path);
-        apply_binary_runtime_path(&mut command, &openclaw_path);
+        let mut command = command_spec.build_command();
         let output = command
             .arg("gateway")
             .arg("status")
@@ -1925,26 +2018,11 @@ impl OpenClawService {
     }
 
     async fn read_openclaw_version(&self) -> Result<Option<String>, String> {
-        let Some(binary) = find_command_in_shell("openclaw").await? else {
+        let Some(command_spec) = resolve_openclaw_command().await? else {
             return Ok(None);
         };
 
-        let mut command = Command::new(&binary);
-        apply_binary_runtime_path(&mut command, &binary);
-        let output = command
-            .arg("--version")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| format!("读取 OpenClaw 版本失败: {e}"))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if stdout.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(stdout))
-        }
+        read_openclaw_version_from_command(&command_spec).await
     }
 
     fn gateway_ws_url(&self) -> String {
@@ -1977,12 +2055,11 @@ impl OpenClawService {
             return None;
         }
 
-        let Some(openclaw_path) = find_command_in_shell("openclaw").await.ok().flatten() else {
+        let Some(command_spec) = resolve_openclaw_command().await.ok().flatten() else {
             return None;
         };
 
-        let mut command = Command::new(&openclaw_path);
-        apply_binary_runtime_path(&mut command, &openclaw_path);
+        let mut command = command_spec.build_command();
         let output = command
             .arg("gateway")
             .arg("health")
@@ -2154,7 +2231,7 @@ impl OpenClawService {
         if self.gateway_auth_token.is_empty() {
             self.gateway_auth_token = generate_auth_token();
         }
-        let binary = find_command_in_shell("openclaw")
+        let openclaw_command = resolve_openclaw_command()
             .await?
             .ok_or_else(|| "未检测到 OpenClaw 可执行文件，请先安装。".to_string())?;
         let config_path = openclaw_lime_config_path();
@@ -2173,7 +2250,7 @@ impl OpenClawService {
                     ""
                 },
                 shell_escape(config_path.to_string_lossy().as_ref()),
-                shell_escape(&binary),
+                openclaw_command.preview_invocation(),
                 command
             ),
         })
@@ -2187,7 +2264,7 @@ impl OpenClawService {
             self.gateway_port = next_port.max(1);
         }
         self.restore_auth_token_from_config();
-        let binary = find_command_in_shell("openclaw")
+        let openclaw_command = resolve_openclaw_command()
             .await?
             .ok_or_else(|| "未检测到 OpenClaw 可执行文件，请先安装。".to_string())?;
         let config_path = openclaw_lime_config_path();
@@ -2196,7 +2273,7 @@ impl OpenClawService {
             command: format!(
                 "OPENCLAW_CONFIG_PATH={} {} gateway stop --url {} --token {}",
                 shell_escape(config_path.to_string_lossy().as_ref()),
-                shell_escape(&binary),
+                openclaw_command.preview_invocation(),
                 self.gateway_ws_url(),
                 shell_escape(&self.gateway_auth_token)
             ),
@@ -2474,7 +2551,7 @@ async fn inspect_git_dependency_status() -> Result<DependencyStatus, String> {
 }
 
 async fn inspect_openclaw_dependency_status() -> Result<DependencyStatus, String> {
-    let Some(path) = find_command_in_shell("openclaw").await? else {
+    let Some(command) = resolve_openclaw_command().await? else {
         if let Some(status) = inspect_openclaw_package_reload_status().await? {
             return Ok(status);
         }
@@ -2488,7 +2565,9 @@ async fn inspect_openclaw_dependency_status() -> Result<DependencyStatus, String
         });
     };
 
-    let version_text = read_command_version_text(&path, &["--version"]).await?;
+    let version_text = read_openclaw_version_from_command(&command)
+        .await?
+        .unwrap_or_default();
     Ok(DependencyStatus {
         status: "ok".to_string(),
         version: if version_text.is_empty() {
@@ -2496,8 +2575,14 @@ async fn inspect_openclaw_dependency_status() -> Result<DependencyStatus, String
         } else {
             Some(version_text.clone())
         },
-        path: Some(path),
-        message: if version_text.is_empty() {
+        path: Some(command.install_path_display()),
+        message: if matches!(command, ResolvedOpenClawCommand::NodeCli { .. }) {
+            if version_text.is_empty() {
+                "已检测到 OpenClaw 包，Lime 将通过当前 Node 运行时直接启动。".to_string()
+            } else {
+                format!("已检测到 OpenClaw 包，Lime 将通过当前 Node 运行时直接启动：{version_text}")
+            }
+        } else if version_text.is_empty() {
             "已检测到 OpenClaw。".to_string()
         } else {
             format!("已检测到 OpenClaw：{version_text}")
@@ -3175,9 +3260,10 @@ fn parse_openclaw_release_version(value: &str) -> Option<String> {
         .and_then(|captures| captures.get(1).map(|value| value.as_str().to_string()))
 }
 
-async fn read_openclaw_update_status_payload(binary_path: &str) -> Result<Value, String> {
-    let mut command = Command::new(binary_path);
-    apply_binary_runtime_path(&mut command, binary_path);
+async fn read_openclaw_update_status_payload(
+    command_spec: &ResolvedOpenClawCommand,
+) -> Result<Value, String> {
+    let mut command = command_spec.build_command();
     let output = command
         .arg("update")
         .arg("status")
@@ -4415,6 +4501,81 @@ fn read_package_version(manifest_path: &Path) -> Option<String> {
     manifest.version.filter(|item| !item.trim().is_empty())
 }
 
+fn resolve_openclaw_cli_entry_from_package_manifest(manifest_path: &Path) -> Option<PathBuf> {
+    let package_root = manifest_path.parent()?;
+    let content = std::fs::read_to_string(manifest_path).ok()?;
+    let manifest = serde_json::from_str::<Value>(&content).ok()?;
+
+    let mut candidates = Vec::new();
+
+    if let Some(bin_value) = manifest.get("bin") {
+        let bin_entry = match bin_value {
+            Value::String(value) => Some(value.as_str()),
+            Value::Object(entries) => entries
+                .get("openclaw")
+                .and_then(Value::as_str)
+                .or_else(|| entries.values().find_map(Value::as_str)),
+            _ => None,
+        };
+
+        if let Some(entry) = bin_entry {
+            candidates.push(package_root.join(entry));
+        }
+    }
+
+    candidates.push(package_root.join("dist").join("index.js"));
+    candidates.push(package_root.join("dist").join("index.mjs"));
+    candidates.push(package_root.join("dist").join("entry.js"));
+    candidates.push(package_root.join("dist").join("entry.mjs"));
+
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+fn resolve_openclaw_command_from_runtime_candidate(
+    candidate: &OpenClawRuntimeCandidate,
+) -> Option<ResolvedOpenClawCommand> {
+    if let Some(openclaw_path) = candidate
+        .openclaw_path
+        .as_deref()
+        .map(PathBuf::from)
+        .filter(|path| path.is_file())
+    {
+        return Some(ResolvedOpenClawCommand::Binary {
+            binary_path: openclaw_path,
+        });
+    }
+
+    let node_path = PathBuf::from(candidate.node_path.as_str());
+    if !node_path.is_file() {
+        return None;
+    }
+
+    let manifest_path = candidate
+        .openclaw_package_path
+        .as_deref()
+        .map(PathBuf::from)?;
+    let cli_path = resolve_openclaw_cli_entry_from_package_manifest(&manifest_path)?;
+
+    Some(ResolvedOpenClawCommand::NodeCli {
+        node_path,
+        cli_path,
+        package_version: read_package_version(&manifest_path),
+    })
+}
+
+fn dedupe_openclaw_commands(
+    commands: Vec<ResolvedOpenClawCommand>,
+) -> Vec<ResolvedOpenClawCommand> {
+    let mut deduped = Vec::with_capacity(commands.len());
+    let mut seen = HashSet::new();
+    for command in commands {
+        if seen.insert(command.dedupe_key()) {
+            deduped.push(command);
+        }
+    }
+    deduped
+}
+
 fn dedupe_paths(candidates: Vec<PathBuf>) -> Vec<PathBuf> {
     let mut deduped = Vec::with_capacity(candidates.len());
     let mut seen = HashSet::new();
@@ -4424,6 +4585,44 @@ fn dedupe_paths(candidates: Vec<PathBuf>) -> Vec<PathBuf> {
         }
     }
     deduped
+}
+
+async fn resolve_openclaw_command() -> Result<Option<ResolvedOpenClawCommand>, String> {
+    if let Some(binary) = find_command_in_shell("openclaw").await? {
+        return Ok(Some(ResolvedOpenClawCommand::Binary {
+            binary_path: PathBuf::from(binary),
+        }));
+    }
+
+    let mut runtime_candidates = list_openclaw_runtime_candidates().await?;
+    runtime_candidates.sort_by(compare_openclaw_runtime_candidates);
+    Ok(runtime_candidates
+        .iter()
+        .find_map(resolve_openclaw_command_from_runtime_candidate))
+}
+
+async fn read_openclaw_version_from_command(
+    command_spec: &ResolvedOpenClawCommand,
+) -> Result<Option<String>, String> {
+    if let Some(version) = command_spec.fallback_version() {
+        return Ok(Some(version));
+    }
+
+    let output = command_spec
+        .build_command()
+        .arg("--version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(|e| format!("读取 OpenClaw 版本失败: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if stdout.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(stdout))
+    }
 }
 
 async fn list_openclaw_runtime_candidates() -> Result<Vec<OpenClawRuntimeCandidate>, String> {
@@ -5062,15 +5261,17 @@ mod tests {
         format_provider_base_url, gateway_start_args, has_api_version,
         infer_openclaw_package_name_from_path, npm_global_command_dirs_for,
         npm_global_node_modules_dirs_for, package_registry_for_package_spec,
-        parse_semver_from_text, resolve_windows_dependency_install_plan,
+        parse_semver_from_text, resolve_openclaw_cli_entry_from_package_manifest,
+        resolve_openclaw_command_from_runtime_candidate, resolve_windows_dependency_install_plan,
         runtime_candidate_matches_install_root, sanitize_runtime_config,
         select_best_semver_candidate, select_gateway_start_failure_detail,
         select_openclaw_update_failure_detail, select_preferred_path_candidate,
         shell_command_escape_for, shell_npm_prefix_assignment_for, shell_path_assignment_for,
         trim_trailing_slash, windows_dependency_action_result, windows_dependency_setup_message,
         windows_install_block_result, windows_manual_install_message, DependencyKind,
-        DependencyStatus, EnvironmentDiagnostics, OpenClawRuntimeCandidate, ShellPlatform,
-        WindowsDependencyInstallPlan, NPM_MIRROR_CN, OPENCLAW_CN_PACKAGE, OPENCLAW_DEFAULT_PACKAGE,
+        DependencyStatus, EnvironmentDiagnostics, OpenClawRuntimeCandidate,
+        ResolvedOpenClawCommand, ShellPlatform, WindowsDependencyInstallPlan, NPM_MIRROR_CN,
+        OPENCLAW_CN_PACKAGE, OPENCLAW_DEFAULT_PACKAGE,
     };
     use crate::database::dao::api_key_provider::{ApiKeyProvider, ApiProviderType, ProviderGroup};
     use chrono::Utc;
@@ -5078,6 +5279,7 @@ mod tests {
     use std::ffi::OsString;
     use std::fs;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn build_provider(provider_type: ApiProviderType, api_host: &str) -> ApiKeyProvider {
         ApiKeyProvider {
@@ -5097,6 +5299,18 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+    }
+
+    fn build_unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应晚于 Unix epoch")
+            .as_nanos();
+
+        std::env::temp_dir().join(format!(
+            "lime-openclaw-{prefix}-{}-{nanos}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -5760,6 +5974,86 @@ mod tests {
         fs::remove_dir_all(&temp_dir).unwrap();
 
         assert_eq!(detected, Some(("openclaw", Some("0.4.1".to_string()))));
+    }
+
+    #[test]
+    fn resolves_openclaw_cli_entry_from_dist_index_when_bin_target_missing() {
+        let temp_dir = build_unique_temp_dir("cli-entry");
+        let package_dir = temp_dir
+            .join("node_modules")
+            .join("@qingchencloud/openclaw-zh");
+        let dist_dir = package_dir.join("dist");
+        fs::create_dir_all(&dist_dir).unwrap();
+        fs::write(
+            package_dir.join("package.json"),
+            r#"{
+                "name":"@qingchencloud/openclaw-zh",
+                "version":"2026.3.13-zh.1",
+                "bin":{"openclaw":"openclaw.mjs"}
+            }"#,
+        )
+        .unwrap();
+        fs::write(dist_dir.join("index.js"), "console.log('openclaw');").unwrap();
+
+        let resolved =
+            resolve_openclaw_cli_entry_from_package_manifest(&package_dir.join("package.json"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        assert_eq!(resolved, Some(package_dir.join("dist").join("index.js")));
+    }
+
+    #[test]
+    fn resolves_openclaw_command_from_runtime_candidate_as_node_cli() {
+        let temp_dir = build_unique_temp_dir("runtime-candidate");
+        let node_bin_dir = temp_dir.join("bin");
+        let package_dir = temp_dir
+            .join("node_modules")
+            .join("@qingchencloud/openclaw-zh");
+        let dist_dir = package_dir.join("dist");
+        fs::create_dir_all(&node_bin_dir).unwrap();
+        fs::create_dir_all(&dist_dir).unwrap();
+
+        let node_path = node_bin_dir.join("node");
+        fs::write(&node_path, "").unwrap();
+        fs::write(
+            package_dir.join("package.json"),
+            r#"{
+                "name":"@qingchencloud/openclaw-zh",
+                "version":"2026.3.13-zh.1",
+                "bin":{"openclaw":"openclaw.mjs"}
+            }"#,
+        )
+        .unwrap();
+        fs::write(dist_dir.join("index.js"), "console.log('openclaw');").unwrap();
+
+        let candidate = OpenClawRuntimeCandidate {
+            id: temp_dir.display().to_string(),
+            source: "nvm".to_string(),
+            bin_dir: node_bin_dir.display().to_string(),
+            node_path: node_path.display().to_string(),
+            node_version: Some("23.4.0".to_string()),
+            npm_path: None,
+            npm_global_prefix: None,
+            openclaw_path: None,
+            openclaw_version: Some("2026.3.13-zh.1".to_string()),
+            openclaw_package_path: Some(package_dir.join("package.json").display().to_string()),
+            is_active: true,
+            is_preferred: true,
+        };
+
+        let resolved = resolve_openclaw_command_from_runtime_candidate(&candidate);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        assert_eq!(
+            resolved,
+            Some(ResolvedOpenClawCommand::NodeCli {
+                node_path,
+                cli_path: package_dir.join("dist").join("index.js"),
+                package_version: Some("2026.3.13-zh.1".to_string()),
+            })
+        );
     }
 
     #[test]

@@ -51,6 +51,7 @@ impl<R: Runtime> TraySynchronizer<R> {
         let tray_manager = tray_guard
             .as_ref()
             .ok_or_else(|| "托盘管理器未初始化".to_string())?;
+        let current_state = tray_manager.get_state().await;
 
         // 计算图标状态
         let icon_status = calculate_icon_status(server_running, credentials);
@@ -72,6 +73,11 @@ impl<R: Runtime> TraySynchronizer<R> {
             total_credentials,
             today_requests,
             auto_start_enabled,
+            current_model_provider_type: current_state.current_model_provider_type,
+            current_model_provider_label: current_state.current_model_provider_label,
+            current_model: current_state.current_model,
+            current_theme_label: current_state.current_theme_label,
+            quick_model_groups: current_state.quick_model_groups,
         };
 
         // 更新托盘状态

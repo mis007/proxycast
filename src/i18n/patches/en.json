@@ -800,7 +800,6 @@
   "参数": "Parameters",
   "执行日志": "Execution Log",
   "执行结果": "Execution Result",
-  "// === components\\agent\\chat\\hooks\\useAgentChat.ts ===": "",
   "加载模型配置失败": "Failed to load model configuration",
   "使用默认配置": "Using default configuration",
   "模型": "Model",

@@ -9,7 +9,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { safeInvoke, safeListen } from "@/lib/dev-bridge";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import {
   showDeepLinkError,
   showApiKeySaveError,
@@ -375,17 +374,22 @@ export function useDeepLink(): UseDeepLinkReturn {
 
     const setupListener = async () => {
       try {
-        // 使用 @tauri-apps/plugin-deep-link 监听 Deep Link URL
+        // 监听插件派发的 Deep Link URL 事件
         // _Requirements: 5.1_
-        unlistenDeepLink = await onOpenUrl(async (urls) => {
-          if (!mounted) return;
+        unlistenDeepLink = await safeListen<string[]>(
+          "deep-link://new-url",
+          async (event) => {
+            if (!mounted) return;
 
-          console.log("[useDeepLink] 收到 Deep Link URL:", urls);
+            const urls = Array.isArray(event.payload) ? event.payload : [];
+            console.log("[useDeepLink] 收到 Deep Link URL:", urls);
 
-          for (const url of urls) {
-            if (url.startsWith("lime://connect")) {
+            for (const url of urls) {
+              if (!url.startsWith("lime://connect")) {
+                continue;
+              }
+
               try {
-                // 调用后端处理 Deep Link
                 const result = await safeInvoke<DeepLinkResult>(
                   "handle_deep_link",
                   { url },
@@ -401,8 +405,8 @@ export function useDeepLink(): UseDeepLinkReturn {
                 }
               }
             }
-          }
-        });
+          },
+        );
 
         // 监听后端发送的 deep-link-connect 事件（兼容旧逻辑）
         const unlisten = await safeListen<DeepLinkResult>(

@@ -1003,11 +1003,14 @@ fn build_web_search_synthesis_runtime_status(coverage_summary: Option<&str>) -> 
 fn duplicate_session_config(config: &aster::agents::SessionConfig) -> aster::agents::SessionConfig {
     aster::agents::SessionConfig {
         id: config.id.clone(),
+        thread_id: config.thread_id.clone(),
+        turn_id: config.turn_id.clone(),
         schedule_id: config.schedule_id.clone(),
         max_turns: config.max_turns,
         retry_config: config.retry_config.clone(),
         system_prompt: config.system_prompt.clone(),
         include_context_trace: config.include_context_trace,
+        turn_context: config.turn_context.clone(),
     }
 }
 

@@ -1,6 +1,12 @@
 import { safeInvoke } from "@/lib/dev-bridge";
 import type { Config, EnvironmentPreview } from "./appConfigTypes";
 
+const APP_CONFIG_CHANGE_STAMP_KEY = "lime.app-config.changed-at";
+
+let configCache: Config | null = null;
+let configLoadingPromise: Promise<Config> | null = null;
+let configCacheStamp: string | null = null;
+
 export type {
   Config,
   CrashReportingConfig,
@@ -24,12 +30,88 @@ export type {
   VoiceConfig,
 } from "./appConfigTypes";
 
-export async function getConfig(): Promise<Config> {
-  return safeInvoke("get_config");
+interface GetConfigOptions {
+  forceRefresh?: boolean;
+}
+
+function cloneConfig(config: Config): Config {
+  if (typeof structuredClone === "function") {
+    return structuredClone(config);
+  }
+  return JSON.parse(JSON.stringify(config)) as Config;
+}
+
+function readAppConfigChangeStamp(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(APP_CONFIG_CHANGE_STAMP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function markAppConfigChanged(): string | null {
+  const nextStamp = String(Date.now());
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(APP_CONFIG_CHANGE_STAMP_KEY, nextStamp);
+    } catch {
+      // ignore
+    }
+  }
+
+  return nextStamp;
+}
+
+function invalidateConfigCache(): void {
+  configCache = null;
+  configLoadingPromise = null;
+  configCacheStamp = null;
+}
+
+export function invalidateAppConfigCache(): void {
+  invalidateConfigCache();
+}
+
+export async function getConfig(
+  options: GetConfigOptions = {},
+): Promise<Config> {
+  if (options.forceRefresh) {
+    invalidateConfigCache();
+  }
+
+  const currentStamp = readAppConfigChangeStamp();
+  if (configCache && configCacheStamp !== currentStamp) {
+    invalidateConfigCache();
+  }
+
+  if (configCache) {
+    return cloneConfig(configCache);
+  }
+
+  if (!configLoadingPromise) {
+    configLoadingPromise = safeInvoke<Config>("get_config")
+      .then((config) => {
+        configCache = cloneConfig(config);
+        configCacheStamp = readAppConfigChangeStamp();
+        return configCache;
+      })
+      .finally(() => {
+        configLoadingPromise = null;
+      });
+  }
+
+  return cloneConfig(await configLoadingPromise);
 }
 
 export async function saveConfig(config: Config): Promise<void> {
-  return safeInvoke("save_config", { config });
+  await safeInvoke("save_config", { config });
+  configCache = cloneConfig(config);
+  configCacheStamp = markAppConfigChanged();
 }
 
 export async function getEnvironmentPreview(): Promise<EnvironmentPreview> {
@@ -41,7 +123,18 @@ export async function getDefaultProvider(): Promise<string> {
 }
 
 export async function setDefaultProvider(provider: string): Promise<string> {
-  return safeInvoke("set_default_provider", { provider });
+  const nextProvider = await safeInvoke<string>("set_default_provider", {
+    provider,
+  });
+
+  if (configCache) {
+    configCache = {
+      ...cloneConfig(configCache),
+      default_provider: nextProvider,
+    };
+  }
+  configCacheStamp = markAppConfigChanged();
+  return nextProvider;
 }
 
 export async function updateProviderEnvVars(
@@ -49,9 +142,11 @@ export async function updateProviderEnvVars(
   apiHost: string,
   apiKey?: string,
 ): Promise<void> {
-  return safeInvoke("update_provider_env_vars", {
+  await safeInvoke("update_provider_env_vars", {
     providerType,
     apiHost,
     apiKey: apiKey || null,
   });
+  invalidateConfigCache();
+  configCacheStamp = markAppConfigChanged();
 }

@@ -491,8 +491,11 @@ impl SessionStore for LimeSessionStore {
     }
 
     async fn delete_session(&self, id: &str) -> Result<()> {
-        let conn = self.db.lock().map_err(|e| anyhow!("数据库锁定失败: {e}"))?;
-        conn.execute("DELETE FROM agent_sessions WHERE id = ?", [id])?;
+        {
+            let conn = self.db.lock().map_err(|e| anyhow!("数据库锁定失败: {e}"))?;
+            conn.execute("DELETE FROM agent_sessions WHERE id = ?", [id])?;
+        }
+
         Ok(())
     }
 

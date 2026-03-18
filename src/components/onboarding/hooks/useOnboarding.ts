@@ -9,6 +9,23 @@ import {
   type UserProfile,
 } from "../constants";
 
+function resolveNeedsOnboardingState(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const isComplete =
+      localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE) === "true";
+    const version = localStorage.getItem(STORAGE_KEYS.ONBOARDING_VERSION);
+
+    return !isComplete || version !== ONBOARDING_VERSION;
+  } catch (error) {
+    console.warn("[Onboarding] 读取引导状态失败，默认继续进入主应用:", error);
+    return false;
+  }
+}
+
 /**
  * 引导状态 Hook
  *
@@ -16,16 +33,12 @@ import {
  */
 export function useOnboardingState() {
   // null 表示正在检测中
-  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(() =>
+    resolveNeedsOnboardingState(),
+  );
 
   useEffect(() => {
-    // 检测是否需要显示引导
-    const isComplete =
-      localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE) === "true";
-    const version = localStorage.getItem(STORAGE_KEYS.ONBOARDING_VERSION);
-
-    // 首次启动或版本升级时显示引导
-    setNeedsOnboarding(!isComplete || version !== ONBOARDING_VERSION);
+    setNeedsOnboarding(resolveNeedsOnboardingState());
   }, []);
 
   /**

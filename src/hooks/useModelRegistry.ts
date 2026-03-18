@@ -210,7 +210,7 @@ export function useModelRegistry(
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
 
   // 加载模型数据（带重试机制）
-  const loadModels = useCallback(async () => {
+  const loadModels = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
 
@@ -220,7 +220,9 @@ export function useModelRegistry(
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const [models, prefs, syncState] = await Promise.all([
-          modelRegistryApi.getModelRegistry(),
+          modelRegistryApi.getModelRegistry(
+            forceRefresh ? { forceRefresh: true } : undefined,
+          ),
           modelRegistryApi.getModelPreferences(),
           modelRegistryApi.getModelSyncState(),
         ]);
@@ -258,7 +260,7 @@ export function useModelRegistry(
     try {
       const count = await modelRegistryApi.refreshModelRegistry();
       console.log(`[ModelRegistry] 刷新完成，加载了 ${count} 个模型`);
-      await loadModels();
+      await loadModels(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -384,7 +386,7 @@ export function useModelRegistry(
   // 自动加载
   useEffect(() => {
     if (autoLoad) {
-      loadModels();
+      void loadModels();
     }
   }, [autoLoad, loadModels]);
 

@@ -39,6 +39,7 @@ import {
   clearInvokeTraceBuffer,
   getInvokeErrorBuffer,
   getInvokeTraceBuffer,
+  safeListen,
   safeInvoke,
 } from "./safeInvoke";
 import { shouldPreferMockInBrowser } from "./mockPriorityCommands";
@@ -51,6 +52,7 @@ describe("safeInvoke", () => {
     clearInvokeErrorBuffer();
     clearInvokeTraceBuffer();
     delete (window as any).__TAURI__;
+    delete (window as any).__TAURI_INTERNALS__;
   });
 
   it("浏览器开发模式下优先走 HTTP bridge", async () => {
@@ -116,6 +118,58 @@ describe("safeInvoke", () => {
 
     await expect(safeInvoke("workspace_list")).rejects.toThrow(
       "[workspace_list] Failed to fetch",
+    );
+  });
+
+  it("事件 internals 已就绪时 safeListen 走原生 event API", async () => {
+    const unlisten = vi.fn();
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: vi.fn(),
+      transformCallback: vi.fn(),
+    };
+    mocks.baseListen.mockResolvedValueOnce(unlisten);
+
+    await expect(safeListen("config-changed", vi.fn())).resolves.toBe(unlisten);
+    expect(mocks.baseListen).toHaveBeenCalledWith(
+      "config-changed",
+      expect.any(Function),
+    );
+  });
+
+  it("Tauri 运行时存在但事件桥缺失时 safeListen 返回空清理函数", async () => {
+    vi.useFakeTimers();
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: vi.fn(),
+      },
+    };
+
+    const promise = safeListen("config-changed", vi.fn());
+    await vi.advanceTimersByTimeAsync(3000);
+    const unlisten = await promise;
+
+    expect(typeof unlisten).toBe("function");
+    expect(mocks.baseListen).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("事件桥调用异常时 safeListen 降级为空清理函数", async () => {
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: vi.fn(),
+      transformCallback: vi.fn(),
+    };
+    mocks.baseListen.mockRejectedValueOnce(
+      new TypeError(
+        "Cannot read properties of undefined (reading 'transformCallback')",
+      ),
+    );
+
+    const unlisten = await safeListen("plugin-task-event", vi.fn());
+
+    expect(typeof unlisten).toBe("function");
+    expect(mocks.baseListen).toHaveBeenCalledWith(
+      "plugin-task-event",
+      expect.any(Function),
     );
   });
 });

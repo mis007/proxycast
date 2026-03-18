@@ -1,13 +1,14 @@
 import styled from "styled-components";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export const Navbar = styled.div`
+export const Navbar = styled.div<{ $compact?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px 10px;
-  min-height: 64px;
+  gap: ${({ $compact }) => ($compact ? "8px" : "12px")};
+  padding: ${({ $compact }) =>
+    $compact ? "7px 10px 7px" : "12px 16px 10px"};
+  min-height: ${({ $compact }) => ($compact ? "50px" : "64px")};
   border-bottom: 1px solid rgba(226, 232, 240, 0.88);
   background:
     linear-gradient(

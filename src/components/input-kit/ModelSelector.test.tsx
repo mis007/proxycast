@@ -14,7 +14,8 @@ const {
 }));
 
 vi.mock("@/hooks/useConfiguredProviders", () => ({
-  useConfiguredProviders: () => mockUseConfiguredProviders(),
+  useConfiguredProviders: (...args: unknown[]) =>
+    mockUseConfiguredProviders(...args),
 }));
 
 vi.mock("@/hooks/useProviderModels", () => ({
@@ -110,12 +111,37 @@ afterEach(() => {
 });
 
 describe("ModelSelector", () => {
-  it("应在 codex 不兼容模型被选中时自动回退到兼容模型", () => {
-    const setModel = vi.fn();
+  it("关闭状态下应延后加载模型选择数据", () => {
+    renderModelSelector();
 
-    renderModelSelector({
+    expect(mockUseConfiguredProviders).toHaveBeenCalledWith({
+      autoLoad: false,
+    });
+    expect(mockUseProviderModels).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "custom-codex" }),
+      expect.objectContaining({
+        returnFullMetadata: true,
+        autoLoad: false,
+      }),
+    );
+  });
+
+  it("打开选择器后应加载数据并回退到兼容模型", () => {
+    const setModel = vi.fn();
+    const { container } = renderModelSelector({
       model: "gpt-5.3-codex",
       setModel,
+    });
+
+    const trigger = container.querySelector(
+      'button[role="combobox"]',
+    ) as HTMLButtonElement | null;
+    if (!trigger) {
+      throw new Error("未找到模型选择触发器");
+    }
+
+    act(() => {
+      trigger.click();
     });
 
     expect(setModel).toHaveBeenCalledWith("gpt-5.2-codex");

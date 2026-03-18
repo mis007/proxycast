@@ -3,6 +3,7 @@ import { safeInvoke } from "@/lib/dev-bridge";
 import {
   getConfig,
   getDefaultProvider,
+  invalidateAppConfigCache,
   getEnvironmentPreview,
   saveConfig,
   setDefaultProvider,
@@ -16,6 +17,8 @@ vi.mock("@/lib/dev-bridge", () => ({
 describe("appConfig API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+    invalidateAppConfigCache();
   });
 
   it("应代理读取配置命令", async () => {
@@ -46,5 +49,83 @@ describe("appConfig API", () => {
     await expect(
       updateProviderEnvVars("openai", "https://example.com", "key"),
     ).resolves.toBeUndefined();
+  });
+
+  it("getConfig 应缓存并复用同一轮读取结果", async () => {
+    vi.mocked(safeInvoke).mockResolvedValueOnce({
+      default_provider: "claude",
+      navigation: { enabled_items: ["agent"] },
+    });
+
+    const [first, second] = await Promise.all([getConfig(), getConfig()]);
+
+    expect(vi.mocked(safeInvoke)).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(
+      expect.objectContaining({ default_provider: "claude" }),
+    );
+    expect(second).toEqual(
+      expect.objectContaining({ default_provider: "claude" }),
+    );
+    expect(first).not.toBe(second);
+  });
+
+  it("saveConfig 后后续 getConfig 应直接命中新缓存", async () => {
+    vi.mocked(safeInvoke).mockResolvedValueOnce(undefined);
+
+    const nextConfig = {
+      default_provider: "kiro",
+      navigation: { enabled_items: ["agent", "tools"] },
+    } as never;
+
+    await expect(saveConfig(nextConfig)).resolves.toBeUndefined();
+    await expect(getConfig()).resolves.toEqual(
+      expect.objectContaining({
+        default_provider: "kiro",
+        navigation: { enabled_items: ["agent", "tools"] },
+      }),
+    );
+
+    expect(vi.mocked(safeInvoke)).toHaveBeenCalledTimes(1);
+  });
+
+  it("setDefaultProvider 应更新已缓存配置中的 default_provider", async () => {
+    vi.mocked(safeInvoke)
+      .mockResolvedValueOnce({
+        default_provider: "claude",
+        navigation: { enabled_items: ["agent"] },
+      })
+      .mockResolvedValueOnce("gemini");
+
+    await getConfig();
+    await expect(setDefaultProvider("gemini")).resolves.toBe("gemini");
+    await expect(getConfig()).resolves.toEqual(
+      expect.objectContaining({ default_provider: "gemini" }),
+    );
+
+    expect(vi.mocked(safeInvoke)).toHaveBeenCalledTimes(2);
+  });
+
+  it("updateProviderEnvVars 后应失效缓存并触发下一次重新读取", async () => {
+    vi.mocked(safeInvoke)
+      .mockResolvedValueOnce({
+        default_provider: "claude",
+        navigation: { enabled_items: ["agent"] },
+      })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        default_provider: "openai",
+        navigation: { enabled_items: ["agent", "tools"] },
+      });
+
+    await getConfig();
+    await updateProviderEnvVars("openai", "https://example.com", "key");
+    await expect(getConfig()).resolves.toEqual(
+      expect.objectContaining({
+        default_provider: "openai",
+        navigation: { enabled_items: ["agent", "tools"] },
+      }),
+    );
+
+    expect(vi.mocked(safeInvoke)).toHaveBeenCalledTimes(3);
   });
 });

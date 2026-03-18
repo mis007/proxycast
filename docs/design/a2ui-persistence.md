@@ -39,11 +39,13 @@ ALTER TABLE agent_messages ADD COLUMN a2ui_submitted_at TEXT;
 ```
 
 **优点**：
+
 - 数据与消息紧密关联，查询简单
 - 不需要额外的表和外键
 - 迁移简单
 
 **缺点**：
+
 - 消息表字段增多
 - 如果一条消息有多个 A2UI 表单，需要用 JSON 数组存储
 
@@ -71,17 +73,20 @@ CREATE INDEX IF NOT EXISTS idx_a2ui_forms_session ON a2ui_forms(session_id);
 ```
 
 **优点**：
+
 - 数据结构清晰
 - 支持一条消息多个表单
 - 便于单独查询和管理表单数据
 
 **缺点**：
+
 - 需要额外的表和外键
 - 查询时需要 JOIN
 
 ## 推荐方案：方案 B
 
 考虑到：
+
 1. 一条 AI 消息可能包含多个 A2UI 表单
 2. 表单数据需要独立更新（用户填写时实时保存）
 3. 未来可能需要表单历史版本、表单模板等功能
@@ -137,7 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_a2ui_forms_session ON a2ui_forms(session_id);
    - 添加 `initialFormData` prop（从后端加载）
    - 添加 `onFormChange` 回调（防抖保存）
 
-2. **useAgentChat Hook**
+2. **useAgentChatUnified / useAsterAgentChat Hook**
    - `switchTopic` 时加载该会话的所有 A2UI 表单数据
    - 将表单数据与消息关联
 
@@ -161,19 +166,23 @@ CREATE INDEX IF NOT EXISTS idx_a2ui_forms_session ON a2ui_forms(session_id);
 ## 实现步骤
 
 ### Phase 1: 数据库层
+
 1. 添加 `a2ui_forms` 表到 schema.rs
 2. 创建 A2UIFormDao
 
 ### Phase 2: 后端服务
+
 1. 创建 A2UIFormService
 2. 添加 Tauri Commands
 
 ### Phase 3: 前端集成
+
 1. 添加 API 调用函数
 2. 修改 A2UIRenderer 支持数据持久化
-3. 修改 useAgentChat 加载表单数据
+3. 修改 useAgentChatUnified / useAsterAgentChat 加载表单数据
 
 ### Phase 4: 测试和优化
+
 1. 测试表单数据保存和恢复
 2. 优化防抖保存策略
 3. 处理边界情况（网络错误、并发等）

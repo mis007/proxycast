@@ -19,14 +19,15 @@ import { getConfig, type Config } from "@/lib/api/appConfig";
 import { I18nPatchProvider } from "./I18nPatchProvider";
 import { Language } from "./text-map";
 import { replaceTextInDOM } from "./dom-replacer";
+import { hasTauriInvokeCapability } from "@/lib/tauri-runtime";
+
+const CONFIG_LOAD_TIMEOUT_MS = 2500;
 
 /**
  * 检查是否在 Tauri 环境中运行
  */
 function isTauriEnvironment(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as any;
-  return !!(w.__TAURI__?.core?.invoke || w.__TAURI__?.invoke);
+  return hasTauriInvokeCapability();
 }
 
 interface WithI18nPatchOptions {
@@ -52,39 +53,66 @@ export function withI18nPatch<P extends object>(
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
+      let cancelled = false;
+      let timeoutId: number | null = null;
+
+      const applyConfig = (nextConfig: Config) => {
+        if (cancelled) {
+          return;
+        }
+
+        setConfig(nextConfig);
+        replaceTextInDOM((nextConfig.language || "zh") as Language);
+        requestAnimationFrame(() => {
+          if (!cancelled) {
+            setIsReady(true);
+          }
+        });
+      };
+
+      const fallbackToDefault = (reason: string, error?: unknown) => {
+        if (error) {
+          console.error(`[i18n] ${reason}:`, error);
+        } else {
+          console.warn(`[i18n] ${reason}`);
+        }
+        applyConfig({ language: "zh" } as Config);
+      };
+
       // 如果不在 Tauri 环境，使用默认配置
       if (!isTauriEnvironment()) {
-        console.warn("[i18n] Not in Tauri environment, using default language");
-        const defaultConfig = { language: "zh" } as Config;
-        setConfig(defaultConfig);
-        replaceTextInDOM("zh");
-        requestAnimationFrame(() => {
-          setIsReady(true);
-        });
-        return;
+        fallbackToDefault("Not in Tauri environment, using default language");
+        return () => {
+          cancelled = true;
+        };
       }
+
+      timeoutId = window.setTimeout(() => {
+        fallbackToDefault("Config load timed out, using default language");
+      }, CONFIG_LOAD_TIMEOUT_MS);
 
       getConfig()
         .then((c) => {
-          setConfig(c);
-          // Apply initial patch immediately (synchronous)
-          const lang = (c.language || "zh") as Language;
-          replaceTextInDOM(lang);
-          // Fade in after patch is complete
-          requestAnimationFrame(() => {
-            setIsReady(true);
-          });
+          if (timeoutId !== null) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          applyConfig(c);
         })
         .catch((err) => {
-          console.error("[i18n] Failed to load config:", err);
-          // Use default language on error
-          const defaultConfig = { language: "zh" } as Config;
-          setConfig(defaultConfig);
-          replaceTextInDOM("zh");
-          requestAnimationFrame(() => {
-            setIsReady(true);
-          });
+          if (timeoutId !== null) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          fallbackToDefault("Failed to load config", err);
         });
+
+      return () => {
+        cancelled = true;
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+      };
     }, []);
 
     if (!config) {

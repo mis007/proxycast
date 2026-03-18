@@ -25,7 +25,6 @@ const mockPriorityCommands = new Set<string>([
   "session_files_read_file",
   "session_files_delete_file",
   "execution_run_get_theme_workbench_state",
-  "aster_agent_chat_stream",
   "agent_runtime_submit_turn",
   "agent_runtime_interrupt_turn",
   "agent_runtime_create_session",

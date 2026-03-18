@@ -20,6 +20,19 @@ pub fn migrate_mcp_lime_enabled(conn: &Connection) -> Result<usize, String> {
         return Ok(0);
     }
 
+    if !has_mcp_columns(
+        conn,
+        &[
+            "enabled_lime",
+            "enabled_claude",
+            "enabled_codex",
+            "enabled_gemini",
+        ],
+    )? {
+        tracing::info!("[迁移] mcp_servers 缺少 Lime 启用状态相关列，跳过 MCP lime 启用状态修复");
+        return Ok(0);
+    }
+
     let updated = conn
         .execute(
             "UPDATE mcp_servers
@@ -50,6 +63,11 @@ pub fn migrate_mcp_created_at_to_integer(conn: &Connection) -> Result<usize, Str
         return Ok(0);
     }
 
+    if !has_mcp_columns(conn, &["created_at"])? {
+        tracing::info!("[迁移] mcp_servers 缺少 created_at 列，跳过 MCP created_at 归一化");
+        return Ok(0);
+    }
+
     let updated_numeric = conn
         .execute(
             "UPDATE mcp_servers
@@ -77,6 +95,25 @@ pub fn migrate_mcp_created_at_to_integer(conn: &Connection) -> Result<usize, Str
     tracing::info!("[迁移] MCP created_at 归一化完成，更新 {} 条记录", total);
 
     Ok(total)
+}
+
+fn has_mcp_columns(conn: &Connection, required_columns: &[&str]) -> Result<bool, String> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(mcp_servers)")
+        .map_err(|e| format!("读取 mcp_servers 表结构失败: {e}"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| format!("扫描 mcp_servers 列失败: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("收集 mcp_servers 列失败: {e}"))?;
+
+    if columns.is_empty() {
+        return Ok(false);
+    }
+
+    Ok(required_columns
+        .iter()
+        .all(|column| columns.iter().any(|existing| existing == column)))
 }
 
 #[cfg(test)]
@@ -194,5 +231,33 @@ mod tests {
             )
             .unwrap();
         assert_eq!(invalid_type, "text");
+    }
+
+    #[test]
+    fn migrate_mcp_lime_enabled_skips_when_required_columns_are_missing() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE mcp_servers (
+                id TEXT PRIMARY KEY,
+                enabled_claude INTEGER NOT NULL DEFAULT 0
+            );
+            ",
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO mcp_servers (id, enabled_claude) VALUES (?1, 1)",
+            ["server-legacy"],
+        )
+        .unwrap();
+
+        let updated = migrate_mcp_lime_enabled(&conn).unwrap();
+        assert_eq!(updated, 0);
+        assert!(!is_true_setting(&conn, MCP_LIME_ENABLED_MIGRATED_KEY));
     }
 }

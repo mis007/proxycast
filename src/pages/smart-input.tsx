@@ -19,6 +19,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sendScreenshotChat } from "@/lib/api/screenshotChat";
 import { useVoiceSound } from "@/hooks/useVoiceSound";
+import { safeListen } from "@/lib/dev-bridge";
 import "./smart-input.css";
 
 // Lime Logo组件
@@ -211,8 +212,7 @@ export function SmartInputPage() {
 
     (async () => {
       try {
-        const { listen } = await import("@tauri-apps/api/event");
-        unlisten = await listen("voice-start-recording", () => {
+        unlisten = await safeListen("voice-start-recording", () => {
           console.log("[语音输入] 收到开始录音事件");
           startVoiceMode();
         });
@@ -405,8 +405,7 @@ export function SmartInputPage() {
 
     const setupStopListener = async () => {
       try {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("voice-stop-recording", async () => {
+        const unlisten = await safeListen("voice-stop-recording", async () => {
           console.log("[语音输入] 收到停止录音事件");
 
           // 播放停止录音音效

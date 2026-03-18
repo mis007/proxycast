@@ -115,7 +115,7 @@ pub async fn handle_command(
         return Ok(result);
     }
 
-    if let Some(result) = agent_sessions::try_handle(state, cmd, args.as_ref())? {
+    if let Some(result) = agent_sessions::try_handle(state, cmd, args.as_ref()).await? {
         return Ok(result);
     }
 

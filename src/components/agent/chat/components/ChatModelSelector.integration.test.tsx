@@ -5,15 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockInitAsterAgent,
-  mockSendAsterMessageStream,
-  mockCreateAsterSession,
-  mockListAsterSessions,
-  mockGetAsterSession,
-  mockRenameAsterSession,
-  mockDeleteAsterSession,
-  mockStopAsterSession,
-  mockConfirmAsterAction,
-  mockSubmitAsterElicitationResponse,
+  mockCreateAgentRuntimeSession,
+  mockListAgentRuntimeSessions,
+  mockGetAgentRuntimeSession,
+  mockUpdateAgentRuntimeSession,
   mockParseStreamEvent,
   mockSafeListen,
   mockToast,
@@ -24,15 +19,10 @@ const {
   mockEmitProviderDataChanged,
 } = vi.hoisted(() => ({
   mockInitAsterAgent: vi.fn(),
-  mockSendAsterMessageStream: vi.fn(),
-  mockCreateAsterSession: vi.fn(),
-  mockListAsterSessions: vi.fn(),
-  mockGetAsterSession: vi.fn(),
-  mockRenameAsterSession: vi.fn(),
-  mockDeleteAsterSession: vi.fn(),
-  mockStopAsterSession: vi.fn(),
-  mockConfirmAsterAction: vi.fn(),
-  mockSubmitAsterElicitationResponse: vi.fn(),
+  mockCreateAgentRuntimeSession: vi.fn(),
+  mockListAgentRuntimeSessions: vi.fn(),
+  mockGetAgentRuntimeSession: vi.fn(),
+  mockUpdateAgentRuntimeSession: vi.fn(),
   mockParseStreamEvent: vi.fn((payload: unknown) => payload),
   mockSafeListen: vi.fn(),
   mockToast: {
@@ -50,15 +40,10 @@ const {
 
 vi.mock("@/lib/api/agentRuntime", () => ({
   initAsterAgent: mockInitAsterAgent,
-  sendAsterMessageStream: mockSendAsterMessageStream,
-  createAsterSession: mockCreateAsterSession,
-  listAsterSessions: mockListAsterSessions,
-  getAsterSession: mockGetAsterSession,
-  renameAsterSession: mockRenameAsterSession,
-  deleteAsterSession: mockDeleteAsterSession,
-  stopAsterSession: mockStopAsterSession,
-  confirmAsterAction: mockConfirmAsterAction,
-  submitAsterElicitationResponse: mockSubmitAsterElicitationResponse,
+  createAgentRuntimeSession: mockCreateAgentRuntimeSession,
+  listAgentRuntimeSessions: mockListAgentRuntimeSessions,
+  getAgentRuntimeSession: mockGetAgentRuntimeSession,
+  updateAgentRuntimeSession: mockUpdateAgentRuntimeSession,
 }));
 
 vi.mock("@/lib/api/agentStream", () => ({
@@ -256,37 +241,39 @@ beforeEach(() => {
   sessionStorage.clear();
 
   mockInitAsterAgent.mockResolvedValue(undefined);
-  mockSendAsterMessageStream.mockResolvedValue(undefined);
-  mockCreateAsterSession.mockResolvedValue("created-session");
-  mockRenameAsterSession.mockResolvedValue(undefined);
-  mockDeleteAsterSession.mockResolvedValue(undefined);
-  mockStopAsterSession.mockResolvedValue(undefined);
-  mockConfirmAsterAction.mockResolvedValue(undefined);
-  mockSubmitAsterElicitationResponse.mockResolvedValue(undefined);
+  mockCreateAgentRuntimeSession.mockResolvedValue("created-session");
+  mockUpdateAgentRuntimeSession.mockResolvedValue(undefined);
   mockSafeListen.mockResolvedValue(() => {});
   mockProviderPoolGetOverview.mockResolvedValue([]);
   mockApiKeyProvidersGetProviders.mockResolvedValue([]);
   mockEmitProviderDataChanged.mockImplementation(() => {});
 
   const createdAt = Math.floor(Date.now() / 1000);
-  mockListAsterSessions.mockResolvedValue([
+  mockListAgentRuntimeSessions.mockResolvedValue([
     {
       id: "topic-a",
       name: "话题 A",
       created_at: createdAt,
+      updated_at: createdAt,
       messages_count: 0,
     },
     {
       id: "topic-b",
       name: "话题 B",
       created_at: createdAt,
+      updated_at: createdAt,
       messages_count: 0,
     },
   ]);
-  mockGetAsterSession.mockImplementation(async (topicId: string) => ({
+  mockGetAgentRuntimeSession.mockImplementation(async (topicId: string) => ({
     id: topicId,
+    created_at: createdAt,
+    updated_at: createdAt,
     messages: [],
     execution_strategy: "react",
+    turns: [],
+    items: [],
+    queued_turns: [],
   }));
 
   mockUseConfiguredProviders.mockReturnValue({

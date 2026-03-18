@@ -34,6 +34,18 @@ pub struct FrontendCrashReport {
     pub context: Option<serde_json::Value>,
 }
 
+/// 前端调试日志上报参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrontendDebugLogReport {
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<serde_json::Value>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogArtifactEntry {
     pub file_name: String,
@@ -435,6 +447,58 @@ pub async fn report_frontend_crash(
         Some(Value::Object(merged_context)),
     );
 
+    Ok(())
+}
+
+fn summarize_frontend_debug_context(context: Option<&Value>) -> String {
+    let Some(context) = context else {
+        return String::new();
+    };
+
+    let serialized =
+        serde_json::to_string(context).unwrap_or_else(|_| "\"<invalid-context>\"".into());
+    let sanitized = logger::sanitize_log_message(&serialized);
+    const MAX_LEN: usize = 1200;
+
+    if sanitized.len() > MAX_LEN {
+        format!("{}...", &sanitized[..MAX_LEN])
+    } else {
+        sanitized
+    }
+}
+
+fn normalize_frontend_debug_level(level: Option<&str>) -> &'static str {
+    match level.unwrap_or("info").trim().to_ascii_lowercase().as_str() {
+        "debug" => "debug",
+        "warn" | "warning" => "warn",
+        "error" => "error",
+        _ => "info",
+    }
+}
+
+/// 写入前端调试日志到本地日志，便于排查卡顿或未崩溃问题
+#[tauri::command]
+pub async fn report_frontend_debug_log(
+    logs: tauri::State<'_, LogState>,
+    report: FrontendDebugLogReport,
+) -> Result<(), String> {
+    let sanitized_message = logger::sanitize_log_message(&report.message);
+    let sanitized_category = report
+        .category
+        .as_deref()
+        .map(logger::sanitize_log_message)
+        .unwrap_or_else(|| "general".to_string());
+    let context_preview = summarize_frontend_debug_context(report.context.as_ref());
+    let level = normalize_frontend_debug_level(report.level.as_deref());
+    let message = if context_preview.is_empty() {
+        format!("[FrontendDebug] category={sanitized_category} message={sanitized_message}")
+    } else {
+        format!(
+            "[FrontendDebug] category={sanitized_category} message={sanitized_message} context={context_preview}"
+        )
+    };
+
+    logs.write().await.add(level, &message);
     Ok(())
 }
 

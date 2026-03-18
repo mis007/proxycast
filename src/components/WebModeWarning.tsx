@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import styled from "styled-components";
+import { hasTauriRuntimeMarkers } from "@/lib/tauri-runtime";
 
 const WarningBanner = styled.div`
   position: fixed;
@@ -82,7 +83,7 @@ export function WebModeWarning() {
   const [visible, setVisible] = useState(true);
 
   // Check if running in Tauri
-  const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+  const isTauri = hasTauriRuntimeMarkers();
 
   // Only show in web mode (not Tauri)
   if (isTauri || !visible) {

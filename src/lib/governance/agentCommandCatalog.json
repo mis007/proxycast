@@ -1,0 +1,133 @@
+{
+  "runtimeGatewayCommands": [
+    "agent_start_process",
+    "agent_stop_process",
+    "agent_get_process_status",
+    "agent_generate_title",
+    "agent_terminal_command_response",
+    "agent_term_scrollback_response",
+    "aster_agent_init",
+    "aster_agent_status",
+    "aster_agent_configure_provider",
+    "aster_agent_configure_from_pool",
+    "aster_agent_reset",
+    "agent_runtime_submit_turn",
+    "agent_runtime_interrupt_turn",
+    "agent_runtime_remove_queued_turn",
+    "agent_runtime_respond_action",
+    "agent_runtime_create_session",
+    "agent_runtime_list_sessions",
+    "agent_runtime_get_session",
+    "agent_runtime_update_session",
+    "agent_runtime_delete_session"
+  ],
+  "deprecatedCommandReplacements": {
+    "get_agent_process_status": "agent_get_process_status",
+    "list_agent_sessions": "agent_runtime_list_sessions",
+    "agent_chat_stream": "agent_runtime_submit_turn",
+    "agent_create_session": "agent_runtime_create_session",
+    "agent_list_sessions": "agent_runtime_list_sessions",
+    "agent_get_session": "agent_runtime_get_session",
+    "agent_get_session_messages": "agent_runtime_get_session",
+    "agent_delete_session": "agent_runtime_delete_session",
+    "agent_rename_session": "agent_runtime_update_session",
+    "aster_agent_chat_stream": "agent_runtime_submit_turn",
+    "aster_agent_stop": "agent_runtime_interrupt_turn",
+    "aster_agent_confirm": "agent_runtime_respond_action",
+    "aster_agent_submit_elicitation_response": "agent_runtime_respond_action",
+    "aster_session_create": "agent_runtime_create_session",
+    "aster_session_list": "agent_runtime_list_sessions",
+    "aster_session_get": "agent_runtime_get_session",
+    "aster_session_rename": "agent_runtime_update_session",
+    "aster_session_set_execution_strategy": "agent_runtime_update_session",
+    "aster_session_delete": "agent_runtime_delete_session"
+  },
+  "deprecatedHelperReplacements": {
+    "createAgentSession": "createAgentRuntimeSession",
+    "listAgentSessions": "listAgentRuntimeSessions",
+    "getAgentSession": "getAgentRuntimeSession",
+    "getAgentSessionMessages": "getAgentRuntimeSession",
+    "renameAgentSession": "updateAgentRuntimeSession",
+    "deleteAgentSession": "deleteAgentRuntimeSession",
+    "generateAgentTitle": "generateAgentRuntimeSessionTitle",
+    "sendAsterMessageStream": "submitAgentRuntimeTurn",
+    "confirmAsterAction": "respondAgentRuntimeAction",
+    "submitAsterElicitationResponse": "respondAgentRuntimeAction",
+    "stopAsterSession": "interruptAgentRuntimeTurn",
+    "createAsterSession": "createAgentRuntimeSession",
+    "listAsterSessions": "listAgentRuntimeSessions",
+    "getAsterSession": "getAgentRuntimeSession",
+    "deleteAsterSession": "deleteAgentRuntimeSession",
+    "renameAsterSession": "updateAgentRuntimeSession"
+  },
+  "legacyCommandSurfaceMonitors": [
+    {
+      "id": "agent-create-session-compat-command",
+      "classification": "compat",
+      "description": "agent_create_session compat 命令前端边界",
+      "commands": ["agent_create_session"],
+      "allowedPaths": ["src/lib/api/agentRuntime.ts"]
+    },
+    {
+      "id": "agent-session-message-legacy-command",
+      "classification": "deprecated",
+      "description": "旧 agent session message 命令前端边界",
+      "commands": ["agent_get_session_messages"],
+      "allowedPaths": ["src/lib/api/agentRuntime.ts"]
+    },
+    {
+      "id": "agent-session-compat-commands",
+      "classification": "deprecated",
+      "description": "旧 agent session compat 命令前端边界",
+      "commands": [
+        "agent_list_sessions",
+        "agent_get_session",
+        "agent_delete_session",
+        "agent_rename_session"
+      ],
+      "allowedPaths": []
+    }
+  ],
+  "legacyHelperSurfaceMonitors": [
+    {
+      "id": "agent-legacy-session-api-helpers",
+      "classification": "deprecated",
+      "description": "旧 Agent session compat helper 直连回流",
+      "helpers": [
+        "createAgentSession",
+        "listAgentSessions",
+        "getAgentSession",
+        "getAgentSessionMessages",
+        "renameAgentSession",
+        "deleteAgentSession",
+        "generateAgentTitle"
+      ],
+      "allowedPaths": ["src/lib/api/agentRuntime.ts"]
+    },
+    {
+      "id": "agent-legacy-stream-action-helpers",
+      "classification": "deprecated",
+      "description": "旧 Aster stream/action helper 直连回流",
+      "helpers": [
+        "sendAsterMessageStream",
+        "confirmAsterAction",
+        "submitAsterElicitationResponse",
+        "stopAsterSession"
+      ],
+      "allowedPaths": ["src/lib/api/agentRuntime.ts"]
+    },
+    {
+      "id": "aster-session-helper-direct-usage",
+      "classification": "deprecated",
+      "description": "前端 direct Aster session helper 回流",
+      "helpers": [
+        "createAsterSession",
+        "listAsterSessions",
+        "getAsterSession",
+        "deleteAsterSession",
+        "renameAsterSession"
+      ],
+      "allowedPaths": ["src/lib/api/agentRuntime.ts"]
+    }
+  ]
+}

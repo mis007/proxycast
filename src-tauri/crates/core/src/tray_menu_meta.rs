@@ -4,6 +4,10 @@
 
 /// 菜单项 ID 常量
 pub mod menu_ids {
+    /// 当前模型信息
+    pub const CURRENT_MODEL_INFO: &str = "current_model_info";
+    /// 快速切换模型
+    pub const QUICK_MODEL_ROOT: &str = "quick_model_root";
     /// 状态信息
     pub const STATUS_INFO: &str = "status_info";
     /// 凭证信息
@@ -79,6 +83,27 @@ pub fn parse_server_address(address: &str) -> (String, u16) {
 /// 获取菜单中包含的所有菜单项 ID
 pub fn get_menu_item_ids() -> Vec<&'static str> {
     menu_ids::all_required_ids()
+}
+
+const QUICK_MODEL_ID_PREFIX: &str = "quick_model";
+
+/// 生成快速模型切换菜单项 ID
+pub fn build_quick_model_item_id(provider_type: &str, model: &str) -> String {
+    format!("{QUICK_MODEL_ID_PREFIX}::{provider_type}::{model}")
+}
+
+/// 解析快速模型切换菜单项 ID
+pub fn parse_quick_model_item_id(id: &str) -> Option<(String, String)> {
+    let mut parts = id.splitn(3, "::");
+    let prefix = parts.next()?;
+    let provider_type = parts.next()?;
+    let model = parts.next()?;
+
+    if prefix != QUICK_MODEL_ID_PREFIX || provider_type.is_empty() || model.is_empty() {
+        return None;
+    }
+
+    Some((provider_type.to_string(), model.to_string()))
 }
 
 #[cfg(test)]
@@ -160,6 +185,24 @@ mod tests {
     fn test_get_menu_item_ids() {
         let ids = get_menu_item_ids();
         assert_eq!(ids.len(), 12, "应有 12 个必需的菜单项");
+    }
+
+    #[test]
+    fn test_build_and_parse_quick_model_item_id() {
+        let id = build_quick_model_item_id("claude", "claude-sonnet-4-5");
+        assert_eq!(id, "quick_model::claude::claude-sonnet-4-5");
+
+        let parsed = parse_quick_model_item_id(&id);
+        assert_eq!(
+            parsed,
+            Some(("claude".to_string(), "claude-sonnet-4-5".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_quick_model_item_id_invalid() {
+        assert_eq!(parse_quick_model_item_id("quick_model::claude"), None);
+        assert_eq!(parse_quick_model_item_id("other::claude::model"), None);
     }
 
     proptest! {

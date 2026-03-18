@@ -9,6 +9,12 @@
 
 import { safeInvoke } from "@/lib/dev-bridge";
 
+const PLUGIN_UI_CHANGE_EVENT = "plugin-changed";
+
+let pluginsWithUICache: PluginUIInfo[] | null = null;
+let pluginsWithUILoadingPromise: Promise<PluginUIInfo[]> | null = null;
+let pluginsWithUICacheStamp: string | null = null;
+
 /**
  * 插件 UI 信息
  *
@@ -27,6 +33,51 @@ export interface PluginUIInfo {
   surfaces: string[];
 }
 
+interface PluginUIQueryOptions {
+  forceRefresh?: boolean;
+}
+
+function clonePluginList(plugins: PluginUIInfo[]): PluginUIInfo[] {
+  return plugins.map((plugin) => ({
+    ...plugin,
+    surfaces: [...plugin.surfaces],
+  }));
+}
+
+function readPluginUIChangeStamp(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(PLUGIN_UI_CHANGE_EVENT);
+  } catch {
+    return null;
+  }
+}
+
+export function invalidatePluginUICache(): void {
+  pluginsWithUICache = null;
+  pluginsWithUILoadingPromise = null;
+  pluginsWithUICacheStamp = null;
+}
+
+export function notifyPluginUIChanged(): void {
+  invalidatePluginUICache();
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(PLUGIN_UI_CHANGE_EVENT, String(Date.now()));
+  } catch {
+    // ignore
+  }
+
+  window.dispatchEvent(new CustomEvent(PLUGIN_UI_CHANGE_EVENT));
+}
+
 /**
  * 获取带有 UI 配置的已安装插件列表
  *
@@ -35,8 +86,36 @@ export interface PluginUIInfo {
  *
  * @returns 带有 UI 配置的插件列表
  */
-export async function getPluginsWithUI(): Promise<PluginUIInfo[]> {
-  return safeInvoke<PluginUIInfo[]>("get_plugins_with_ui");
+export async function getPluginsWithUI(
+  options: PluginUIQueryOptions = {},
+): Promise<PluginUIInfo[]> {
+  if (options.forceRefresh) {
+    invalidatePluginUICache();
+  }
+
+  const currentStamp = readPluginUIChangeStamp();
+  if (pluginsWithUICache && pluginsWithUICacheStamp !== currentStamp) {
+    invalidatePluginUICache();
+  }
+
+  if (pluginsWithUICache) {
+    return clonePluginList(pluginsWithUICache);
+  }
+
+  if (!pluginsWithUILoadingPromise) {
+    pluginsWithUILoadingPromise = safeInvoke<PluginUIInfo[]>("get_plugins_with_ui")
+      .then((plugins) => {
+        const snapshot = clonePluginList(plugins);
+        pluginsWithUICache = snapshot;
+        pluginsWithUICacheStamp = readPluginUIChangeStamp();
+        return snapshot;
+      })
+      .finally(() => {
+        pluginsWithUILoadingPromise = null;
+      });
+  }
+
+  return clonePluginList(await pluginsWithUILoadingPromise);
 }
 
 /**
@@ -49,7 +128,8 @@ export async function getPluginsWithUI(): Promise<PluginUIInfo[]> {
  */
 export async function getPluginsForSurface(
   surface: string,
+  options: PluginUIQueryOptions = {},
 ): Promise<PluginUIInfo[]> {
-  const plugins = await getPluginsWithUI();
+  const plugins = await getPluginsWithUI(options);
   return plugins.filter((plugin) => plugin.surfaces.includes(surface));
 }

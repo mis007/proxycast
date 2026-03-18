@@ -1,3 +1,4 @@
+import styled, { keyframes } from "styled-components";
 import {
   EMPTY_STATE_META_PILL_CLASSNAME,
   EMPTY_STATE_PANEL_CLASSNAME,
@@ -5,6 +6,96 @@ import {
   EMPTY_STATE_PRESET_BUTTON_CLASSNAME,
   EMPTY_STATE_RECOMMENDATION_CARD_CLASSNAME,
 } from "./emptyStateSurfaceTokens";
+
+const sectionReveal = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const itemReveal = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const QuickActionsPanel = styled.section<{ $embedded: boolean }>`
+  position: relative;
+  overflow: hidden;
+  animation: ${sectionReveal} 580ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 200ms;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 1.1rem;
+    width: 8rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(16, 185, 129, 0.55) 0%,
+      rgba(56, 189, 248, 0.24) 100%
+    );
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const PresetButton = styled.button.attrs({
+  className: EMPTY_STATE_PRESET_BUTTON_CLASSNAME,
+})<{ $index: number }>`
+  animation: ${itemReveal} 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: ${({ $index }) => `${160 + $index * 40}ms`};
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 24px -20px rgba(15, 23, 42, 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transition: none;
+  }
+`;
+
+const RecommendationCard = styled.button.attrs({
+  className: EMPTY_STATE_RECOMMENDATION_CARD_CLASSNAME,
+})<{ $index: number }>`
+  animation: ${itemReveal} 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: ${({ $index }) => `${220 + $index * 70}ms`};
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    border-color: rgba(203, 213, 225, 0.98);
+    box-shadow: 0 16px 28px -22px rgba(15, 23, 42, 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transition: none;
+  }
+`;
 
 export interface EmptyStateQuickActionItem {
   key: string;
@@ -47,8 +138,11 @@ export function EmptyStateQuickActions({
   }
 
   return (
-    <section
-      className={embedded ? EMPTY_STATE_PANEL_EMBEDDED_CLASSNAME : EMPTY_STATE_PANEL_CLASSNAME}
+    <QuickActionsPanel
+      $embedded={embedded}
+      className={
+        embedded ? EMPTY_STATE_PANEL_EMBEDDED_CLASSNAME : EMPTY_STATE_PANEL_CLASSNAME
+      }
     >
       <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
         <div>
@@ -61,12 +155,12 @@ export function EmptyStateQuickActions({
 
       {presets.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-2">
-          {presets.map((preset) => (
-            <button
+          {presets.map((preset, index) => (
+            <PresetButton
               key={preset.key}
+              $index={index}
               type="button"
               onClick={() => onPresetAction?.(preset)}
-              className={EMPTY_STATE_PRESET_BUTTON_CLASSNAME}
             >
               {preset.icon ? (
                 <span aria-hidden="true" className="text-base leading-none">
@@ -74,7 +168,7 @@ export function EmptyStateQuickActions({
                 </span>
               ) : null}
               <span>{preset.label}</span>
-            </button>
+            </PresetButton>
           ))}
         </div>
       ) : null}
@@ -89,12 +183,12 @@ export function EmptyStateQuickActions({
       ) : null}
 
       <div className="mt-2.5 grid gap-2 md:grid-cols-2">
-        {items.map((item) => (
-          <button
+        {items.map((item, index) => (
+          <RecommendationCard
             key={item.key}
+            $index={index}
             type="button"
             onClick={() => onAction(item)}
-            className={EMPTY_STATE_RECOMMENDATION_CARD_CLASSNAME}
           >
             <div className="flex w-full items-start justify-between gap-3">
               <span className={EMPTY_STATE_META_PILL_CLASSNAME}>
@@ -112,10 +206,10 @@ export function EmptyStateQuickActions({
                 {item.description}
               </p>
             </div>
-          </button>
+          </RecommendationCard>
         ))}
       </div>
-    </section>
+    </QuickActionsPanel>
   );
 }
 

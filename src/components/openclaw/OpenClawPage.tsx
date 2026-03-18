@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ConfiguredProvider } from "@/hooks/useConfiguredProviders";
 import { useProviderModels } from "@/hooks/useProviderModels";
 import { useApiKeyProvider } from "@/hooks/useApiKeyProvider";
@@ -64,6 +65,7 @@ import {
 } from "./types";
 import { useOpenClawStore } from "./useOpenClawStore";
 import { openUrl } from "./openUrl";
+import { compactPathLabel } from "./pathDisplay";
 import { useOpenClawDashboardWindow } from "./useOpenClawDashboardWindow";
 import {
   openClawPanelClassName,
@@ -465,11 +467,15 @@ function renderBlockedPage(
 
 function resolveOpenClawSubpage(
   candidate: OpenClawSubpage,
-  installed: boolean,
+  workflowReady: boolean,
   gatewayRunning: boolean,
   gatewayStarting: boolean,
   operationState: OpenClawOperationState,
+  options?: {
+    allowInstallPage?: boolean;
+  },
 ): OpenClawSubpage {
+  const allowInstallPage = options?.allowInstallPage ?? false;
   if (operationState.running && operationState.kind) {
     return progressSubpageByAction[operationState.kind];
   }
@@ -482,15 +488,15 @@ function resolveOpenClawSubpage(
     return candidate;
   }
 
-  if (!installed) {
+  if (!workflowReady) {
     return "install";
   }
 
-  if (
-    candidate === "install" ||
-    candidate === "installing" ||
-    candidate === "updating"
-  ) {
+  if (candidate === "install") {
+    return allowInstallPage ? "install" : "runtime";
+  }
+
+  if (candidate === "installing" || candidate === "updating") {
     return "runtime";
   }
 
@@ -562,6 +568,7 @@ export function OpenClawPage({
 
   const [fallbackSubpage, setFallbackSubpage] =
     useState<LocalOpenClawSubpage>("install");
+  const hasManualFallbackNavigationRef = useRef(false);
   const [statusResolved, setStatusResolved] = useState(false);
   const [installedStatus, setInstalledStatus] =
     useState<OpenClawBinaryInstallStatus | null>(null);
@@ -859,6 +866,7 @@ export function OpenClawPage({
 
   const requestedOrFallbackSubpage =
     requestedSubpage ?? (onNavigate ? defaultSubpage : fallbackSubpage);
+  const allowInstallPage = environmentStatus?.openclaw.status === "needs_reload";
   const currentSubpage = useMemo(
     () =>
       resolveOpenClawSubpage(
@@ -867,10 +875,12 @@ export function OpenClawPage({
         gatewayRunning,
         gatewayStarting,
         operationState,
+        { allowInstallPage },
       ),
     [
       gatewayRunning,
       gatewayStarting,
+      allowInstallPage,
       openclawWorkflowReady,
       operationState,
       requestedOrFallbackSubpage,
@@ -921,6 +931,7 @@ export function OpenClawPage({
       if (onNavigate) {
         onNavigate("openclaw", { subpage });
       } else {
+        hasManualFallbackNavigationRef.current = true;
         setFallbackSubpage(subpage);
       }
     },
@@ -1216,12 +1227,21 @@ export function OpenClawPage({
       return;
     }
 
+    const preserveInstallPage =
+      allowInstallPage &&
+      hasManualFallbackNavigationRef.current &&
+      fallbackSubpage === "install";
     const resolvedSubpage = !openclawWorkflowReady ? "install" : "runtime";
 
-    if (!onNavigate && fallbackSubpage !== resolvedSubpage) {
+    if (
+      !onNavigate &&
+      !preserveInstallPage &&
+      fallbackSubpage !== resolvedSubpage
+    ) {
       setFallbackSubpage(resolvedSubpage);
     }
   }, [
+    allowInstallPage,
     fallbackSubpage,
     gatewayRunning,
     gatewayStarting,
@@ -2315,11 +2335,11 @@ export function OpenClawPage({
           if (installed) {
             return { label: "已安装", tone: "done" };
           }
-          if (softInstalled) {
-            return { label: "可继续", tone: "active" };
-          }
           if (environmentStatus?.openclaw.status === "needs_reload") {
             return { label: "待刷新", tone: "active" };
+          }
+          if (softInstalled) {
+            return { label: "可继续", tone: "active" };
           }
           return { label: "待安装", tone: "idle" };
         case "sync":
@@ -2455,6 +2475,7 @@ export function OpenClawPage({
       title: string;
       value: string;
       description: string;
+      descriptionTitle?: string;
       icon: LucideIcon;
       iconClassName: string;
       valueClassName?: string;
@@ -2471,11 +2492,22 @@ export function OpenClawPage({
             : operationState.running
               ? "处理中"
               : "待安装",
-        description:
+        descriptionTitle:
           environmentStatus?.openclaw.path ||
           currentRuntimeCandidate?.openclawPath ||
           currentRuntimeCandidate?.openclawPackagePath ||
-          "等待检测安装路径",
+          undefined,
+        description:
+          environmentStatus?.openclaw.path ||
+          currentRuntimeCandidate?.openclawPath ||
+          currentRuntimeCandidate?.openclawPackagePath
+            ? compactPathLabel(
+                environmentStatus?.openclaw.path ||
+                  currentRuntimeCandidate?.openclawPath ||
+                  currentRuntimeCandidate?.openclawPackagePath,
+                54,
+              )
+            : "等待检测安装路径",
         icon: Wrench,
         iconClassName: "border-slate-200 bg-slate-100 text-slate-700",
       },
@@ -2808,192 +2840,58 @@ export function OpenClawPage({
       <div className="flex-1 overflow-auto">
         <div className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-6 px-4 py-5 lg:px-6 lg:py-6">
           <section className="relative overflow-hidden rounded-[30px] border border-amber-200/70 bg-[linear-gradient(135deg,rgba(249,248,244,0.98)_0%,rgba(248,250,252,0.98)_46%,rgba(243,248,247,0.96)_100%)] shadow-sm shadow-slate-950/5">
-            <div className="pointer-events-none absolute -left-20 top-[-72px] h-56 w-56 rounded-full bg-amber-200/30 blur-3xl" />
-            <div className="pointer-events-none absolute right-[-76px] top-[-24px] h-56 w-56 rounded-full bg-sky-200/24 blur-3xl" />
-
             <div className="relative flex flex-col gap-6 p-6 lg:p-8">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div className="max-w-3xl space-y-4">
-                  <div className="flex items-center gap-4">
-                    <OpenClawMark size="md" className="shadow-red-500/10" />
-                    <div>
-                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-white/85 px-3 py-1 text-xs font-semibold tracking-[0.16em] text-amber-700 shadow-sm">
-                        OPENCLAW WORKSPACE
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-                      OpenClaw 工作台
-                    </h1>
-                    <p className="max-w-2xl text-sm leading-6 text-slate-600">
-                      {pageDescription}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-full border border-white/90 bg-white/90 px-3 py-1 text-slate-700 shadow-sm hover:bg-white">
-                      {currentSubpageLabel}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
-                    >
-                      {installed
-                        ? "环境已安装"
-                        : softInstalled
-                          ? "环境可继续"
-                          : "环境待安装"}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
-                    >
-                      已安装 {installedVersion || "未检测到版本"}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "rounded-full bg-white/75 px-3 py-1",
-                        versionMismatch
-                          ? "border-amber-200 text-amber-700"
-                          : "border-slate-200 text-slate-600",
-                      )}
-                    >
-                      运行中{" "}
-                      {gatewayRunning
-                        ? runningVersion || "待校验"
-                        : gatewayStarting
-                          ? "启动中"
-                          : "未启动"}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
-                    >
-                      Gateway {gatewayRunning ? "运行中" : gatewayStatus}
-                    </Badge>
-                    {versionMismatch ? (
-                      <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700 shadow-none hover:bg-amber-50">
-                        需重启 Gateway 才会切到新版本
-                      </Badge>
-                    ) : null}
-                    {updateRuntimeRequiresSwitch &&
-                    recommendedUpdateRuntimeCandidate ? (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-sky-700"
-                      >
-                        升级将自动切到{" "}
-                        {formatRuntimeCandidateLabel(
-                          recommendedUpdateRuntimeCandidate,
-                        )}
-                      </Badge>
-                    ) : null}
-                    {updateInfo?.hasUpdate ? (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full border-amber-200 bg-amber-50 px-3 py-1 text-amber-700"
-                      >
-                        可升级至 {updateInfo.latestVersion || "新版本"}
-                      </Badge>
-                    ) : null}
-                    {updateInfo?.hasUpdate ? (
-                      <button
-                        type="button"
-                        onClick={() => void handlePerformUpdate()}
-                        disabled={operationState.running || switchingRuntime}
-                        className={cn(
-                          openClawPrimaryButtonClassName,
-                          "h-8 rounded-full px-3 text-xs shadow-sm",
-                        )}
-                      >
-                        {updating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ArrowUpCircle className="h-3.5 w-3.5" />
-                        )}
-                        智能升级
-                      </button>
-                    ) : null}
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <OpenClawMark size="md" className="shadow-red-500/10" />
+                  <div>
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-white/85 px-3 py-1 text-xs font-semibold tracking-[0.16em] text-amber-700 shadow-sm">
+                      OPENCLAW WORKSPACE
+                    </span>
                   </div>
                 </div>
 
-                <div className="w-full max-w-[360px] rounded-[24px] border border-white/90 bg-white/88 p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        当前摘要
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">
-                        安装、模型同步、Gateway 和 Dashboard 状态会在这里持续汇总。
-                      </p>
-                    </div>
-                    {operationState.running ? (
-                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        处理中
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
-                        已就绪
-                      </span>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+                    OpenClaw 工作台
+                  </h1>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-600">
+                    {pageDescription}
+                  </p>
+                </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1">
-                      {compatibleProviders.length} 个 Provider
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1">
-                      {channels.length} 个通道
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1">
-                      端口 {gatewayPort}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold tracking-[0.12em] text-slate-500">
-                          VERSION STATUS
-                        </p>
-                        <p
-                          className={cn(
-                            "mt-1 text-sm font-semibold",
-                            versionMismatch
-                              ? "text-amber-700"
-                              : "text-slate-800",
-                          )}
-                        >
-                          {versionStatusSummary.label}
-                        </p>
-                      </div>
-                      {versionMismatch && canRestartGateway ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleRestart()}
-                          disabled={operationState.running}
-                          className={cn(
-                            openClawSecondaryButtonClassName,
-                            "px-3 py-2 text-xs",
-                          )}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          立即重启生效
-                        </button>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
-                      {versionStatusSummary.description}
-                    </p>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="rounded-full border border-white/90 bg-white/90 px-3 py-1 text-slate-700 shadow-sm hover:bg-white">
+                    {currentSubpageLabel}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
+                  >
+                    {installed
+                      ? "环境已安装"
+                      : softInstalled
+                        ? "环境可继续"
+                        : "环境待安装"}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-slate-200 bg-white/75 px-3 py-1 text-slate-600"
+                  >
+                    Gateway {gatewayRunning ? "运行中" : gatewayStatus}
+                  </Badge>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="overview">概览</TabsTrigger>
+                  <TabsTrigger value="actions">快捷操作</TabsTrigger>
+                  <TabsTrigger value="version">版本状态</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="mt-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {summaryCards.map((card) => {
                   const CardIcon = card.icon;
                   return (
@@ -3002,11 +2900,14 @@ export function OpenClawPage({
                       className="rounded-[22px] border border-white/90 bg-white/85 p-4 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-slate-800">
                             {card.title}
                           </p>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                          <p
+                            className="mt-1 truncate text-xs leading-5 text-slate-500"
+                            title={card.descriptionTitle ?? card.description}
+                          >
                             {card.description}
                           </p>
                         </div>
@@ -3030,7 +2931,171 @@ export function OpenClawPage({
                     </div>
                   );
                 })}
-              </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="actions" className="mt-4">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (gatewayRunning) {
+                          void handleOpenDashboardWindow();
+                          return;
+                        }
+
+                        navigateSubpage(
+                          openclawWorkflowReady ? "runtime" : "install",
+                        );
+                      }}
+                      disabled={gatewayRunning ? dashboardWindowBusy : false}
+                      className={cn(
+                        openClawPrimaryButtonClassName,
+                        "px-4 py-2.5 text-sm shadow-sm",
+                      )}
+                    >
+                      {gatewayRunning && dashboardWindowBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MonitorSmartphone className="h-4 w-4" />
+                      )}
+                      {gatewayRunning
+                        ? dashboardWindowOpen
+                          ? "聚焦桌面面板"
+                          : "打开桌面面板"
+                        : openclawWorkflowReady
+                          ? "前往运行页"
+                          : "进入安装环境"}
+                    </button>
+                    {(environmentStatus?.openclaw.status === "needs_reload" ||
+                      !installed) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigateSubpage("install");
+                          void refreshAll();
+                        }}
+                        disabled={operationState.running || switchingRuntime}
+                        className={cn(
+                          openClawSecondaryButtonClassName,
+                          "px-4 py-2.5 text-sm",
+                        )}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        重新检测环境
+                      </button>
+                    )}
+                    {updateInfo?.hasUpdate ? (
+                      <button
+                        type="button"
+                        onClick={() => void handlePerformUpdate()}
+                        disabled={operationState.running || switchingRuntime}
+                        className={cn(
+                          openClawPrimaryButtonClassName,
+                          "px-4 py-2.5 text-sm shadow-sm",
+                        )}
+                      >
+                        {updating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowUpCircle className="h-4 w-4" />
+                        )}
+                        智能升级
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void refreshAll()}
+                      className={cn(
+                        openClawSecondaryButtonClassName,
+                        "px-4 py-2.5 text-sm",
+                      )}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      刷新状态
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openUrl(OPENCLAW_DOCS_URL)}
+                      className={cn(
+                        openClawSecondaryButtonClassName,
+                        "px-4 py-2.5 text-sm",
+                      )}
+                    >
+                      查看文档
+                    </button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="version" className="mt-4">
+                  <div className="rounded-[24px] border border-white/90 bg-white/85 p-5 shadow-sm">
+                    <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold tracking-[0.12em] text-slate-500">
+                            VERSION STATUS
+                          </p>
+                          <p
+                            className={cn(
+                              "mt-1 text-sm font-semibold",
+                              versionMismatch
+                                ? "text-amber-700"
+                                : "text-slate-800",
+                            )}
+                          >
+                            {versionStatusSummary.label}
+                          </p>
+                        </div>
+                        {versionMismatch && canRestartGateway ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleRestart()}
+                            disabled={operationState.running}
+                            className={cn(
+                              openClawSecondaryButtonClassName,
+                              "px-3 py-2 text-xs",
+                            )}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            立即重启生效
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-500">
+                        {versionStatusSummary.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {versionMismatch ? (
+                        <Badge className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700 shadow-none hover:bg-amber-50">
+                          需重启 Gateway 才会切到新版本
+                        </Badge>
+                      ) : null}
+                      {updateInfo?.hasUpdate ? (
+                        <Badge
+                          variant="outline"
+                          className="rounded-full border-amber-200 bg-amber-50 px-3 py-1 text-amber-700"
+                        >
+                          可升级至 {updateInfo.latestVersion || "新版本"}
+                        </Badge>
+                      ) : null}
+                      {updateRuntimeRequiresSwitch &&
+                      recommendedUpdateRuntimeCandidate ? (
+                        <Badge
+                          variant="outline"
+                          className="rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-sky-700"
+                        >
+                          升级将自动切到{" "}
+                          {formatRuntimeCandidateLabel(
+                            recommendedUpdateRuntimeCandidate,
+                          )}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </section>
 
@@ -3052,8 +3117,13 @@ export function OpenClawPage({
                     <div className="text-xs font-medium text-slate-500">
                       安装路径
                     </div>
-                    <div className="mt-2 break-all text-sm leading-6 text-slate-700">
-                      {installedStatus?.path || "尚未检测到安装路径"}
+                    <div
+                      className="mt-2 truncate text-sm leading-6 text-slate-700"
+                      title={installedStatus?.path || undefined}
+                    >
+                      {installedStatus?.path
+                        ? compactPathLabel(installedStatus.path, 52)
+                        : "尚未检测到安装路径"}
                     </div>
                   </div>
                   <div className={openClawSubPanelClassName}>
@@ -3066,60 +3136,6 @@ export function OpenClawPage({
                       {selectedModelId.trim() || "未选择模型"}
                     </div>
                   </div>
-                  <div className={openClawSubPanelClassName}>
-                    <div className="text-xs font-medium text-slate-500">
-                      Dashboard
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-slate-700">
-                      {dashboardWindowOpen
-                        ? "桌面面板已打开"
-                        : dashboardUrl
-                          ? "访问地址已生成"
-                          : "尚未生成访问地址"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {updateInfo?.hasUpdate ? (
-                    <button
-                      type="button"
-                      onClick={() => void handlePerformUpdate()}
-                      disabled={operationState.running || switchingRuntime}
-                      className={cn(
-                        openClawPrimaryButtonClassName,
-                        "px-3 py-2 text-xs",
-                      )}
-                    >
-                      {updating ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <ArrowUpCircle className="h-3.5 w-3.5" />
-                      )}
-                      智能升级到 {updateInfo.latestVersion || "最新版本"}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void refreshAll()}
-                    className={cn(
-                      openClawSecondaryButtonClassName,
-                      "px-3 py-2 text-xs",
-                    )}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    刷新状态
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void openUrl(OPENCLAW_DOCS_URL)}
-                    className={cn(
-                      openClawSecondaryButtonClassName,
-                      "px-3 py-2 text-xs",
-                    )}
-                  >
-                    查看文档
-                  </button>
                 </div>
               </section>
             </aside>

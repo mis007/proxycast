@@ -8,6 +8,8 @@
 //! - 5.1, 5.2: 设置切换事件处理
 
 use super::menu::menu_ids;
+use lime_core::tray_menu_meta::parse_quick_model_item_id;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_autostart::ManagerExt;
 use tracing::{debug, error, info, warn};
@@ -29,6 +31,15 @@ pub mod menu_events {
     pub const HEALTH_CHECK: &str = "tray-health-check";
     /// 自启动状态变更事件
     pub const AUTO_START_CHANGED: &str = "tray-auto-start-changed";
+    /// 托盘快速切换模型事件
+    pub const MODEL_SELECTED: &str = "tray-model-selected";
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TrayModelSelectedPayload {
+    provider_type: String,
+    model: String,
 }
 
 /// 处理菜单事件
@@ -41,6 +52,11 @@ pub mod menu_events {
 /// - 5.1, 5.2: 设置切换
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
     debug!("处理托盘菜单事件: {}", menu_id);
+
+    if let Some((provider_type, model)) = parse_quick_model_item_id(menu_id) {
+        handle_model_selected(app, provider_type, model);
+        return;
+    }
 
     match menu_id {
         // === 服务器控制 ===
@@ -59,13 +75,32 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
         menu_ids::AUTO_START => handle_auto_start_toggle(app),
 
         // 忽略信息类菜单项和分隔符
-        menu_ids::STATUS_INFO | menu_ids::CREDENTIAL_INFO | menu_ids::REQUEST_INFO => {
+        menu_ids::CURRENT_MODEL_INFO
+        | menu_ids::STATUS_INFO
+        | menu_ids::CREDENTIAL_INFO
+        | menu_ids::REQUEST_INFO => {
             debug!("忽略信息类菜单项: {}", menu_id);
         }
 
         _ => {
             warn!("未知的菜单项 ID: {}", menu_id);
         }
+    }
+}
+
+fn handle_model_selected<R: Runtime>(app: &AppHandle<R>, provider_type: String, model: String) {
+    info!(
+        "[托盘] 用户请求切换模型: provider_type={}, model={}",
+        provider_type, model
+    );
+
+    let payload = TrayModelSelectedPayload {
+        provider_type,
+        model,
+    };
+
+    if let Err(e) = app.emit(menu_events::MODEL_SELECTED, payload) {
+        error!("[托盘] 发送模型切换事件失败: {}", e);
     }
 }
 

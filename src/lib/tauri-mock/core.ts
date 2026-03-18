@@ -10,6 +10,7 @@ import {
   isDevBridgeAvailable,
   normalizeDevBridgeError,
 } from "../dev-bridge/http-client";
+import agentCommandCatalog from "../governance/agentCommandCatalog.json";
 import { shouldPreferMockInBrowser } from "../dev-bridge/mockPriorityCommands";
 
 // 模拟的命令处理器
@@ -21,6 +22,18 @@ const createDeprecatedCommandMock =
       `命令 ${command} 已废弃，请迁移到 ${replacement}。Mock 不再为旧链路伪造成功结果。`,
     );
   };
+
+const deprecatedAgentCommandReplacements =
+  agentCommandCatalog.deprecatedCommandReplacements as Record<string, string>;
+
+const deprecatedAgentCommandMocks = Object.fromEntries(
+  Object.entries(deprecatedAgentCommandReplacements).map(
+    ([command, replacement]) => [
+      command,
+      createDeprecatedCommandMock(command, replacement),
+    ],
+  ),
+) as Record<string, () => never>;
 
 type MockBrowserProfileRecord = {
   id: string;
@@ -1508,24 +1521,10 @@ const defaultMocks: Record<string, any> = {
   }),
 
   // Agent 相关
-  list_agent_sessions: () => [],
-  agent_list_sessions: () => [],
-  get_agent_process_status: () => ({ running: false }),
+  ...deprecatedAgentCommandMocks,
   agent_get_process_status: () => ({ running: false }),
   agent_start_process: () => ({ success: true }),
   agent_stop_process: () => ({ success: true }),
-  agent_create_session: () => ({ session_id: "mock-session-id" }),
-  agent_send_message: createDeprecatedCommandMock(
-    "agent_send_message",
-    "aster_agent_chat_stream",
-  ),
-  agent_get_session: () => ({ session: null }),
-  agent_delete_session: () => ({ success: true }),
-  agent_get_session_messages: () => [],
-  agent_chat_stream: createDeprecatedCommandMock(
-    "agent_chat_stream",
-    "aster_agent_chat_stream",
-  ),
   agent_terminal_command_response: () => ({}),
   agent_term_scrollback_response: () => ({}),
 
@@ -1543,14 +1542,6 @@ const defaultMocks: Record<string, any> = {
     initialized: true,
     provider_configured: true,
   }),
-  aster_agent_chat_stream: () => ({}),
-  aster_agent_stop: () => true,
-  aster_session_create: () => "mock-aster-session",
-  aster_session_set_execution_strategy: () => ({}),
-  aster_session_list: () => [],
-  aster_session_get: () => ({ id: "mock", messages: [] }),
-  aster_agent_confirm: () => ({}),
-  aster_agent_submit_elicitation_response: () => ({}),
   agent_runtime_submit_turn: () => ({}),
   agent_runtime_interrupt_turn: () => true,
   agent_runtime_create_session: () => "mock-aster-session",
@@ -1845,6 +1836,7 @@ const defaultMocks: Record<string, any> = {
   get_models_by_tier: () => [],
   get_provider_alias_config: () => ({ alias: {} }),
   get_all_alias_configs: () => ({}),
+  sync_tray_model_shortcuts: () => ({}),
 
   // Orchestrator 相关
   init_orchestrator: () => ({}),

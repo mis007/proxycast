@@ -5,7 +5,10 @@
 
 use aster::agents::AgentEvent;
 use aster::conversation::message::{ActionRequiredData, Message, MessageContent};
-use lime_core::database::dao::agent_timeline::{AgentThreadItem, AgentThreadTurn};
+use aster::session::{ItemRuntime, ItemRuntimePayload, ItemStatus, TurnRuntime, TurnStatus};
+use lime_core::database::dao::agent_timeline::{
+    AgentThreadItem, AgentThreadItemPayload, AgentThreadTurn,
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -774,6 +777,24 @@ pub enum TauriMessageContent {
 /// 一个 AgentEvent 可能产生多个 TauriAgentEvent
 pub fn convert_agent_event(event: AgentEvent) -> Vec<TauriAgentEvent> {
     match event {
+        AgentEvent::TurnStarted { turn } => {
+            let thread_id = turn.thread_id.clone();
+            vec![
+                TauriAgentEvent::ThreadStarted { thread_id },
+                TauriAgentEvent::TurnStarted {
+                    turn: convert_turn_runtime(turn),
+                },
+            ]
+        }
+        AgentEvent::ItemStarted { item } => vec![TauriAgentEvent::ItemStarted {
+            item: convert_item_runtime(item),
+        }],
+        AgentEvent::ItemUpdated { item } => vec![TauriAgentEvent::ItemUpdated {
+            item: convert_item_runtime(item),
+        }],
+        AgentEvent::ItemCompleted { item } => vec![TauriAgentEvent::ItemCompleted {
+            item: convert_item_runtime(item),
+        }],
         AgentEvent::Message(message) => convert_message(message),
         AgentEvent::McpNotification((server_name, notification)) => {
             // MCP 通知暂时忽略或转换为日志
@@ -798,6 +819,133 @@ pub fn convert_agent_event(event: AgentEvent) -> Vec<TauriAgentEvent> {
                 })
                 .collect(),
         }],
+    }
+}
+
+fn convert_turn_status(
+    status: TurnStatus,
+) -> lime_core::database::dao::agent_timeline::AgentThreadTurnStatus {
+    match status {
+        TurnStatus::Queued | TurnStatus::Running => {
+            lime_core::database::dao::agent_timeline::AgentThreadTurnStatus::Running
+        }
+        TurnStatus::Completed => {
+            lime_core::database::dao::agent_timeline::AgentThreadTurnStatus::Completed
+        }
+        TurnStatus::Failed => {
+            lime_core::database::dao::agent_timeline::AgentThreadTurnStatus::Failed
+        }
+        TurnStatus::Aborted => {
+            lime_core::database::dao::agent_timeline::AgentThreadTurnStatus::Aborted
+        }
+    }
+}
+
+pub fn convert_turn_runtime(turn: TurnRuntime) -> AgentThreadTurn {
+    AgentThreadTurn {
+        id: turn.id,
+        thread_id: turn.thread_id,
+        prompt_text: turn.input_text.unwrap_or_default(),
+        status: convert_turn_status(turn.status),
+        started_at: turn.started_at.unwrap_or(turn.created_at).to_rfc3339(),
+        completed_at: turn.completed_at.map(|value| value.to_rfc3339()),
+        error_message: turn.error_message,
+        created_at: turn.created_at.to_rfc3339(),
+        updated_at: turn.updated_at.to_rfc3339(),
+    }
+}
+
+fn convert_item_status(
+    status: ItemStatus,
+) -> lime_core::database::dao::agent_timeline::AgentThreadItemStatus {
+    match status {
+        ItemStatus::InProgress => {
+            lime_core::database::dao::agent_timeline::AgentThreadItemStatus::InProgress
+        }
+        ItemStatus::Completed => {
+            lime_core::database::dao::agent_timeline::AgentThreadItemStatus::Completed
+        }
+        ItemStatus::Failed => {
+            lime_core::database::dao::agent_timeline::AgentThreadItemStatus::Failed
+        }
+    }
+}
+
+fn convert_item_payload(payload: ItemRuntimePayload) -> AgentThreadItemPayload {
+    match payload {
+        ItemRuntimePayload::UserMessage { content } => {
+            AgentThreadItemPayload::UserMessage { content }
+        }
+        ItemRuntimePayload::AgentMessage { text } => {
+            AgentThreadItemPayload::AgentMessage { text, phase: None }
+        }
+        ItemRuntimePayload::Reasoning { text } => AgentThreadItemPayload::Reasoning {
+            text,
+            summary: None,
+        },
+        ItemRuntimePayload::ToolCall {
+            tool_name,
+            arguments,
+            output,
+            success,
+            error,
+            metadata,
+        } => {
+            let output_text = output
+                .as_ref()
+                .map(extract_tool_result_text)
+                .filter(|text| !text.is_empty());
+            AgentThreadItemPayload::ToolCall {
+                tool_name,
+                arguments,
+                output: output_text,
+                success,
+                error,
+                metadata,
+            }
+        }
+        ItemRuntimePayload::ApprovalRequest {
+            request_id,
+            action_type,
+            prompt,
+            tool_name,
+            arguments,
+            response,
+        } => AgentThreadItemPayload::ApprovalRequest {
+            request_id,
+            action_type,
+            prompt,
+            tool_name,
+            arguments,
+            response,
+        },
+        ItemRuntimePayload::RequestUserInput {
+            request_id,
+            action_type,
+            prompt,
+            requested_schema: _,
+            response,
+        } => AgentThreadItemPayload::RequestUserInput {
+            request_id,
+            action_type,
+            prompt,
+            questions: None,
+            response,
+        },
+    }
+}
+
+pub fn convert_item_runtime(item: ItemRuntime) -> AgentThreadItem {
+    AgentThreadItem {
+        id: item.id,
+        thread_id: item.thread_id,
+        turn_id: item.turn_id,
+        sequence: item.sequence,
+        status: convert_item_status(item.status),
+        started_at: item.started_at.to_rfc3339(),
+        completed_at: item.completed_at.map(|value| value.to_rfc3339()),
+        updated_at: item.updated_at.to_rfc3339(),
+        payload: convert_item_payload(item.payload),
     }
 }
 
@@ -1152,6 +1300,155 @@ mod tests {
                 assert!(steps[0].detail.contains("自动压缩"));
             }
             _ => panic!("Expected ContextTrace event"),
+        }
+    }
+
+    #[test]
+    fn test_convert_turn_started() {
+        let turn = TurnRuntime::new(
+            "turn-1",
+            "session-1",
+            "thread-1",
+            Some("帮我总结".to_string()),
+            None,
+        );
+        let events = convert_agent_event(AgentEvent::TurnStarted { turn });
+
+        assert_eq!(events.len(), 2);
+        match &events[0] {
+            TauriAgentEvent::ThreadStarted { thread_id } => {
+                assert_eq!(thread_id, "thread-1");
+            }
+            _ => panic!("Expected ThreadStarted event"),
+        }
+        match &events[1] {
+            TauriAgentEvent::TurnStarted { turn } => {
+                assert_eq!(turn.id, "turn-1");
+                assert_eq!(turn.thread_id, "thread-1");
+                assert_eq!(turn.prompt_text, "帮我总结");
+            }
+            _ => panic!("Expected TurnStarted event"),
+        }
+    }
+
+    #[test]
+    fn test_convert_item_completed_tool_call() {
+        let now = chrono::Utc::now();
+        let item = ItemRuntime {
+            id: "tool-1".to_string(),
+            thread_id: "thread-1".to_string(),
+            turn_id: "turn-1".to_string(),
+            sequence: 2,
+            status: ItemStatus::Completed,
+            started_at: now,
+            completed_at: Some(now),
+            updated_at: now,
+            payload: ItemRuntimePayload::ToolCall {
+                tool_name: "web_search".to_string(),
+                arguments: Some(serde_json::json!({ "q": "codex" })),
+                output: Some(serde_json::json!({
+                    "content": [
+                        { "type": "text", "text": "Codex 是一个智能体编码系统" }
+                    ]
+                })),
+                success: Some(true),
+                error: None,
+                metadata: Some(serde_json::json!({ "source": "native_item_runtime" })),
+            },
+        };
+
+        let events = convert_agent_event(AgentEvent::ItemCompleted { item });
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            TauriAgentEvent::ItemCompleted { item } => {
+                assert_eq!(item.id, "tool-1");
+                assert_eq!(item.sequence, 2);
+                assert_eq!(
+                    item.status,
+                    lime_core::database::dao::agent_timeline::AgentThreadItemStatus::Completed
+                );
+                match &item.payload {
+                    AgentThreadItemPayload::ToolCall {
+                        tool_name,
+                        arguments,
+                        output,
+                        success,
+                        error,
+                        metadata,
+                    } => {
+                        assert_eq!(tool_name, "web_search");
+                        assert_eq!(
+                            arguments.as_ref(),
+                            Some(&serde_json::json!({ "q": "codex" }))
+                        );
+                        assert_eq!(output.as_deref(), Some("Codex 是一个智能体编码系统"));
+                        assert_eq!(*success, Some(true));
+                        assert_eq!(error, &None);
+                        assert_eq!(
+                            metadata.as_ref(),
+                            Some(&serde_json::json!({ "source": "native_item_runtime" }))
+                        );
+                    }
+                    other => panic!("Unexpected payload: {other:?}"),
+                }
+            }
+            other => panic!("Expected ItemCompleted event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_convert_item_started_request_user_input() {
+        let now = chrono::Utc::now();
+        let item = ItemRuntime {
+            id: "request-1".to_string(),
+            thread_id: "thread-1".to_string(),
+            turn_id: "turn-1".to_string(),
+            sequence: 3,
+            status: ItemStatus::InProgress,
+            started_at: now,
+            completed_at: None,
+            updated_at: now,
+            payload: ItemRuntimePayload::RequestUserInput {
+                request_id: "request-1".to_string(),
+                action_type: "elicitation".to_string(),
+                prompt: Some("请补充发布渠道".to_string()),
+                requested_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "channel": { "type": "string" }
+                    }
+                })),
+                response: None,
+            },
+        };
+
+        let events = convert_agent_event(AgentEvent::ItemStarted { item });
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            TauriAgentEvent::ItemStarted { item } => {
+                assert_eq!(item.id, "request-1");
+                assert_eq!(
+                    item.status,
+                    lime_core::database::dao::agent_timeline::AgentThreadItemStatus::InProgress
+                );
+                match &item.payload {
+                    AgentThreadItemPayload::RequestUserInput {
+                        request_id,
+                        action_type,
+                        prompt,
+                        questions,
+                        response,
+                    } => {
+                        assert_eq!(request_id, "request-1");
+                        assert_eq!(action_type, "elicitation");
+                        assert_eq!(prompt.as_deref(), Some("请补充发布渠道"));
+                        assert_eq!(questions, &None);
+                        assert_eq!(response, &None);
+                    }
+                    other => panic!("Unexpected payload: {other:?}"),
+                }
+            }
+            other => panic!("Expected ItemStarted event, got {other:?}"),
         }
     }
 

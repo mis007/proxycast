@@ -6,11 +6,11 @@ import type { WriteArtifactContext } from "../types";
 const {
   mockInitAsterAgent,
   mockSubmitAgentRuntimeTurn,
-  mockCreateAsterSession,
-  mockListAsterSessions,
-  mockGetAsterSession,
+  mockCreateAgentRuntimeSession,
+  mockListAgentRuntimeSessions,
+  mockGetAgentRuntimeSession,
   mockUpdateAgentRuntimeSession,
-  mockDeleteAsterSession,
+  mockDeleteAgentRuntimeSession,
   mockInterruptAgentRuntimeTurn,
   mockRemoveAgentRuntimeQueuedTurn,
   mockRespondAgentRuntimeAction,
@@ -22,11 +22,11 @@ const {
 } = vi.hoisted(() => ({
   mockInitAsterAgent: vi.fn(),
   mockSubmitAgentRuntimeTurn: vi.fn(),
-  mockCreateAsterSession: vi.fn(),
-  mockListAsterSessions: vi.fn(),
-  mockGetAsterSession: vi.fn(),
+  mockCreateAgentRuntimeSession: vi.fn(),
+  mockListAgentRuntimeSessions: vi.fn(),
+  mockGetAgentRuntimeSession: vi.fn(),
   mockUpdateAgentRuntimeSession: vi.fn(),
-  mockDeleteAsterSession: vi.fn(),
+  mockDeleteAgentRuntimeSession: vi.fn(),
   mockInterruptAgentRuntimeTurn: vi.fn(),
   mockRemoveAgentRuntimeQueuedTurn: vi.fn(),
   mockRespondAgentRuntimeAction: vi.fn(),
@@ -44,20 +44,14 @@ const {
   mockTryExecuteSlashSkillCommand: vi.fn(async () => false),
 }));
 
-const mockSendAsterMessageStream = mockSubmitAgentRuntimeTurn;
-
 vi.mock("@/lib/api/agentRuntime", () => ({
   initAsterAgent: mockInitAsterAgent,
-  createAsterSession: mockCreateAsterSession,
-  listAsterSessions: mockListAsterSessions,
-  getAsterSession: mockGetAsterSession,
-  deleteAsterSession: mockDeleteAsterSession,
   submitAgentRuntimeTurn: mockSubmitAgentRuntimeTurn,
-  createAgentRuntimeSession: mockCreateAsterSession,
-  listAgentRuntimeSessions: mockListAsterSessions,
-  getAgentRuntimeSession: mockGetAsterSession,
+  createAgentRuntimeSession: mockCreateAgentRuntimeSession,
+  listAgentRuntimeSessions: mockListAgentRuntimeSessions,
+  getAgentRuntimeSession: mockGetAgentRuntimeSession,
   updateAgentRuntimeSession: mockUpdateAgentRuntimeSession,
-  deleteAgentRuntimeSession: mockDeleteAsterSession,
+  deleteAgentRuntimeSession: mockDeleteAgentRuntimeSession,
   interruptAgentRuntimeTurn: mockInterruptAgentRuntimeTurn,
   removeAgentRuntimeQueuedTurn: mockRemoveAgentRuntimeQueuedTurn,
   respondAgentRuntimeAction: mockRespondAgentRuntimeAction,
@@ -84,6 +78,7 @@ import { useAsterAgentChat } from "./useAsterAgentChat";
 
 interface HookHarness {
   getValue: () => ReturnType<typeof useAsterAgentChat>;
+  getRenderCount: () => number;
   unmount: () => void;
 }
 
@@ -102,8 +97,10 @@ function mountHook(
   const root = createRoot(container);
 
   let hookValue: ReturnType<typeof useAsterAgentChat> | null = null;
+  let renderCount = 0;
 
   function TestComponent() {
+    renderCount += 1;
     hookValue = useAsterAgentChat({
       workspaceId,
       onWriteFile: currentOptions.onWriteFile,
@@ -122,6 +119,7 @@ function mountHook(
       }
       return hookValue;
     },
+    getRenderCount: () => renderCount,
     unmount: () => {
       act(() => {
         root.unmount();
@@ -168,14 +166,14 @@ beforeEach(() => {
 
   mockInitAsterAgent.mockResolvedValue(undefined);
   mockSubmitAgentRuntimeTurn.mockResolvedValue(undefined);
-  mockCreateAsterSession.mockResolvedValue("created-session");
-  mockListAsterSessions.mockResolvedValue([]);
-  mockGetAsterSession.mockResolvedValue({
+  mockCreateAgentRuntimeSession.mockResolvedValue("created-session");
+  mockListAgentRuntimeSessions.mockResolvedValue([]);
+  mockGetAgentRuntimeSession.mockResolvedValue({
     id: "session-from-api",
     messages: [],
   });
   mockUpdateAgentRuntimeSession.mockResolvedValue(undefined);
-  mockDeleteAsterSession.mockResolvedValue(undefined);
+  mockDeleteAgentRuntimeSession.mockResolvedValue(undefined);
   mockInterruptAgentRuntimeTurn.mockResolvedValue(undefined);
   mockRemoveAgentRuntimeQueuedTurn.mockResolvedValue(true);
   mockRespondAgentRuntimeAction.mockResolvedValue(undefined);
@@ -190,6 +188,21 @@ afterEach(() => {
 });
 
 describe("useAsterAgentChat 首页新会话", () => {
+  it("无工作区时不应主动初始化 Agent", async () => {
+    const harness = mountHook("");
+
+    try {
+      await flushEffects();
+
+      expect(mockInitAsterAgent).not.toHaveBeenCalled();
+      expect(mockListAgentRuntimeSessions).not.toHaveBeenCalled();
+      expect(harness.getValue().processStatus.running).toBe(false);
+      expect(harness.getValue().topics).toEqual([]);
+    } finally {
+      harness.unmount();
+    }
+  });
+
   it("clearMessages 后重新进入同工作区不应恢复旧话题", async () => {
     const workspaceId = "ws-home-clear";
     const sessionId = "session-home-clear";
@@ -229,9 +242,85 @@ describe("useAsterAgentChat 首页新会话", () => {
       harness.unmount();
     }
   });
+
+  it("加载话题不应依赖预先初始化 Agent", async () => {
+    const workspaceId = "ws-topic-lazy-init";
+    const sessionId = "session-topic-lazy-init";
+    mockListAgentRuntimeSessions.mockResolvedValue([
+      {
+        id: sessionId,
+        name: "任务 C",
+        created_at: 1700000020,
+        updated_at: 1700000021,
+        messages_count: 0,
+      },
+    ]);
+
+    const harness = mountHook(workspaceId);
+
+    try {
+      await flushEffects();
+      await flushEffects();
+
+      expect(mockInitAsterAgent).not.toHaveBeenCalled();
+      expect(mockListAgentRuntimeSessions).toHaveBeenCalledTimes(1);
+      expect(harness.getValue().topics.map((topic) => topic.id)).toEqual([
+        sessionId,
+      ]);
+    } finally {
+      harness.unmount();
+    }
+  });
 });
 
 describe("useAsterAgentChat 任务快照", () => {
+  it("空会话快照稳定后不应继续自发重渲染", async () => {
+    const workspaceId = "ws-task-stable";
+    const sessionId = "session-task-stable";
+    sessionStorage.setItem(
+      `aster_curr_sessionId_${workspaceId}`,
+      JSON.stringify(sessionId),
+    );
+    mockListAgentRuntimeSessions.mockResolvedValue([
+      {
+        id: sessionId,
+        name: "任务稳定性",
+        created_at: 1700000100,
+        updated_at: 1700000101,
+        messages_count: 0,
+      },
+    ]);
+    mockGetAgentRuntimeSession.mockResolvedValue({
+      id: sessionId,
+      messages: [],
+      turns: [],
+      items: [],
+      queued_turns: [],
+    });
+
+    const harness = mountHook(workspaceId);
+
+    try {
+      await flushEffects();
+      await flushEffects();
+
+      const topic = harness
+        .getValue()
+        .topics.find((item) => item.id === sessionId);
+      expect(topic).toBeTruthy();
+      expect(topic?.updatedAt.getTime()).toBe(1700000101 * 1000);
+
+      const settledRenderCount = harness.getRenderCount();
+
+      await flushEffects();
+      await flushEffects();
+
+      expect(harness.getRenderCount()).toBe(settledRenderCount);
+    } finally {
+      harness.unmount();
+    }
+  });
+
   it("应将当前任务的真实摘要与状态回写到任务列表", async () => {
     const workspaceId = "ws-task-snapshot";
     const sessionId = "session-task-snapshot";
@@ -250,7 +339,7 @@ describe("useAsterAgentChat 任务快照", () => {
         },
       ]),
     );
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: sessionId,
         name: "任务 A",
@@ -285,7 +374,7 @@ describe("useAsterAgentChat 任务快照", () => {
       `aster_curr_sessionId_${workspaceId}`,
       JSON.stringify(sessionId),
     );
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: sessionId,
         name: "任务 B",
@@ -294,7 +383,7 @@ describe("useAsterAgentChat 任务快照", () => {
         messages_count: 0,
       },
     ]);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: sessionId,
       messages: [],
       turns: [],
@@ -430,7 +519,7 @@ describe("useAsterAgentChat.confirmAction", () => {
 
 describe("useAsterAgentChat queue hydration", () => {
   it("切换话题时应恢复后端返回的排队项", async () => {
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: "session-queue",
         name: "带队列的话题",
@@ -438,7 +527,7 @@ describe("useAsterAgentChat queue hydration", () => {
         updated_at: 2,
       },
     ]);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "session-queue",
       messages: [],
       turns: [],
@@ -502,12 +591,15 @@ describe("useAsterAgentChat thread timeline", () => {
           .sendMessage("帮我先开始处理", [], false, false, false, "react");
       });
 
-      expect(harness.getValue().currentTurnId).toMatch(/^local-turn:/);
+      const optimisticTurnId = harness.getValue().currentTurnId;
+      expect(optimisticTurnId).toBeTruthy();
       expect(harness.getValue().turns).toHaveLength(1);
-      expect(harness.getValue().turns[0]?.id).toMatch(/^local-turn:/);
+      expect(harness.getValue().turns[0]?.id).toBe(optimisticTurnId);
       expect(harness.getValue().turns[0]?.status).toBe("running");
       expect(harness.getValue().threadItems).toHaveLength(1);
-      expect(harness.getValue().threadItems[0]?.id).toMatch(/^local-item:/);
+      expect(harness.getValue().threadItems[0]?.id).toBe(
+        `turn-summary:${optimisticTurnId}`,
+      );
       expect(harness.getValue().threadItems[0]?.type).toBe("turn_summary");
       expect(harness.getValue().threadItems[0]?.status).toBe("in_progress");
 
@@ -871,7 +963,7 @@ describe("useAsterAgentChat slash skill 执行链路", () => {
         "/social_post_with_cover 写一篇春季新品文案",
       );
       expect(mockTryExecuteSlashSkillCommand).toHaveBeenCalledTimes(1);
-      expect(mockSendAsterMessageStream).not.toHaveBeenCalled();
+      expect(mockSubmitAgentRuntimeTurn).not.toHaveBeenCalled();
     } finally {
       harness.unmount();
     }
@@ -903,7 +995,7 @@ describe("useAsterAgentChat slash skill 执行链路", () => {
       });
 
       expect(mockTryExecuteSlashSkillCommand).toHaveBeenCalledTimes(1);
-      expect(mockSendAsterMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSubmitAgentRuntimeTurn).toHaveBeenCalledTimes(1);
     } finally {
       harness.unmount();
     }
@@ -2211,7 +2303,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
     const now = Math.floor(Date.now() / 1000);
 
     seedSession(workspaceId, staleSessionId);
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: activeSessionId,
         name: "可用会话",
@@ -2220,7 +2312,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
         messages_count: 1,
       },
     ]);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: activeSessionId,
       created_at: now - 10,
       updated_at: now,
@@ -2235,7 +2327,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
       await flushEffects();
 
       expect(
-        mockGetAsterSession.mock.calls.some(
+        mockGetAgentRuntimeSession.mock.calls.some(
           ([sessionId]) => sessionId === staleSessionId,
         ),
       ).toBe(false);
@@ -2249,7 +2341,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
     const workspaceId = "ws-filter-current";
     const createdAt = Math.floor(Date.now() / 1000);
 
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: "topic-current",
         name: "当前项目话题",
@@ -2298,7 +2390,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
     const workspaceId = "ws-topic-memory";
     const createdAt = Math.floor(Date.now() / 1000);
 
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: "topic-a",
         name: "话题 A",
@@ -2312,7 +2404,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
         messages_count: 0,
       },
     ]);
-    mockGetAsterSession.mockImplementation(async (topicId: string) => ({
+    mockGetAgentRuntimeSession.mockImplementation(async (topicId: string) => ({
       id: topicId,
       messages: [],
       execution_strategy: "react",
@@ -2379,7 +2471,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
     const workspaceId = "ws-topic-memory-immediate";
     const createdAt = Math.floor(Date.now() / 1000);
 
-    mockListAsterSessions.mockResolvedValue([
+    mockListAgentRuntimeSessions.mockResolvedValue([
       {
         id: "topic-a",
         name: "话题 A",
@@ -2393,7 +2485,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
         messages_count: 0,
       },
     ]);
-    mockGetAsterSession.mockImplementation(async (topicId: string) => ({
+    mockGetAgentRuntimeSession.mockImplementation(async (topicId: string) => ({
       id: topicId,
       messages: [],
       execution_strategy: "react",
@@ -2447,7 +2539,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应保留工具调用历史并恢复 elicitation 回答文本", async () => {
     const workspaceId = "ws-history-hydrate";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-history",
       execution_strategy: "react",
       messages: [
@@ -2516,7 +2608,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应恢复 input_image 历史消息", async () => {
     const workspaceId = "ws-history-image";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-image",
       execution_strategy: "react",
       messages: [
@@ -2574,7 +2666,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应将仅含 tool_response 协议的空白 user 消息归一为 assistant 轨迹", async () => {
     const workspaceId = "ws-history-empty-user-tool-response";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-empty-user",
       execution_strategy: "react",
       messages: [
@@ -2649,7 +2741,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应从 tool_response 输出中提取图片并写入工具结果", async () => {
     const workspaceId = "ws-history-tool-image";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-tool-image",
       execution_strategy: "react",
       messages: [
@@ -2702,7 +2794,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应清洗 tool_response error 中的 Lime 元数据块", async () => {
     const workspaceId = "ws-history-tool-error-metadata";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-tool-error-metadata",
       execution_strategy: "react",
       messages: [
@@ -2766,7 +2858,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应合并同一工具调用的 running/completed 轨迹为一条", async () => {
     const workspaceId = "ws-history-tool-dedupe";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-tool-dedupe",
       execution_strategy: "react",
       messages: [
@@ -2823,7 +2915,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应合并连续 assistant 历史片段", async () => {
     const workspaceId = "ws-history-merge";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-merge",
       execution_strategy: "react",
       messages: [
@@ -2882,7 +2974,7 @@ describe("useAsterAgentChat 偏好持久化", () => {
   it("切换话题时应去重相邻重复历史消息", async () => {
     const workspaceId = "ws-history-adjacent-dedupe";
     const now = Math.floor(Date.now() / 1000);
-    mockGetAsterSession.mockResolvedValue({
+    mockGetAgentRuntimeSession.mockResolvedValue({
       id: "topic-adjacent-dedupe",
       execution_strategy: "react",
       messages: [
@@ -3044,7 +3136,7 @@ describe("useAsterAgentChat 兼容接口", () => {
 
   it("renameTopic 应调用后端并刷新话题标题", async () => {
     const createdAt = Math.floor(Date.now() / 1000);
-    mockListAsterSessions
+    mockListAgentRuntimeSessions
       .mockResolvedValue([
         {
           id: "topic-1",
@@ -3098,8 +3190,8 @@ describe("useAsterAgentChat 兼容接口", () => {
       },
     ];
 
-    mockListAsterSessions.mockImplementation(async () => currentSessions);
-    mockDeleteAsterSession.mockImplementation(async () => {
+    mockListAgentRuntimeSessions.mockImplementation(async () => currentSessions);
+    mockDeleteAgentRuntimeSession.mockImplementation(async () => {
       currentSessions = [];
     });
 
@@ -3113,8 +3205,8 @@ describe("useAsterAgentChat 兼容接口", () => {
         await harness.getValue().deleteTopic("topic-1");
       });
 
-      expect(mockDeleteAsterSession).toHaveBeenCalledTimes(1);
-      expect(mockDeleteAsterSession).toHaveBeenCalledWith("topic-1");
+      expect(mockDeleteAgentRuntimeSession).toHaveBeenCalledTimes(1);
+      expect(mockDeleteAgentRuntimeSession).toHaveBeenCalledWith("topic-1");
 
       const deletedTopic = harness
         .getValue()

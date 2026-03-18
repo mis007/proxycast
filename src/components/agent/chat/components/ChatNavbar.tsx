@@ -118,6 +118,22 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
   const browserAssistTitle = resolveBrowserAssistTitle(
     browserAssistAttentionLevel,
   );
+  const groupClassName = cn(
+    toolbarGroupClassName,
+    isWorkspaceCompact && "rounded-[18px] p-1",
+  );
+  const dividerClassName = cn(
+    toolbarDividerClassName,
+    isWorkspaceCompact && "mx-1 h-5",
+  );
+  const embeddedButtonClassName = cn(
+    toolbarEmbeddedButtonClassName,
+    isWorkspaceCompact && "h-8 rounded-[18px] px-3",
+  );
+  const ghostIconButtonClassName = cn(
+    toolbarGhostIconButtonClassName,
+    isWorkspaceCompact && "h-8 w-8 rounded-[18px]",
+  );
   const showStatusTools = showBrowserAssistEntry || showHarnessToggle;
   const showNavigationTools =
     !isWorkspaceCompact &&
@@ -127,17 +143,20 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
   const showWorkspaceTools = showHistoryToggle || showCanvasToggle || Boolean(novelCanvasControls);
   const showProjectSelector = !isWorkspaceCompact;
   const showCompactSettingsButton = isWorkspaceCompact && Boolean(onToggleSettings);
+  const compactProjectSelectorClassName = isWorkspaceCompact
+    ? "min-w-[184px] max-w-[248px]"
+    : "min-w-[196px] max-w-[280px]";
 
   return (
-    <Navbar>
+    <Navbar $compact={isWorkspaceCompact}>
       <div className="flex items-center gap-2">
         {showNavigationTools ? (
-          <div className={toolbarGroupClassName}>
+          <div className={groupClassName}>
             {onBackHome && (
               <Button
                 variant="ghost"
                 size="icon"
-                className={toolbarGhostIconButtonClassName}
+                className={ghostIconButtonClassName}
                 onClick={onBackHome}
                 title="返回新建任务"
                 aria-label="返回新建任务"
@@ -146,13 +165,13 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
               </Button>
             )}
             {onBackHome && (onBackToResources || onBackToProjectManagement) ? (
-              <div className={toolbarDividerClassName} aria-hidden="true" />
+              <div className={dividerClassName} aria-hidden="true" />
             ) : null}
             {onBackToResources && (
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(toolbarEmbeddedButtonClassName, toolbarTextButtonClassName)}
+                className={cn(embeddedButtonClassName, toolbarTextButtonClassName)}
                 onClick={onBackToResources}
               >
                 <FolderOpen size={16} className="mr-0.5" />
@@ -160,13 +179,13 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
               </Button>
             )}
             {onBackToResources && onBackToProjectManagement ? (
-              <div className={toolbarDividerClassName} aria-hidden="true" />
+              <div className={dividerClassName} aria-hidden="true" />
             ) : null}
             {onBackToProjectManagement && (
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(toolbarEmbeddedButtonClassName, toolbarTextButtonClassName)}
+                className={cn(embeddedButtonClassName, toolbarTextButtonClassName)}
                 onClick={onBackToProjectManagement}
               >
                 项目管理
@@ -176,12 +195,12 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
         ) : null}
 
         {showWorkspaceTools ? (
-          <div className={toolbarGroupClassName}>
+          <div className={groupClassName}>
             {showHistoryToggle && (
               <Button
                 variant="ghost"
                 size="icon"
-                className={toolbarGhostIconButtonClassName}
+                className={ghostIconButtonClassName}
                 onClick={onToggleHistory}
                 aria-label="切换历史"
                 title="切换历史"
@@ -190,13 +209,13 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
               </Button>
             )}
             {showHistoryToggle && (showCanvasToggle || novelCanvasControls) ? (
-              <div className={toolbarDividerClassName} aria-hidden="true" />
+              <div className={dividerClassName} aria-hidden="true" />
             ) : null}
             {showCanvasToggle ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className={toolbarGhostIconButtonClassName}
+                className={ghostIconButtonClassName}
                 onClick={onToggleCanvas}
                 aria-label={isCanvasOpen ? "折叠画布" : "展开画布"}
                 title={isCanvasOpen ? "折叠画布" : "展开画布"}
@@ -209,14 +228,14 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
               </Button>
             ) : null}
             {showCanvasToggle && novelCanvasControls ? (
-              <div className={toolbarDividerClassName} aria-hidden="true" />
+              <div className={dividerClassName} aria-hidden="true" />
             ) : null}
             {novelCanvasControls ? (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={toolbarGhostIconButtonClassName}
+                  className={ghostIconButtonClassName}
                   onClick={novelCanvasControls.onToggleChapterList}
                   title={
                     novelCanvasControls.chapterListCollapsed
@@ -233,7 +252,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={toolbarGhostIconButtonClassName}
+                  className={ghostIconButtonClassName}
                   onClick={novelCanvasControls.onAddChapter}
                   title="新建章节"
                 >
@@ -242,7 +261,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={toolbarGhostIconButtonClassName}
+                  className={ghostIconButtonClassName}
                   onClick={novelCanvasControls.onCloseCanvas}
                   title="关闭画布"
                 >
@@ -258,7 +277,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
 
       <div className="flex items-center gap-2">
         {showProjectSelector ? (
-          <div className={toolbarGroupClassName}>
+          <div className={groupClassName}>
             <ProjectSelector
               value={projectId}
               onChange={(nextProjectId) => onProjectChange?.(nextProjectId)}
@@ -269,13 +288,13 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
               enableManagement={workspaceType === "general"}
               density="compact"
               chrome="embedded"
-              className="min-w-[196px] max-w-[280px]"
+              className={compactProjectSelectorClassName}
             />
-            <div className={toolbarDividerClassName} aria-hidden="true" />
+            <div className={dividerClassName} aria-hidden="true" />
             <Button
               variant="ghost"
               size="icon"
-              className={toolbarGhostIconButtonClassName}
+              className={ghostIconButtonClassName}
               onClick={onToggleSettings}
               aria-label="打开设置"
               title="打开设置"
@@ -286,11 +305,11 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
         ) : null}
 
         {showCompactSettingsButton ? (
-          <div className={toolbarGroupClassName}>
+          <div className={groupClassName}>
             <Button
               variant="ghost"
               size="icon"
-              className={toolbarGhostIconButtonClassName}
+              className={ghostIconButtonClassName}
               onClick={onToggleSettings}
               aria-label="打开设置"
               title="打开设置"
@@ -301,14 +320,14 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
         ) : null}
 
         {showStatusTools ? (
-          <div className={toolbarGroupClassName}>
+          <div className={groupClassName}>
             {showBrowserAssistEntry ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  toolbarEmbeddedButtonClassName,
+                  embeddedButtonClassName,
                   toolbarTextButtonClassName,
                   browserAssistActive && "bg-slate-100 text-slate-900",
                   browserAssistAttentionLevel === "warning" &&
@@ -342,7 +361,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
             ) : null}
 
             {showBrowserAssistEntry && showHarnessToggle ? (
-              <div className={toolbarDividerClassName} aria-hidden="true" />
+              <div className={dividerClassName} aria-hidden="true" />
             ) : null}
 
             {showHarnessToggle ? (
@@ -351,7 +370,7 @@ export const ChatNavbar: React.FC<ChatNavbarProps> = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  toolbarEmbeddedButtonClassName,
+                  embeddedButtonClassName,
                   toolbarTextButtonClassName,
                   harnessPanelVisible && "bg-slate-100 text-slate-900",
                   harnessAttentionLevel === "warning" &&

@@ -123,7 +123,6 @@ const Body = styled.div`
   flex: 1;
   min-height: 0;
   width: 100%;
-  gap: 12px;
 
   @media (max-width: 1100px) {
     flex-direction: column;
@@ -135,9 +134,13 @@ const SidebarContainer = styled.div<{ $collapsed: boolean }>`
   flex-shrink: 0;
   height: 100%;
   min-height: 0;
-  background: hsl(var(--background) / 0.72);
-  border-radius: 28px;
-  border: 1px solid hsl(var(--border) / 0.7);
+  background: transparent;
+  border-radius: ${({ $collapsed }) =>
+    $collapsed ? "0" : "28px 0 0 28px"};
+  border: 1px solid
+    ${({ $collapsed }) =>
+      $collapsed ? "transparent" : "hsl(var(--border) / 0.7)"};
+  border-right: none;
   box-shadow:
     0 16px 40px hsl(215 40% 10% / 0.06),
     inset 0 1px 0 hsl(0 0% 100% / 0.72);
@@ -154,24 +157,30 @@ const SidebarContainer = styled.div<{ $collapsed: boolean }>`
     width: 100%;
     height: auto;
     max-height: ${({ $collapsed }) => ($collapsed ? "0px" : "780px")};
+    border-radius: ${({ $collapsed }) => ($collapsed ? "0" : "28px")};
+    border-right: 1px solid
+      ${({ $collapsed }) =>
+        $collapsed ? "transparent" : "hsl(var(--border) / 0.7)"};
   }
 `;
 
 const Splitter = styled.div`
-  width: 18px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  position: relative;
+  width: 0;
   flex-shrink: 0;
+  z-index: 2;
 
   @media (max-width: 1100px) {
     width: 100%;
-    justify-content: flex-start;
+    height: 0;
   }
 `;
 
 const SplitterButton = styled.button`
-  margin-top: 12px;
+  position: absolute;
+  top: 14px;
+  left: 0;
+  transform: translateX(-50%);
   width: 32px;
   height: 48px;
   border-radius: 999px;
@@ -198,7 +207,9 @@ const SplitterButton = styled.button`
   }
 
   @media (max-width: 1100px) {
-    margin-top: 0;
+    top: 0;
+    left: 18px;
+    transform: translateY(-50%);
     width: 48px;
     height: 32px;
   }
@@ -208,11 +219,7 @@ const MainContainer = styled.div`
   flex: 1;
   height: 100%;
   min-height: 0;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background) / 0.94),
-    hsl(200 48% 98% / 0.94)
-  );
+  background: transparent;
   overflow: hidden;
   position: relative;
 `;
@@ -221,13 +228,17 @@ const WorkspaceFrame = styled.div`
   flex: 1;
   min-height: 0;
   display: flex;
-  border-radius: 32px;
+  border-radius: 0 32px 32px 0;
   border: 1px solid hsl(var(--border) / 0.75);
-  background: hsl(var(--background) / 0.84);
+  background: transparent;
   box-shadow:
     0 20px 48px hsl(215 32% 12% / 0.07),
     inset 0 1px 0 hsl(0 0% 100% / 0.7);
   overflow: hidden;
+
+  @media (max-width: 1100px) {
+    border-radius: 32px;
+  }
 `;
 
 export const VideoCanvas: React.FC<VideoCanvasProps> = memo(

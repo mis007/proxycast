@@ -7,7 +7,7 @@
 //! - 7.2: 凭证健康状态变化时在 1 秒内更新托盘图标
 //! - 7.3: 托盘菜单打开时获取并显示最新信息
 
-use crate::tray::{TrayIconStatus, TrayStateSnapshot};
+use crate::tray::{TrayIconStatus, TrayQuickModelGroup, TrayStateSnapshot};
 use crate::TrayManagerState;
 use tauri::State;
 use tracing::{debug, info};
@@ -33,6 +33,7 @@ pub async fn sync_tray_state(
     let tray_manager = tray_guard
         .as_ref()
         .ok_or_else(|| "托盘管理器未初始化".to_string())?;
+    let current_state = tray_manager.get_state().await;
 
     // 计算图标状态
     let icon_status = if !server_running {
@@ -53,6 +54,11 @@ pub async fn sync_tray_state(
         total_credentials,
         today_requests,
         auto_start_enabled,
+        current_model_provider_type: current_state.current_model_provider_type,
+        current_model_provider_label: current_state.current_model_provider_label,
+        current_model: current_state.current_model,
+        current_theme_label: current_state.current_theme_label,
+        quick_model_groups: current_state.quick_model_groups,
     };
 
     tray_manager
@@ -226,6 +232,7 @@ pub async fn refresh_tray_with_stats(
     let tray_manager = tray_guard
         .as_ref()
         .ok_or_else(|| "托盘管理器未初始化".to_string())?;
+    let current_state = tray_manager.get_state().await;
 
     // 计算图标状态
     let icon_status = if !server_running {
@@ -246,6 +253,11 @@ pub async fn refresh_tray_with_stats(
         total_credentials,
         today_requests,
         auto_start_enabled,
+        current_model_provider_type: current_state.current_model_provider_type,
+        current_model_provider_label: current_state.current_model_provider_label,
+        current_model: current_state.current_model,
+        current_theme_label: current_state.current_theme_label,
+        quick_model_groups: current_state.quick_model_groups,
     };
 
     // 更新状态并刷新菜单
@@ -258,6 +270,40 @@ pub async fn refresh_tray_with_stats(
         "托盘菜单已刷新: server_running={}, requests={}, credentials={}/{}",
         server_running, today_requests, available_credentials, total_credentials
     );
+
+    Ok(())
+}
+
+/// 同步托盘中的快速模型切换菜单
+///
+/// 由前端在模型或 Provider 变化时调用，用于更新系统托盘中的当前模型信息与快捷切换列表。
+#[tauri::command]
+pub async fn sync_tray_model_shortcuts(
+    tray_state: State<'_, TrayManagerState<tauri::Wry>>,
+    current_model_provider_type: String,
+    current_model_provider_label: String,
+    current_model: String,
+    current_theme_label: String,
+    quick_model_groups: Vec<TrayQuickModelGroup>,
+) -> Result<(), String> {
+    let tray_guard = tray_state.0.read().await;
+    let tray_manager = tray_guard
+        .as_ref()
+        .ok_or_else(|| "托盘管理器未初始化".to_string())?;
+
+    let mut current_state = tray_manager.get_state().await;
+    current_state.current_model_provider_type = current_model_provider_type;
+    current_state.current_model_provider_label = current_model_provider_label;
+    current_state.current_model = current_model;
+    current_state.current_theme_label = current_theme_label;
+    current_state.quick_model_groups = quick_model_groups;
+
+    tray_manager
+        .update_state(current_state)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    debug!("托盘模型快捷菜单已同步");
 
     Ok(())
 }

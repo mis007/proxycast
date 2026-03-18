@@ -30,11 +30,7 @@ const SidebarWrapper = styled.div`
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background) / 0.84),
-    hsl(201 42% 98% / 0.72)
-  );
+  background: transparent;
 
   @media (max-width: 1100px) {
     padding: 16px;

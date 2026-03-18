@@ -4,6 +4,13 @@
 
 Lime 已完整集成 aster-rust 框架，包括凭证池桥接。
 
+## 当前事实源
+
+- `Aster thread / turn / item runtime` 是运行态事实源。
+- Lime 只负责事件映射、数据库投影和 UI 派生，不再伪造核心 runtime item。
+- 会话删除统一收口到存储边界；命令层和 Dev Bridge 不应直接调用 `AgentDao::delete_session`。
+- 需要恢复运行态时，优先从 Aster runtime 恢复，再映射到 Lime timeline。
+
 **后端模块** (`src-tauri/src/agent/`):
 
 - `aster_state.rs` - Agent 状态管理
@@ -17,9 +24,10 @@ Lime 已完整集成 aster-rust 框架，包括凭证池桥接。
 - `aster_agent_configure_provider` - 手动配置 Provider
 - `aster_agent_configure_from_pool` - 从凭证池配置 Provider（推荐）
 - `aster_agent_status` - 获取状态
-- `aster_agent_chat_stream` - 流式对话
-- `aster_agent_stop` - 停止会话
-- `aster_session_create/list/get` - 会话管理
+- `agent_runtime_submit_turn` - 统一提交 turn
+- `agent_runtime_interrupt_turn` - 统一中断 turn
+- `agent_runtime_create/list/get/update/delete_session` - 统一会话管理
+- `agent_runtime_respond_action` - 统一响应工具确认 / ask / elicitation
 
 ## 架构
 
@@ -27,7 +35,7 @@ Lime 已完整集成 aster-rust 框架，包括凭证池桥接。
 ┌─────────────────────────────────────────────────────────────────┐
 │                      前端 (React)                                │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │  sendAsterMessageStream / configureAsterProvider            ││
+│  │  useAsterAgentChat / agentRuntime.ts / configureAsterProvider ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                                 │
@@ -83,12 +91,17 @@ Lime 已完整集成 aster-rust 框架，包括凭证池桥接。
 ### 使用方式
 
 > 治理约定：前端业务层不要直接 `invoke('aster_*')`，统一通过 `src/lib/api/agentRuntime.ts` 调用现役 Aster API。历史 `src/lib/api/agentCompat.ts` 已删除。
+>
+> 删除治理约定：会话删除统一走 `agent_runtime_delete_session`，不要再暴露旧 Aster/Dev Bridge 删除边界。
 
 ```typescript
 import {
+  createAgentRuntimeSession,
   configureAsterProvider,
-  sendAsterMessageStream,
+  submitAgentRuntimeTurn,
 } from "@/lib/api/agentRuntime";
+
+const sessionId = await createAgentRuntimeSession("workspace-id");
 
 // 配置 Provider
 const status = await configureAsterProvider(
@@ -96,16 +109,16 @@ const status = await configureAsterProvider(
     provider_name: "openai",
     model_name: "gpt-4",
   },
-  "my-session",
+  sessionId,
 );
 
 // 流式对话
-await sendAsterMessageStream(
-  "Hello",
-  "my-session",
-  "agent_stream",
-  "workspace-id",
-);
+await submitAgentRuntimeTurn({
+  message: "Hello",
+  session_id: sessionId,
+  event_name: "agent_stream",
+  workspace_id: "workspace-id",
+});
 ```
 
 ## 相关文档

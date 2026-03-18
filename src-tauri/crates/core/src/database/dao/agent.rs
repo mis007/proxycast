@@ -5,6 +5,7 @@
 use crate::agent::types::{
     AgentMessage, AgentSession, ContentPart, FunctionCall, MessageContent, ToolCall,
 };
+use chrono::{Local, TimeZone};
 use rusqlite::{params, Connection};
 
 const JSON_RECURSION_LIMIT: usize = 50;
@@ -439,6 +440,61 @@ fn parse_tool_calls(tool_calls_json: Option<&str>) -> Option<Vec<ToolCall>> {
 
 pub struct AgentDao;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentModelPatternMatch {
+    Like,
+    NotLike,
+}
+
+impl AgentModelPatternMatch {
+    fn sql_operator(self) -> &'static str {
+        match self {
+            Self::Like => "LIKE",
+            Self::NotLike => "NOT LIKE",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentModelUsageRow {
+    pub model: String,
+    pub conversations: u64,
+    pub content_chars: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentMessageTextRow {
+    pub session_id: String,
+    pub role: String,
+    pub content: String,
+    pub timestamp_ms: i64,
+}
+
+fn parse_message_timestamp_to_millis(value: &str) -> Option<i64> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.timestamp_millis())
+        .or_else(|| parse_datetime_or_timestamp_to_millis(value))
+}
+
+fn parse_datetime_or_timestamp_to_millis(value: &str) -> Option<i64> {
+    if let Ok(v) = value.parse::<i64>() {
+        if v > 1_000_000_000_000 {
+            return Some(v);
+        }
+        return Some(v * 1000);
+    }
+
+    chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S")
+        .ok()
+        .and_then(|naive| {
+            Local
+                .from_local_datetime(&naive)
+                .single()
+                .map(|dt| dt.timestamp_millis())
+        })
+}
+
 impl AgentDao {
     /// 创建新会话
     pub fn create_session(
@@ -540,6 +596,192 @@ impl AgentDao {
             |row| row.get(0),
         )?;
         Ok(count as usize)
+    }
+
+    pub fn count_sessions_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        from_datetime: Option<&str>,
+        to_datetime: Option<&str>,
+    ) -> Result<i64, rusqlite::Error> {
+        let sql = format!(
+            "SELECT COUNT(*)
+             FROM agent_sessions s
+             WHERE s.model {} ?1
+               AND (?2 IS NULL OR datetime(s.created_at) >= datetime(?2))
+               AND (?3 IS NULL OR datetime(s.created_at) < datetime(?3))",
+            match_mode.sql_operator()
+        );
+
+        conn.query_row(
+            &sql,
+            params![model_pattern, from_datetime, to_datetime],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn count_messages_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        from_datetime: Option<&str>,
+        to_datetime: Option<&str>,
+    ) -> Result<i64, rusqlite::Error> {
+        let sql = format!(
+            "SELECT COUNT(*)
+             FROM agent_messages m
+             JOIN agent_sessions s ON s.id = m.session_id
+             WHERE s.model {} ?1
+               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
+               AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
+            match_mode.sql_operator()
+        );
+
+        conn.query_row(
+            &sql,
+            params![model_pattern, from_datetime, to_datetime],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn sum_message_chars_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        from_datetime: Option<&str>,
+        to_datetime: Option<&str>,
+    ) -> Result<i64, rusqlite::Error> {
+        let sql = format!(
+            "SELECT COALESCE(SUM(LENGTH(m.content_json)), 0)
+             FROM agent_messages m
+             JOIN agent_sessions s ON s.id = m.session_id
+             WHERE s.model {} ?1
+               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
+               AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
+            match_mode.sql_operator()
+        );
+
+        conn.query_row(
+            &sql,
+            params![model_pattern, from_datetime, to_datetime],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn list_model_usage_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        start_datetime: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AgentModelUsageRow>, rusqlite::Error> {
+        let rows = if let Some(start_datetime) = start_datetime {
+            let sql = format!(
+                "SELECT s.model,
+                        COUNT(DISTINCT m.session_id) AS conversations,
+                        COALESCE(SUM(LENGTH(m.content_json)), 0) AS content_chars
+                 FROM agent_messages m
+                 JOIN agent_sessions s ON s.id = m.session_id
+                 WHERE s.model {} ?1
+                   AND datetime(m.timestamp) >= datetime(?2)
+                 GROUP BY s.model
+                 ORDER BY content_chars DESC, conversations DESC
+                 LIMIT ?3",
+                match_mode.sql_operator()
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(
+                params![model_pattern, start_datetime, limit as i64],
+                |row| {
+                    let content_chars: i64 = row.get(2)?;
+                    let conversations: i64 = row.get(1)?;
+                    Ok(AgentModelUsageRow {
+                        model: row.get(0)?,
+                        conversations: conversations.max(0) as u64,
+                        content_chars: content_chars.max(0) as u64,
+                    })
+                },
+            )?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        } else {
+            let sql = format!(
+                "SELECT s.model,
+                        COUNT(DISTINCT m.session_id) AS conversations,
+                        COALESCE(SUM(LENGTH(m.content_json)), 0) AS content_chars
+                 FROM agent_messages m
+                 JOIN agent_sessions s ON s.id = m.session_id
+                 WHERE s.model {} ?1
+                 GROUP BY s.model
+                 ORDER BY content_chars DESC, conversations DESC
+                 LIMIT ?2",
+                match_mode.sql_operator()
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![model_pattern, limit as i64], |row| {
+                let content_chars: i64 = row.get(2)?;
+                let conversations: i64 = row.get(1)?;
+                Ok(AgentModelUsageRow {
+                    model: row.get(0)?,
+                    conversations: conversations.max(0) as u64,
+                    content_chars: content_chars.max(0) as u64,
+                })
+            })?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+
+        Ok(rows)
+    }
+
+    pub fn list_message_text_rows_by_model_pattern(
+        conn: &Connection,
+        model_pattern: &str,
+        match_mode: AgentModelPatternMatch,
+        from_datetime: Option<&str>,
+        to_datetime: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AgentMessageTextRow>, rusqlite::Error> {
+        let sql = format!(
+            "SELECT m.session_id, m.role, m.content_json, m.timestamp
+             FROM agent_messages m
+             JOIN agent_sessions s ON s.id = m.session_id
+             WHERE s.model {} ?1
+               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
+               AND (?3 IS NULL OR datetime(m.timestamp) <= datetime(?3))
+             ORDER BY datetime(m.timestamp) DESC
+             LIMIT ?4",
+            match_mode.sql_operator()
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(
+            params![model_pattern, from_datetime, to_datetime, limit as i64],
+            |row| {
+                let content_json: String = row.get(2)?;
+                let timestamp: String = row.get(3)?;
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    parse_message_content(&content_json).as_text(),
+                    parse_message_timestamp_to_millis(&timestamp),
+                ))
+            },
+        )?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            let (session_id, role, content, timestamp_ms) = row?;
+            let Some(timestamp_ms) = timestamp_ms else {
+                continue;
+            };
+            result.push(AgentMessageTextRow {
+                session_id,
+                role,
+                content,
+                timestamp_ms,
+            });
+        }
+
+        Ok(result)
     }
 
     /// 更新会话的 updated_at 时间
@@ -665,6 +907,19 @@ impl AgentDao {
         conn.execute(
             "UPDATE agent_sessions SET title = ? WHERE id = ?",
             params![title, session_id],
+        )?;
+        Ok(())
+    }
+
+    /// 更新会话工作目录
+    pub fn update_working_dir(
+        conn: &Connection,
+        session_id: &str,
+        working_dir: &str,
+    ) -> Result<(), rusqlite::Error> {
+        conn.execute(
+            "UPDATE agent_sessions SET working_dir = ? WHERE id = ?",
+            params![working_dir, session_id],
         )?;
         Ok(())
     }

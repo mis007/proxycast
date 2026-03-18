@@ -5,6 +5,7 @@
  */
 
 import { safeInvoke } from "@/lib/dev-bridge";
+import { logAgentDebug } from "@/lib/agentDebug";
 import type {
   AgentThreadItem,
   AgentThreadTurn,
@@ -26,35 +27,7 @@ export interface AgentProcessStatus {
   port?: number;
 }
 
-/**
- * 创建会话响应
- */
-export interface CreateSessionResponse {
-  session_id: string;
-  credential_name: string;
-  credential_uuid: string;
-  provider_type: string;
-  model?: string;
-  execution_strategy?: AsterExecutionStrategy;
-}
-
 export type AsterExecutionStrategy = "react" | "code_orchestrated" | "auto";
-
-/**
- * 会话信息
- */
-export interface SessionInfo {
-  session_id: string;
-  provider_type: string;
-  model?: string;
-  title?: string;
-  created_at: string;
-  last_activity: string;
-  messages_count: number;
-  workspace_id?: string;
-  working_dir?: string;
-  execution_strategy?: AsterExecutionStrategy;
-}
 
 /**
  * 图片输入
@@ -62,15 +35,6 @@ export interface SessionInfo {
 export interface ImageInput {
   data: string;
   media_type: string;
-}
-
-/**
- * Skill 信息
- */
-export interface SkillInfo {
-  name: string;
-  description?: string;
-  path?: string;
 }
 
 const requireWorkspaceId = (
@@ -123,8 +87,11 @@ export interface AsterSessionInfo {
   name?: string;
   created_at: number;
   updated_at: number;
+  model?: string;
   messages_count?: number;
   execution_strategy?: AsterExecutionStrategy;
+  workspace_id?: string;
+  working_dir?: string;
 }
 
 /**
@@ -133,6 +100,7 @@ export interface AsterSessionInfo {
 export interface TauriMessageContent {
   type: string;
   text?: string;
+  image_url?: { url: string; detail?: string } | string;
   id?: string;
   action_type?: string;
   data?: unknown;
@@ -154,6 +122,9 @@ export interface AsterSessionDetail {
   name?: string;
   created_at: number;
   updated_at: number;
+  model?: string;
+  workspace_id?: string;
+  working_dir?: string;
   execution_strategy?: AsterExecutionStrategy;
   messages: Array<{
     id?: string;
@@ -181,6 +152,7 @@ export interface AgentRuntimeSubmitTurnRequest {
   session_id: string;
   event_name: string;
   workspace_id: string;
+  turn_id?: string;
   images?: ImageInput[];
   turn_config?: AgentTurnConfigSnapshot;
   queue_if_busy?: boolean;
@@ -212,58 +184,6 @@ export interface AgentRuntimeUpdateSessionRequest {
   name?: string;
   execution_strategy?: AsterExecutionStrategy;
 }
-
-interface InvokeAsterChatStreamOptions {
-  message: string;
-  sessionId: string;
-  eventName: string;
-  workspaceId: string;
-  images?: ImageInput[];
-  providerConfig?: AsterProviderConfig;
-  executionStrategy?: AsterExecutionStrategy;
-  webSearch?: boolean;
-  searchMode?: AgentSearchMode;
-  autoContinue?: AutoContinueRequestPayload;
-  systemPrompt?: string;
-  projectId?: string;
-  metadata?: Record<string, unknown>;
-}
-
-const invokeAsterChatStream = async ({
-  message,
-  sessionId,
-  eventName,
-  workspaceId,
-  images,
-  providerConfig,
-  executionStrategy,
-  webSearch,
-  searchMode,
-  autoContinue,
-  systemPrompt,
-  projectId,
-  metadata,
-}: InvokeAsterChatStreamOptions): Promise<void> => {
-  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, projectId);
-
-  return await safeInvoke("aster_agent_chat_stream", {
-    request: {
-      message,
-      session_id: sessionId,
-      event_name: eventName,
-      images,
-      provider_config: providerConfig,
-      project_id: projectId,
-      workspace_id: resolvedWorkspaceId,
-      execution_strategy: executionStrategy,
-      web_search: webSearch,
-      search_mode: searchMode,
-      auto_continue: autoContinue,
-      system_prompt: systemPrompt,
-      metadata,
-    },
-  });
-};
 
 export async function submitAgentRuntimeTurn(
   request: AgentRuntimeSubmitTurnRequest,
@@ -302,7 +222,58 @@ export async function createAgentRuntimeSession(
 }
 
 export async function listAgentRuntimeSessions(): Promise<AsterSessionInfo[]> {
-  return await safeInvoke("agent_runtime_list_sessions");
+  const startedAt = Date.now();
+  let settled = false;
+  const slowTimer: ReturnType<typeof setTimeout> | null =
+    typeof window !== "undefined"
+      ? window.setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          logAgentDebug(
+            "AgentApi",
+            "runtimeListSessions.slow",
+            {
+              elapsedMs: Date.now() - startedAt,
+            },
+            {
+              dedupeKey: "runtimeListSessions.slow",
+              level: "warn",
+              throttleMs: 1000,
+            },
+          );
+        }, 1000)
+      : null;
+
+  logAgentDebug("AgentApi", "runtimeListSessions.start");
+
+  try {
+    const sessions = await safeInvoke<AsterSessionInfo[]>(
+      "agent_runtime_list_sessions",
+    );
+    settled = true;
+    logAgentDebug("AgentApi", "runtimeListSessions.success", {
+      durationMs: Date.now() - startedAt,
+      sessionsCount: sessions.length,
+    });
+    return sessions;
+  } catch (error) {
+    settled = true;
+    logAgentDebug(
+      "AgentApi",
+      "runtimeListSessions.error",
+      {
+        durationMs: Date.now() - startedAt,
+        error,
+      },
+      { level: "error" },
+    );
+    throw error;
+  } finally {
+    if (slowTimer !== null) {
+      clearTimeout(slowTimer);
+    }
+  }
 }
 
 export async function getAgentRuntimeSession(
@@ -351,114 +322,13 @@ export async function getAgentProcessStatus(): Promise<AgentProcessStatus> {
 }
 
 /**
- * 创建 Agent 会话
+ * 生成会话智能标题
+ *
+ * 现役 runtime 命名入口。
  */
-export async function createAgentSession(
-  providerType: string,
-  workspaceId: string,
-  model?: string,
-  systemPrompt?: string,
-  skills?: SkillInfo[],
-  executionStrategy?: AsterExecutionStrategy,
-): Promise<CreateSessionResponse> {
-  const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
-
-  return await safeInvoke("agent_create_session", {
-    providerType,
-    model,
-    systemPrompt,
-    skills,
-    workspaceId: resolvedWorkspaceId,
-    executionStrategy,
-  });
-}
-
-/**
- * 获取会话列表
- */
-export async function listAgentSessions(): Promise<SessionInfo[]> {
-  return await safeInvoke("agent_list_sessions");
-}
-
-/**
- * 获取会话详情
- */
-export async function getAgentSession(sessionId: string): Promise<SessionInfo> {
-  return await safeInvoke("agent_get_session", {
-    sessionId,
-  });
-}
-
-/**
- * 删除会话
- */
-export async function deleteAgentSession(sessionId: string): Promise<void> {
-  return await safeInvoke("agent_delete_session", {
-    sessionId,
-  });
-}
-
-/**
- * Agent 消息内容类型
- */
-export type AgentMessageContent =
-  | string
-  | Array<
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string; detail?: string } }
-    >;
-
-/**
- * 工具调用
- */
-export interface AgentToolCall {
-  id: string;
-  type: string;
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-/**
- * Agent 消息
- */
-export interface AgentMessage {
-  role: string;
-  content: AgentMessageContent;
-  timestamp: string;
-  tool_calls?: AgentToolCall[];
-  tool_call_id?: string;
-}
-
-/**
- * 获取会话消息列表
- */
-export async function getAgentSessionMessages(
+export async function generateAgentRuntimeSessionTitle(
   sessionId: string,
-): Promise<AgentMessage[]> {
-  return await safeInvoke("agent_get_session_messages", {
-    sessionId,
-  });
-}
-
-/**
- * 重命名会话（更新标题）
- */
-export async function renameAgentSession(
-  sessionId: string,
-  title: string,
-): Promise<void> {
-  return await safeInvoke("agent_rename_session", {
-    sessionId,
-    title,
-  });
-}
-
-/**
- * 生成智能标题
- */
-export async function generateAgentTitle(sessionId: string): Promise<string> {
+): Promise<string> {
   return await safeInvoke("agent_generate_title", {
     sessionId,
   });
@@ -488,155 +358,6 @@ export async function configureAsterProvider(
   return await safeInvoke("aster_agent_configure_provider", {
     request: config,
     session_id: sessionId,
-  });
-}
-
-/**
- * 发送消息到 Aster Agent (流式响应)
- *
- * 通过 Tauri 事件接收响应流
- */
-export async function sendAsterMessageStream(
-  message: string,
-  sessionId: string,
-  eventName: string,
-  workspaceId: string,
-  images?: ImageInput[],
-  providerConfig?: AsterProviderConfig,
-  executionStrategy?: AsterExecutionStrategy,
-  webSearch?: boolean,
-  autoContinue?: AutoContinueRequestPayload,
-  systemPrompt?: string,
-  projectId?: string,
-  metadata?: Record<string, unknown>,
-): Promise<void> {
-  return await invokeAsterChatStream({
-    message,
-    sessionId,
-    eventName,
-    workspaceId,
-    images,
-    providerConfig,
-    executionStrategy,
-    webSearch,
-    autoContinue,
-    systemPrompt,
-    projectId,
-    metadata,
-  });
-}
-
-/**
- * 停止 Aster Agent 会话
- */
-export async function stopAsterSession(sessionId: string): Promise<boolean> {
-  return await safeInvoke("aster_agent_stop", { sessionId });
-}
-
-/**
- * 创建 Aster 会话
- */
-export async function createAsterSession(
-  workspaceId: string,
-  workingDir?: string,
-  name?: string,
-  executionStrategy?: AsterExecutionStrategy,
-): Promise<string> {
-  const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
-
-  return await safeInvoke("aster_session_create", {
-    workingDir,
-    workspaceId: resolvedWorkspaceId,
-    name,
-    executionStrategy,
-  });
-}
-
-/**
- * 获取 Aster 会话列表
- */
-export async function listAsterSessions(): Promise<AsterSessionInfo[]> {
-  return await safeInvoke("aster_session_list");
-}
-
-/**
- * 获取 Aster 会话详情
- */
-export async function getAsterSession(
-  sessionId: string,
-): Promise<AsterSessionDetail> {
-  const detail = await safeInvoke("aster_session_get", { sessionId });
-  return {
-    ...(detail as AsterSessionDetail),
-    queued_turns: normalizeQueuedTurnSnapshots(
-      (detail as AsterSessionDetail | null | undefined)?.queued_turns,
-    ),
-  };
-}
-
-/**
- * 重命名 Aster 会话
- */
-export async function renameAsterSession(
-  sessionId: string,
-  name: string,
-): Promise<void> {
-  return await safeInvoke("aster_session_rename", { sessionId, name });
-}
-
-/**
- * 设置 Aster 会话执行策略
- */
-export async function setAsterSessionExecutionStrategy(
-  sessionId: string,
-  executionStrategy: AsterExecutionStrategy,
-): Promise<void> {
-  return await safeInvoke("aster_session_set_execution_strategy", {
-    sessionId,
-    executionStrategy,
-  });
-}
-
-/**
- * 删除 Aster 会话
- */
-export async function deleteAsterSession(sessionId: string): Promise<void> {
-  return await safeInvoke("aster_session_delete", { sessionId });
-}
-
-/**
- * 确认 Aster Agent 权限请求
- */
-export async function confirmAsterAction(
-  requestId: string,
-  confirmed: boolean,
-  response?: string,
-): Promise<void> {
-  return await safeInvoke("aster_agent_confirm", {
-    request: {
-      request_id: requestId,
-      confirmed,
-      response,
-    },
-  });
-}
-
-/**
- * 提交 Aster Agent elicitation 响应
- */
-export async function submitAsterElicitationResponse(
-  sessionId: string,
-  requestId: string,
-  userData: unknown,
-  metadata?: Record<string, unknown>,
-): Promise<void> {
-  return await safeInvoke("aster_agent_submit_elicitation_response", {
-    sessionId,
-    request: {
-      request_id: requestId,
-      user_data: userData,
-      metadata,
-    },
   });
 }
 
@@ -743,34 +464,5 @@ export async function sendTermScrollbackResponse(
     content: response.content,
     hasMore: response.has_more,
     error: response.error,
-  });
-}
-
-/**
- * 权限确认响应
- */
-export interface PermissionResponse {
-  /** 请求 ID */
-  requestId: string;
-  /** 是否确认 */
-  confirmed: boolean;
-  /** 响应内容（用户输入或选择的答案） */
-  response?: string;
-}
-
-/**
- * 发送权限确认响应到后端
- *
- * 当用户确认或拒绝权限请求后，调用此函数将结果发送给 Agent
- */
-export async function sendPermissionResponse(
-  response: PermissionResponse,
-): Promise<void> {
-  return await safeInvoke("aster_agent_confirm", {
-    request: {
-      request_id: response.requestId,
-      confirmed: response.confirmed,
-      response: response.response,
-    },
   });
 }

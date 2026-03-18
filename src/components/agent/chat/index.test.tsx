@@ -3605,7 +3605,7 @@ describe("AgentChatPage 自动引导", () => {
           gate_key: "write_mode",
           status: "running",
           source: "chat",
-          source_ref: "aster_agent_chat_stream",
+          source_ref: "agent_runtime_submit_turn",
           started_at: "2026-03-06T04:00:00.000Z",
         },
       ],
@@ -3622,7 +3622,7 @@ describe("AgentChatPage 自动引导", () => {
     await flushEffects(12);
 
     expect(mockSkillExecutionGetDetail).not.toHaveBeenCalledWith(
-      "aster_agent_chat_stream",
+      "agent_runtime_submit_turn",
     );
   });
 

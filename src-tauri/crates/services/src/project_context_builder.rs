@@ -140,6 +140,18 @@ impl ProjectContextBuilder {
         sections.join("\n\n")
     }
 
+    /// 基于已持有的数据库连接直接构建项目 System Prompt
+    ///
+    /// 适用于调用方已经拿到 `rusqlite::Connection` 的场景，
+    /// 可以避免再次通过高层 `DbConnection` 包装重复获取数据库锁。
+    pub fn build_system_prompt_for_project(
+        conn: &Connection,
+        project_id: &str,
+    ) -> Result<String, ProjectError> {
+        let context = Self::build_context(conn, project_id)?;
+        Ok(Self::build_system_prompt(&context))
+    }
+
     // ------------------------------------------------------------------------
     // 辅助方法 - 数据加载
     // ------------------------------------------------------------------------
@@ -543,6 +555,19 @@ mod tests {
         assert!(!prompt.contains("## 你的身份"));
         assert!(!prompt.contains("## 可引用素材"));
         assert!(!prompt.contains("## 排版规则"));
+    }
+
+    #[test]
+    fn test_build_system_prompt_for_project_matches_composed_builders() {
+        let conn = setup_test_db();
+        create_test_project(&conn, "project-1", "测试项目");
+
+        let context = ProjectContextBuilder::build_context(&conn, "project-1").unwrap();
+        let expected = ProjectContextBuilder::build_system_prompt(&context);
+        let prompt =
+            ProjectContextBuilder::build_system_prompt_for_project(&conn, "project-1").unwrap();
+
+        assert_eq!(prompt, expected);
     }
 
     #[test]

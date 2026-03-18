@@ -6,6 +6,7 @@ import {
   type VersionInfo,
 } from "@/lib/api/appUpdate";
 import { safeListen } from "@/lib/dev-bridge";
+import { notifyPluginUIChanged } from "@/lib/api/pluginUI";
 import {
   cancelPluginTask,
   disablePlugin,
@@ -838,8 +839,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
   const handleInstallSuccess = useCallback(() => {
     fetchData();
     toast.success("插件安装成功");
-    // 触发侧边栏刷新事件
-    window.dispatchEvent(new CustomEvent("plugin-changed"));
+    notifyPluginUIChanged();
   }, [fetchData]);
 
   const handleTogglePlugin = async (name: string, currentEnabled: boolean) => {
@@ -850,6 +850,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
         await enablePlugin(name);
       }
       await fetchData();
+      notifyPluginUIChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -859,6 +860,7 @@ export function PluginManager({ onNavigate }: PluginManagerProps = {}) {
     try {
       await reloadPlugins();
       await fetchData();
+      notifyPluginUIChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

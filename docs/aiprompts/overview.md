@@ -232,3 +232,4 @@ lime/
 - [commands.md](commands.md) - Tauri 命令
 - [services.md](services.md) - 业务服务
 - [database.md](database.md) - 数据库层
+- [performance-profiling.md](performance-profiling.md) - 性能分析与火焰图

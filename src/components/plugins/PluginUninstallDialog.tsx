@@ -9,6 +9,7 @@ import { useState } from "react";
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { Modal, ModalBody, ModalFooter } from "@/components/Modal";
 import { Button } from "@/components/ui/button";
+import { notifyPluginUIChanged } from "@/lib/api/pluginUI";
 import { uninstallPlugin } from "@/lib/api/plugins";
 
 /** 已安装插件信息 */
@@ -56,8 +57,7 @@ export function PluginUninstallDialog({
     try {
       await uninstallPlugin(plugin.id);
       onSuccess();
-      // 触发侧边栏刷新事件
-      window.dispatchEvent(new CustomEvent("plugin-changed"));
+      notifyPluginUIChanged();
       handleClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

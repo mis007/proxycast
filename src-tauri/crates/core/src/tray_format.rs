@@ -5,30 +5,56 @@
 /// 格式化服务器状态文本
 ///
 /// # 示例输出
-/// - "🟢 API 服务器: 运行中 (127.0.0.1:8080)"
-/// - "⚪ API 服务器: 已停止"
+/// - "● Lime 网关：运行中 (127.0.0.1:8080)"
+/// - "○ Lime 网关：未启动"
 pub fn format_server_status(running: bool, host: &str, port: u16) -> String {
     if running {
-        format!("🟢 API 服务器: 运行中 ({host}:{port})")
+        format!("● Lime 网关：运行中 ({host}:{port})")
     } else {
-        "⚪ API 服务器: 已停止".to_string()
+        "○ Lime 网关：未启动".to_string()
     }
 }
 
 /// 格式化凭证状态文本
 ///
 /// # 示例输出
-/// - "🔑 可用凭证: 3/5"
+/// - "◐ 可用账号：3/5"
 pub fn format_credential_status(available: usize, total: usize) -> String {
-    format!("🔑 可用凭证: {available}/{total}")
+    format!("◐ 可用账号：{available}/{total}")
 }
 
 /// 格式化请求统计文本
 ///
 /// # 示例输出
-/// - "📊 今日请求: 128 次"
+/// - "◌ 今日调用：128 次"
 pub fn format_request_count(count: u64) -> String {
-    format!("📊 今日请求: {count} 次")
+    format!("◌ 今日调用：{count} 次")
+}
+
+/// 格式化当前模型文本
+///
+/// # 示例输出
+/// - "◉ Claw 模型：Claude / claude-sonnet-4-5"
+/// - "◉ Claw 模型：Claude / claude-sonnet-4-5 · 社媒内容"
+/// - "◉ Claw 模型：未同步"
+pub fn format_current_model_status(
+    provider_label: &str,
+    model: &str,
+    theme_label: Option<&str>,
+) -> String {
+    let normalized_provider = provider_label.trim();
+    let normalized_model = model.trim();
+    let normalized_theme = theme_label.unwrap_or("").trim();
+
+    if normalized_provider.is_empty() || normalized_model.is_empty() {
+        return "◉ Claw 模型：未同步".to_string();
+    }
+
+    if normalized_theme.is_empty() {
+        return format!("◉ Claw 模型：{normalized_provider} / {normalized_model}");
+    }
+
+    format!("◉ Claw 模型：{normalized_provider} / {normalized_model} · {normalized_theme}")
 }
 
 /// 格式化 API 地址
@@ -87,25 +113,43 @@ mod tests {
     #[test]
     fn test_format_server_status_running() {
         let status = format_server_status(true, "127.0.0.1", 8080);
-        assert_eq!(status, "🟢 API 服务器: 运行中 (127.0.0.1:8080)");
+        assert_eq!(status, "● Lime 网关：运行中 (127.0.0.1:8080)");
     }
 
     #[test]
     fn test_format_server_status_stopped() {
         let status = format_server_status(false, "127.0.0.1", 8080);
-        assert_eq!(status, "⚪ API 服务器: 已停止");
+        assert_eq!(status, "○ Lime 网关：未启动");
     }
 
     #[test]
     fn test_format_credential_status() {
         let status = format_credential_status(3, 5);
-        assert_eq!(status, "🔑 可用凭证: 3/5");
+        assert_eq!(status, "◐ 可用账号：3/5");
     }
 
     #[test]
     fn test_format_request_count() {
         let status = format_request_count(128);
-        assert_eq!(status, "📊 今日请求: 128 次");
+        assert_eq!(status, "◌ 今日调用：128 次");
+    }
+
+    #[test]
+    fn test_format_current_model_status_basic() {
+        let status = format_current_model_status("Claude", "claude-sonnet-4-5", None);
+        assert_eq!(status, "◉ Claw 模型：Claude / claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn test_format_current_model_status_with_theme() {
+        let status = format_current_model_status("Claude", "claude-sonnet-4-5", Some("社媒内容"));
+        assert_eq!(status, "◉ Claw 模型：Claude / claude-sonnet-4-5 · 社媒内容");
+    }
+
+    #[test]
+    fn test_format_current_model_status_empty() {
+        let status = format_current_model_status("", "", None);
+        assert_eq!(status, "◉ Claw 模型：未同步");
     }
 
     #[test]

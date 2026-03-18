@@ -4,5 +4,6 @@
 //! 本模块保留兼容导出。
 
 pub use lime_core::tray_state::{
-    calculate_icon_status, CredentialHealth, TrayIconStatus, TrayStateSnapshot,
+    calculate_icon_status, CredentialHealth, TrayIconStatus, TrayQuickModelGroup,
+    TrayQuickModelItem, TrayStateSnapshot,
 };

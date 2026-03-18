@@ -46,8 +46,8 @@ pub use durable_memory_fs::{
     DURABLE_MEMORY_VIRTUAL_ROOT, LEGACY_DURABLE_MEMORY_ROOT_ENV, LIME_DURABLE_MEMORY_ROOT_ENV,
 };
 pub use event_converter::{
-    convert_agent_event, convert_to_tauri_message, TauriAgentEvent, TauriArtifactSnapshot,
-    TauriRuntimeStatus,
+    convert_agent_event, convert_item_runtime, convert_to_tauri_message, convert_turn_runtime,
+    TauriAgentEvent, TauriArtifactSnapshot, TauriRuntimeStatus,
 };
 pub use lsp_bridge::create_lsp_callback;
 pub use prompt::SystemPromptBuilder;
@@ -60,7 +60,11 @@ pub use request_tool_policy::{
     WebSearchExecutionTracker, REQUEST_TOOL_POLICY_MARKER,
 };
 pub use session_store::{
-    create_session_sync, get_session_sync, list_sessions_sync, SessionDetail, SessionInfo,
+    create_session_record_sync, create_session_sync, get_compat_session_sync,
+    get_persisted_session_metadata_sync, get_session_sync, list_compat_sessions_sync,
+    list_sessions_sync, list_title_preview_messages_sync, update_session_execution_strategy_sync,
+    update_session_working_dir_sync, CompatSessionInfo, CreateSessionRecordInput,
+    PersistedSessionMetadata, SessionDetail, SessionInfo, SessionTitlePreviewMessage,
 };
 pub use shell_security::ShellSecurityChecker;
 pub use subagent_scheduler::{

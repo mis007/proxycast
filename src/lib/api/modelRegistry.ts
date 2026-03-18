@@ -13,11 +13,75 @@ import type {
   UserModelPreference,
 } from "@/lib/types/modelRegistry";
 
+interface ModelRegistryQueryOptions {
+  forceRefresh?: boolean;
+}
+
+let modelRegistryCache: EnhancedModelMetadata[] | null = null;
+let modelRegistryLoadingPromise: Promise<EnhancedModelMetadata[]> | null = null;
+let allAliasConfigsCache: Record<string, ProviderAliasConfig> | null = null;
+let allAliasConfigsLoadingPromise: Promise<
+  Record<string, ProviderAliasConfig>
+> | null = null;
+const providerAliasConfigCache = new Map<string, ProviderAliasConfig | null>();
+const providerAliasConfigLoadingPromises = new Map<
+  string,
+  Promise<ProviderAliasConfig | null>
+>();
+
+function cloneValue<T>(value: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function normalizeProviderKey(provider: string): string {
+  return provider.trim();
+}
+
+function invalidateAliasConfigCache(): void {
+  allAliasConfigsCache = null;
+  allAliasConfigsLoadingPromise = null;
+  providerAliasConfigCache.clear();
+  providerAliasConfigLoadingPromises.clear();
+}
+
+export function invalidateModelRegistryCache(): void {
+  modelRegistryCache = null;
+  modelRegistryLoadingPromise = null;
+  invalidateAliasConfigCache();
+}
+
 /**
  * 获取所有模型
  */
-export async function getModelRegistry(): Promise<EnhancedModelMetadata[]> {
-  return safeInvoke("get_model_registry");
+export async function getModelRegistry(
+  options: ModelRegistryQueryOptions = {},
+): Promise<EnhancedModelMetadata[]> {
+  if (options.forceRefresh) {
+    modelRegistryCache = null;
+    modelRegistryLoadingPromise = null;
+  }
+
+  if (modelRegistryCache) {
+    return cloneValue(modelRegistryCache);
+  }
+
+  if (!modelRegistryLoadingPromise) {
+    modelRegistryLoadingPromise = safeInvoke<EnhancedModelMetadata[]>(
+      "get_model_registry",
+    )
+      .then((models) => {
+        modelRegistryCache = cloneValue(models);
+        return modelRegistryCache;
+      })
+      .finally(() => {
+        modelRegistryLoadingPromise = null;
+      });
+  }
+
+  return cloneValue(await modelRegistryLoadingPromise);
 }
 
 /**
@@ -32,7 +96,9 @@ export async function getModelRegistryProviderIds(): Promise<string[]> {
  * @returns 加载的模型数量
  */
 export async function refreshModelRegistry(): Promise<number> {
-  return safeInvoke("refresh_model_registry");
+  const count = await safeInvoke<number>("refresh_model_registry");
+  invalidateModelRegistryCache();
+  return count;
 }
 
 /**
@@ -113,8 +179,47 @@ export async function getModelsByTier(
  */
 export async function getProviderAliasConfig(
   provider: string,
+  options: ModelRegistryQueryOptions = {},
 ): Promise<ProviderAliasConfig | null> {
-  return safeInvoke("get_provider_alias_config", { provider });
+  const normalizedProvider = normalizeProviderKey(provider);
+  if (!normalizedProvider) {
+    return null;
+  }
+
+  if (options.forceRefresh) {
+    invalidateAliasConfigCache();
+  }
+
+  if (allAliasConfigsCache) {
+    return cloneValue(allAliasConfigsCache[normalizedProvider] ?? null);
+  }
+
+  if (providerAliasConfigCache.has(normalizedProvider)) {
+    return cloneValue(providerAliasConfigCache.get(normalizedProvider) ?? null);
+  }
+
+  const existingPromise = providerAliasConfigLoadingPromises.get(
+    normalizedProvider,
+  );
+  if (existingPromise) {
+    return cloneValue(await existingPromise);
+  }
+
+  const loadingPromise = safeInvoke<ProviderAliasConfig | null>(
+    "get_provider_alias_config",
+    { provider: normalizedProvider },
+  )
+    .then((config) => {
+      const snapshot = config ? cloneValue(config) : null;
+      providerAliasConfigCache.set(normalizedProvider, snapshot);
+      return snapshot;
+    })
+    .finally(() => {
+      providerAliasConfigLoadingPromises.delete(normalizedProvider);
+    });
+
+  providerAliasConfigLoadingPromises.set(normalizedProvider, loadingPromise);
+  return cloneValue(await loadingPromise);
 }
 
 /**
@@ -123,7 +228,38 @@ export async function getProviderAliasConfig(
 export async function getAllAliasConfigs(): Promise<
   Record<string, ProviderAliasConfig>
 > {
-  return safeInvoke("get_all_alias_configs");
+  return getAllAliasConfigsCached();
+}
+
+async function getAllAliasConfigsCached(
+  options: ModelRegistryQueryOptions = {},
+): Promise<Record<string, ProviderAliasConfig>> {
+  if (options.forceRefresh) {
+    invalidateAliasConfigCache();
+  }
+
+  if (allAliasConfigsCache) {
+    return cloneValue(allAliasConfigsCache);
+  }
+
+  if (!allAliasConfigsLoadingPromise) {
+    allAliasConfigsLoadingPromise = safeInvoke<Record<string, ProviderAliasConfig>>(
+      "get_all_alias_configs",
+    )
+      .then((configs) => {
+        allAliasConfigsCache = cloneValue(configs);
+        providerAliasConfigCache.clear();
+        Object.entries(allAliasConfigsCache).forEach(([key, value]) => {
+          providerAliasConfigCache.set(key, cloneValue(value));
+        });
+        return allAliasConfigsCache;
+      })
+      .finally(() => {
+        allAliasConfigsLoadingPromise = null;
+      });
+  }
+
+  return cloneValue(await allAliasConfigsLoadingPromise);
 }
 
 /**
@@ -142,5 +278,5 @@ export const modelRegistryApi = {
   getModelsForProvider,
   getModelsByTier,
   getProviderAliasConfig,
-  getAllAliasConfigs,
+  getAllAliasConfigs: getAllAliasConfigsCached,
 };

@@ -98,9 +98,10 @@ let stream = agent.reply(user_message, session_config, Some(cancel_token)).await
 | `aster_agent_init` | 初始化 Agent |
 | `aster_agent_configure_provider` | 手动配置 Provider |
 | `aster_agent_configure_from_pool` | 从凭证池配置 Provider（推荐） |
-| `aster_agent_chat_stream` | 流式对话 |
-| `aster_agent_stop` | 停止会话 |
-| `aster_session_create/list/get` | 会话管理 |
+| `agent_runtime_submit_turn` | 统一提交 turn |
+| `agent_runtime_interrupt_turn` | 统一中断 turn |
+| `agent_runtime_create/list/get/update/delete_session` | 统一会话管理 |
+| `agent_runtime_respond_action` | 统一响应工具确认 / ask / elicitation |
 
 ## 凭证池桥接
 

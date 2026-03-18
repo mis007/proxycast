@@ -55,6 +55,28 @@ impl CredentialHealth {
     }
 }
 
+/// 托盘快速切换模型项
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TrayQuickModelItem {
+    /// Provider 类型
+    pub provider_type: String,
+    /// Provider 显示名称
+    pub provider_label: String,
+    /// 模型 ID
+    pub model: String,
+}
+
+/// 托盘快速切换模型分组
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TrayQuickModelGroup {
+    /// Provider 类型
+    pub provider_type: String,
+    /// Provider 显示名称
+    pub provider_label: String,
+    /// 当前 Provider 可快速切换的模型列表
+    pub models: Vec<TrayQuickModelItem>,
+}
+
 /// 托盘状态快照
 #[derive(Debug, Clone, Serialize)]
 pub struct TrayStateSnapshot {
@@ -72,6 +94,16 @@ pub struct TrayStateSnapshot {
     pub today_requests: u64,
     /// 是否开机自启
     pub auto_start_enabled: bool,
+    /// 当前选中的 Provider 类型
+    pub current_model_provider_type: String,
+    /// 当前选中的 Provider 显示名称
+    pub current_model_provider_label: String,
+    /// 当前选中的模型 ID
+    pub current_model: String,
+    /// 当前主题显示名称
+    pub current_theme_label: String,
+    /// 托盘中的快速模型切换候选
+    pub quick_model_groups: Vec<TrayQuickModelGroup>,
 }
 
 impl Default for TrayStateSnapshot {
@@ -84,6 +116,11 @@ impl Default for TrayStateSnapshot {
             total_credentials: 0,
             today_requests: 0,
             auto_start_enabled: false,
+            current_model_provider_type: String::new(),
+            current_model_provider_label: String::new(),
+            current_model: String::new(),
+            current_theme_label: String::new(),
+            quick_model_groups: Vec::new(),
         }
     }
 }

@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   mcpApi,
   McpServerInfo,
@@ -24,6 +24,7 @@ import {
   McpResourceContent,
   McpServerCapabilities,
 } from "@/lib/api/mcp";
+import { safeListen } from "@/lib/dev-bridge";
 
 // ============================================================================
 // 事件 Payload 类型
@@ -254,55 +255,55 @@ export function useMcp(): UseMcpReturn {
     };
 
     const setupListeners = async () => {
-      // 监听服务器启动事件
-      const unlistenStarted = await listen<McpServerStartedPayload>(
-        "mcp:server_started",
-        (event) => {
-          console.log("[useMcp] 服务器已启动:", event.payload.server_name);
-          refreshServers();
-          refreshTools();
-        },
-      );
-      unlisteners.push(unlistenStarted);
+      try {
+        const unlistenStarted = await safeListen<McpServerStartedPayload>(
+          "mcp:server_started",
+          (event) => {
+            console.log("[useMcp] 服务器已启动:", event.payload.server_name);
+            refreshServers();
+            refreshTools();
+          },
+        );
+        unlisteners.push(unlistenStarted);
 
-      // 监听服务器停止事件
-      const unlistenStopped = await listen<McpServerStoppedPayload>(
-        "mcp:server_stopped",
-        (event) => {
-          console.log("[useMcp] 服务器已停止:", event.payload.server_name);
-          refreshServers();
-          refreshTools();
-        },
-      );
-      unlisteners.push(unlistenStopped);
+        const unlistenStopped = await safeListen<McpServerStoppedPayload>(
+          "mcp:server_stopped",
+          (event) => {
+            console.log("[useMcp] 服务器已停止:", event.payload.server_name);
+            refreshServers();
+            refreshTools();
+          },
+        );
+        unlisteners.push(unlistenStopped);
 
-      // 监听服务器错误事件
-      const unlistenError = await listen<McpServerErrorPayload>(
-        "mcp:server_error",
-        (event) => {
-          console.error(
-            "[useMcp] 服务器错误:",
-            event.payload.server_name,
-            event.payload.error,
-          );
-          if (mounted) {
-            setError(`${event.payload.server_name}: ${event.payload.error}`);
-          }
-        },
-      );
-      unlisteners.push(unlistenError);
+        const unlistenError = await safeListen<McpServerErrorPayload>(
+          "mcp:server_error",
+          (event) => {
+            console.error(
+              "[useMcp] 服务器错误:",
+              event.payload.server_name,
+              event.payload.error,
+            );
+            if (mounted) {
+              setError(`${event.payload.server_name}: ${event.payload.error}`);
+            }
+          },
+        );
+        unlisteners.push(unlistenError);
 
-      // 监听工具列表更新事件
-      const unlistenTools = await listen<McpToolsUpdatedPayload>(
-        "mcp:tools_updated",
-        (event) => {
-          console.log("[useMcp] 工具列表已更新:", event.payload.tools.length);
-          if (mounted) {
-            setTools(event.payload.tools);
-          }
-        },
-      );
-      unlisteners.push(unlistenTools);
+        const unlistenTools = await safeListen<McpToolsUpdatedPayload>(
+          "mcp:tools_updated",
+          (event) => {
+            console.log("[useMcp] 工具列表已更新:", event.payload.tools.length);
+            if (mounted) {
+              setTools(event.payload.tools);
+            }
+          },
+        );
+        unlisteners.push(unlistenTools);
+      } catch (error) {
+        console.error("[useMcp] 注册 MCP 事件监听失败:", error);
+      }
     };
 
     init();

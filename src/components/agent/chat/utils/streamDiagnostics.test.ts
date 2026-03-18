@@ -13,7 +13,7 @@ describe("streamDiagnostics", () => {
   });
 
   it("开始流后应写入基础上下文", () => {
-    const reporter = createStreamDiagnosticsReporter("useAgentChat");
+    const reporter = createStreamDiagnosticsReporter("useAsterAgentChat");
     reporter.start({
       sessionId: "session-1",
       eventName: "agent_stream_1",
@@ -24,7 +24,7 @@ describe("streamDiagnostics", () => {
     expect(updateCrashContextMock).toHaveBeenCalledTimes(1);
     expect(updateCrashContextMock.mock.calls[0]?.[0]).toMatchObject({
       agent_stream_diag: expect.objectContaining({
-        component: "useAgentChat",
+        component: "useAsterAgentChat",
         sessionId: "session-1",
         eventName: "agent_stream_1",
         assistantMessageId: "assistant-1",
@@ -34,7 +34,7 @@ describe("streamDiagnostics", () => {
   });
 
   it("遇到关键事件应立即刷新上下文", () => {
-    const reporter = createStreamDiagnosticsReporter("useAgentChat");
+    const reporter = createStreamDiagnosticsReporter("useAsterAgentChat");
     reporter.start({
       sessionId: "session-1",
       eventName: "agent_stream_1",
@@ -72,7 +72,7 @@ describe("streamDiagnostics", () => {
   });
 
   it("tool_end 缺少 output 时不应抛错", () => {
-    const reporter = createStreamDiagnosticsReporter("useAgentChat");
+    const reporter = createStreamDiagnosticsReporter("useAsterAgentChat");
     reporter.start({
       sessionId: "session-1",
       eventName: "agent_stream_1",
@@ -94,7 +94,7 @@ describe("streamDiagnostics", () => {
   });
 
   it("解析失败时应记录 invalid 事件", () => {
-    const reporter = createStreamDiagnosticsReporter("useAgentChat");
+    const reporter = createStreamDiagnosticsReporter("useAsterAgentChat");
     reporter.start({
       sessionId: "session-1",
       eventName: "agent_stream_1",

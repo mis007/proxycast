@@ -110,6 +110,10 @@ export interface UseApiKeyProviderReturn {
   providersByGroup: Map<ProviderGroup, ProviderWithKeysDisplay[]>;
 }
 
+interface UseApiKeyProviderOptions {
+  autoLoad?: boolean;
+}
+
 // ============================================================================
 // UI 状态键
 // ============================================================================
@@ -163,7 +167,10 @@ function providerDebugLog(...args: unknown[]): void {
 // Hook 实现
 // ============================================================================
 
-export function useApiKeyProvider(): UseApiKeyProviderReturn {
+export function useApiKeyProvider(
+  options: UseApiKeyProviderOptions = {},
+): UseApiKeyProviderReturn {
+  const { autoLoad = true } = options;
   // ===== 状态 =====
   const [providers, setProviders] = useState<ProviderWithKeysDisplay[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
@@ -211,7 +218,9 @@ export function useApiKeyProvider(): UseApiKeyProviderReturn {
         setLoading(true);
       }
       setError(null);
-      providerCacheState.inFlight = apiKeyProviderApi.getProviders();
+      providerCacheState.inFlight = apiKeyProviderApi.getProviders(
+        force ? { forceRefresh: true } : undefined,
+      );
       const data = await providerCacheState.inFlight;
       providerDebugLog("[useApiKeyProvider] 获取到", data.length, "个 Provider");
 
@@ -265,6 +274,11 @@ export function useApiKeyProvider(): UseApiKeyProviderReturn {
 
   // ===== 初始化 =====
   useEffect(() => {
+    if (!autoLoad) {
+      setLoading(false);
+      return;
+    }
+
     if (!applyCachedProviders()) {
       void fetchProviders(true);
     }
@@ -284,7 +298,7 @@ export function useApiKeyProvider(): UseApiKeyProviderReturn {
     return () => {
       unsubscribe();
     };
-  }, [applyCachedProviders, fetchProviders, loadUiState]);
+  }, [applyCachedProviders, autoLoad, fetchProviders, loadUiState]);
 
   // ===== 保存折叠状态 =====
   const saveCollapsedGroups = useCallback(

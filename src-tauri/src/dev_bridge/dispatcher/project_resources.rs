@@ -1,6 +1,7 @@
 use super::{args_or_default, get_string_arg, parse_optional_nested_arg};
 use crate::dev_bridge::DevBridgeState;
 use serde_json::Value as JsonValue;
+use std::time::Instant;
 
 type DynError = Box<dyn std::error::Error>;
 
@@ -56,13 +57,46 @@ pub(super) fn try_handle(
         "project_memory_get" => {
             let args = args_or_default(args);
             let project_id = get_string_arg(&args, "project_id", "projectId")?;
+            let started_at = Instant::now();
+            if let Ok(mut logs) = state.logs.try_write() {
+                logs.add(
+                    "info",
+                    &format!(
+                        "[AgentDiag] project_memory_get.devbridge.start project_id={}",
+                        crate::logger::sanitize_log_message(&project_id)
+                    ),
+                );
+            }
 
             match &state.db {
                 Some(db) => {
                     let manager = crate::memory::MemoryManager::new(db.clone());
-                    let memory = manager
-                        .get_project_memory(&project_id)
-                        .map_err(|e| format!("获取项目记忆失败: {e}"))?;
+                    let memory = manager.get_project_memory(&project_id).map_err(|e| {
+                        if let Ok(mut logs) = state.logs.try_write() {
+                            logs.add(
+                                "error",
+                                &format!(
+                                    "[AgentDiag] project_memory_get.devbridge.error project_id={} duration_ms={} error={}",
+                                    crate::logger::sanitize_log_message(&project_id),
+                                    started_at.elapsed().as_millis(),
+                                    crate::logger::sanitize_log_message(&e)
+                                ),
+                            );
+                        }
+                        format!("获取项目记忆失败: {e}")
+                    })?;
+                    if let Ok(mut logs) = state.logs.try_write() {
+                        logs.add(
+                            "info",
+                            &format!(
+                                "[AgentDiag] project_memory_get.devbridge.success project_id={} duration_ms={} characters={} outline={}",
+                                crate::logger::sanitize_log_message(&project_id),
+                                started_at.elapsed().as_millis(),
+                                memory.characters.len(),
+                                memory.outline.len()
+                            ),
+                        );
+                    }
                     serde_json::to_value(memory)?
                 }
                 None => return Err("Database not initialized".into()),

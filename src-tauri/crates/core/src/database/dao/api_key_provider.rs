@@ -998,7 +998,7 @@ impl ApiKeyProviderDao {
         conn: &Connection,
     ) -> Result<Vec<ProviderWithKeys>, rusqlite::Error> {
         let providers = Self::get_all_providers(conn)?;
-        tracing::info!(
+        tracing::debug!(
             "[DAO] get_all_providers_with_keys: 获取到 {} 个 Provider",
             providers.len()
         );
@@ -1007,7 +1007,7 @@ impl ApiKeyProviderDao {
 
         for provider in providers {
             let api_keys = Self::get_api_keys_by_provider(conn, &provider.id)?;
-            tracing::info!(
+            tracing::trace!(
                 "[DAO] Provider {} ({}): {} 个 API Key",
                 provider.id,
                 provider.name,

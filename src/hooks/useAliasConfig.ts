@@ -26,6 +26,10 @@ export interface UseAliasConfigResult {
   error: string | null;
 }
 
+interface UseAliasConfigOptions {
+  autoLoad?: boolean;
+}
+
 // ============================================================================
 // Hook 实现
 // ============================================================================
@@ -51,7 +55,9 @@ export interface UseAliasConfigResult {
  */
 export function useAliasConfig(
   selectedProvider: ConfiguredProvider | undefined | null,
+  options: UseAliasConfigOptions = {},
 ): UseAliasConfigResult {
+  const { autoLoad = true } = options;
   const [aliasConfig, setAliasConfig] = useState<ProviderAliasConfig | null>(
     null,
   );
@@ -59,6 +65,13 @@ export function useAliasConfig(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!autoLoad) {
+      setAliasConfig(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     // 如果没有选中 Provider，清空配置
     if (!selectedProvider) {
       setAliasConfig(null);
@@ -97,7 +110,7 @@ export function useAliasConfig(
       });
     // 只依赖 key 变化，避免 selectedProvider 对象引用变化导致不必要的重新加载
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvider?.key]);
+  }, [autoLoad, selectedProvider?.key]);
 
   return {
     aliasConfig,

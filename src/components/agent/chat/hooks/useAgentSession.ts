@@ -11,6 +11,7 @@ import type {
   AsterExecutionStrategy,
   QueuedTurnSnapshot,
 } from "@/lib/api/agentRuntime";
+import { logAgentDebug } from "@/lib/agentDebug";
 import { normalizeQueuedTurnSnapshots } from "@/lib/api/queuedTurn";
 import {
   isAsterSessionNotFoundError,
@@ -42,7 +43,7 @@ interface UseAgentSessionOptions {
   runtime: AgentRuntimeAdapter;
   workspaceId: string;
   disableSessionRestore: boolean;
-  isInitialized: boolean;
+  preserveRestoredMessages: boolean;
   executionStrategy: AsterExecutionStrategy;
   providerTypeRef: MutableRefObject<string>;
   modelRef: MutableRefObject<string>;
@@ -73,7 +74,7 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     runtime,
     workspaceId,
     disableSessionRestore,
-    isInitialized,
+    preserveRestoredMessages,
     executionStrategy,
     providerTypeRef,
     modelRef,
@@ -277,10 +278,6 @@ export function useAgentSession(options: UseAgentSessionOptions) {
   useEffect(() => {
     let cancelled = false;
 
-    if (!isInitialized) {
-      return;
-    }
-
     if (!workspaceId?.trim()) {
       setTopics([]);
       setTopicsReady(true);
@@ -288,6 +285,10 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     }
 
     setTopicsReady(false);
+    const startedAt = Date.now();
+    logAgentDebug("useAgentSession", "listSessions.start", {
+      workspaceId,
+    });
     runtime
       .listSessions()
       .then((sessions) => {
@@ -296,6 +297,12 @@ export function useAgentSession(options: UseAgentSessionOptions) {
         }
         const topicList =
           filterSessionsByWorkspace(sessions).map(mapSessionToTopic);
+        logAgentDebug("useAgentSession", "listSessions.success", {
+          durationMs: Date.now() - startedAt,
+          sessionsCount: sessions.length,
+          topicsCount: topicList.length,
+          workspaceId,
+        });
         setTopics(topicList);
       })
       .catch((error) => {
@@ -303,6 +310,16 @@ export function useAgentSession(options: UseAgentSessionOptions) {
           return;
         }
         console.error("[AsterChat] 加载话题失败:", error);
+        logAgentDebug(
+          "useAgentSession",
+          "listSessions.error",
+          {
+            durationMs: Date.now() - startedAt,
+            error,
+            workspaceId,
+          },
+          { level: "error" },
+        );
       })
       .finally(() => {
         if (!cancelled) {
@@ -313,7 +330,7 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     return () => {
       cancelled = true;
     };
-  }, [filterSessionsByWorkspace, isInitialized, runtime, workspaceId]);
+  }, [filterSessionsByWorkspace, runtime, workspaceId]);
 
   const loadTopics = useCallback(async () => {
     if (!workspaceId?.trim()) {
@@ -323,13 +340,33 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     }
 
     setTopicsReady(false);
+    const startedAt = Date.now();
+    logAgentDebug("useAgentSession", "loadTopics.start", {
+      workspaceId,
+    });
     try {
       const sessions = await runtime.listSessions();
       const topicList =
         filterSessionsByWorkspace(sessions).map(mapSessionToTopic);
+      logAgentDebug("useAgentSession", "loadTopics.success", {
+        durationMs: Date.now() - startedAt,
+        sessionsCount: sessions.length,
+        topicsCount: topicList.length,
+        workspaceId,
+      });
       setTopics(topicList);
     } catch (error) {
       console.error("[AsterChat] 加载话题失败:", error);
+      logAgentDebug(
+        "useAgentSession",
+        "loadTopics.error",
+        {
+          durationMs: Date.now() - startedAt,
+          error,
+          workspaceId,
+        },
+        { level: "error" },
+      );
     } finally {
       setTopicsReady(true);
     }
@@ -344,6 +381,11 @@ export function useAgentSession(options: UseAgentSessionOptions) {
       }
 
       try {
+        logAgentDebug("useAgentSession", "createFreshSession.start", {
+          executionStrategy,
+          sessionName: sessionName?.trim() || null,
+          workspaceId: resolvedWorkspaceId,
+        });
         const newSessionId = await runtime.createSession(
           resolvedWorkspaceId,
           sessionName,
@@ -392,9 +434,24 @@ export function useAgentSession(options: UseAgentSessionOptions) {
         saveTransient(scopedKeys.currentTurnKey, null);
 
         void loadTopics();
+        logAgentDebug("useAgentSession", "createFreshSession.success", {
+          newSessionId,
+          sessionName: sessionName?.trim() || null,
+          workspaceId: resolvedWorkspaceId,
+        });
         return newSessionId;
       } catch (error) {
         console.error("[AsterChat] 创建新任务失败:", error);
+        logAgentDebug(
+          "useAgentSession",
+          "createFreshSession.error",
+          {
+            error,
+            sessionName: sessionName?.trim() || null,
+            workspaceId: resolvedWorkspaceId,
+          },
+          { level: "error" },
+        );
         toast.error(`创建新任务失败: ${error}`);
         return null;
       }
@@ -449,11 +506,7 @@ export function useAgentSession(options: UseAgentSessionOptions) {
         toast.success(toastMessage);
       }
     },
-    [
-      resetPendingActions,
-      resetStreamingRefs,
-      scopedKeys,
-    ],
+    [resetPendingActions, resetStreamingRefs, scopedKeys],
   );
 
   const deleteMessage = useCallback((id: string) => {
@@ -513,10 +566,26 @@ export function useAgentSession(options: UseAgentSessionOptions) {
 
       skipAutoRestoreRef.current = false;
       try {
+        const startedAt = Date.now();
+        logAgentDebug("useAgentSession", "switchTopic.start", {
+          currentSessionId,
+          messagesCount: messages.length,
+          topicId,
+          workspaceId,
+        });
         const detail = await runtime.getSession(topicId);
         const topicPreference = loadSessionModelPreference(topicId);
 
         applySessionDetail(topicId, detail, { syncSessionId: true });
+        logAgentDebug("useAgentSession", "switchTopic.success", {
+          durationMs: Date.now() - startedAt,
+          itemsCount: detail.items?.length ?? 0,
+          messagesCount: detail.messages.length,
+          queuedTurnsCount: detail.queued_turns?.length ?? 0,
+          topicId,
+          turnsCount: detail.turns?.length ?? 0,
+          workspaceId,
+        });
 
         if (topicPreference) {
           applySessionModelPreference(topicId, topicPreference);
@@ -524,6 +593,16 @@ export function useAgentSession(options: UseAgentSessionOptions) {
       } catch (error) {
         console.error("[AsterChat] 切换话题失败:", error);
         console.error("[AsterChat] 错误详情:", JSON.stringify(error, null, 2));
+        logAgentDebug(
+          "useAgentSession",
+          "switchTopic.error",
+          {
+            error,
+            topicId,
+            workspaceId,
+          },
+          { level: "error" },
+        );
         if (isAsterSessionNotFoundError(error)) {
           setMessages([]);
           setThreadTurns([]);
@@ -561,6 +640,7 @@ export function useAgentSession(options: UseAgentSessionOptions) {
       runtime,
       scopedKeys,
       sessionIdRef,
+      workspaceId,
     ],
   );
 
@@ -589,7 +669,6 @@ export function useAgentSession(options: UseAgentSessionOptions) {
   useEffect(() => {
     const resolvedWorkspaceId = workspaceId?.trim();
     if (!resolvedWorkspaceId) return;
-    if (!isInitialized) return;
     if (disableSessionRestore) return;
     if (!topicsReady) return;
     if (skipAutoRestoreRef.current) return;
@@ -611,16 +690,41 @@ export function useAgentSession(options: UseAgentSessionOptions) {
       })),
     });
     if (!targetSessionId) {
+      logAgentDebug(
+        "useAgentSession",
+        "autoRestore.skipWithoutTarget",
+        {
+          candidateSessionId: scopedCandidate,
+          topicsCount: topics.length,
+          workspaceId: resolvedWorkspaceId,
+        },
+        { throttleMs: 1000 },
+      );
       return;
     }
 
+    logAgentDebug("useAgentSession", "autoRestore.start", {
+      candidateSessionId: scopedCandidate,
+      targetSessionId,
+      topicsCount: topics.length,
+      workspaceId: resolvedWorkspaceId,
+    });
     switchTopic(targetSessionId).catch((error) => {
       console.warn("[AsterChat] 自动恢复会话失败:", error);
+      logAgentDebug(
+        "useAgentSession",
+        "autoRestore.error",
+        {
+          error,
+          targetSessionId,
+          workspaceId: resolvedWorkspaceId,
+        },
+        { level: "warn" },
+      );
       saveTransient(scopedKeys.currentSessionKey, null);
       savePersisted(scopedKeys.persistedSessionKey, null);
     });
   }, [
-    isInitialized,
     disableSessionRestore,
     sessionId,
     scopedKeys,
@@ -641,6 +745,16 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     if (!topicsReady) return;
 
     if (topics.length > 0 && !topics.some((topic) => topic.id === sessionId)) {
+      logAgentDebug(
+        "useAgentSession",
+        "hydrateSession.sessionMissingFromTopics",
+        {
+          sessionId,
+          topicsCount: topics.length,
+          workspaceId,
+        },
+        { level: "warn" },
+      );
       setSessionId(null);
       setMessages([]);
       setThreadTurns([]);
@@ -661,18 +775,41 @@ export function useAgentSession(options: UseAgentSessionOptions) {
       return;
     }
 
+    if (preserveRestoredMessages && messages.length > 0) {
+      hydratedSessionRef.current = sessionId;
+      return;
+    }
+
     if (hydratedSessionRef.current === sessionId) {
       return;
     }
 
     hydratedSessionRef.current = sessionId;
+    logAgentDebug("useAgentSession", "hydrateSession.start", {
+      messagesCount: messages.length,
+      sessionId,
+      threadItemsCount: threadItems.length,
+      threadTurnsCount: threadTurns.length,
+      workspaceId,
+    });
 
     switchTopic(sessionId).catch((error) => {
       console.warn("[AsterChat] 会话水合失败:", error);
+      logAgentDebug(
+        "useAgentSession",
+        "hydrateSession.error",
+        {
+          error,
+          sessionId,
+          workspaceId,
+        },
+        { level: "warn" },
+      );
       hydratedSessionRef.current = null;
     });
   }, [
     messages.length,
+    preserveRestoredMessages,
     scopedKeys,
     sessionId,
     switchTopic,
@@ -680,6 +817,49 @@ export function useAgentSession(options: UseAgentSessionOptions) {
     threadTurns.length,
     topics,
     topicsReady,
+    workspaceId,
+  ]);
+
+  useEffect(() => {
+    logAgentDebug(
+      "useAgentSession",
+      "stateSnapshot",
+      {
+        currentTurnId: currentTurnId ?? null,
+        messagesCount: messages.length,
+        queuedTurnsCount: queuedTurns.length,
+        sessionId: sessionId ?? null,
+        threadItemsCount: threadItems.length,
+        threadTurnsCount: threadTurns.length,
+        topicsCount: topics.length,
+        topicsReady,
+        workspaceId,
+      },
+      {
+        dedupeKey: JSON.stringify({
+          currentTurnId: currentTurnId ?? null,
+          messagesCount: messages.length,
+          queuedTurnsCount: queuedTurns.length,
+          sessionId: sessionId ?? null,
+          threadItemsCount: threadItems.length,
+          threadTurnsCount: threadTurns.length,
+          topicsCount: topics.length,
+          topicsReady,
+          workspaceId,
+        }),
+        throttleMs: 800,
+      },
+    );
+  }, [
+    currentTurnId,
+    messages.length,
+    queuedTurns.length,
+    sessionId,
+    threadItems.length,
+    threadTurns.length,
+    topics.length,
+    topicsReady,
+    workspaceId,
   ]);
 
   const deleteTopic = useCallback(
@@ -779,9 +959,11 @@ export function useAgentSession(options: UseAgentSessionOptions) {
             return topic;
           }
 
+          const { updatedAt, ...restSnapshot } = snapshot;
           const nextTopic = {
             ...topic,
-            ...snapshot,
+            ...restSnapshot,
+            ...(updatedAt ? { updatedAt } : {}),
           };
 
           const unchanged =

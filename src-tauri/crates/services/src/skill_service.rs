@@ -17,6 +17,7 @@ use lime_core::models::{
 };
 
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
+const REMOTE_SKILLS_LIST_TIMEOUT: Duration = Duration::from_secs(8);
 const REMOTE_SKILLS_CACHE_TTL: Duration = Duration::from_secs(300);
 const REMOTE_SKILLS_ERROR_CACHE_TTL: Duration = Duration::from_secs(120);
 
@@ -71,6 +72,19 @@ impl RepoCacheEntry {
         };
 
         self.fetched_at.elapsed() < ttl
+    }
+}
+
+struct InflightFetchGuard<'a> {
+    inflight_fetches: &'a Mutex<HashMap<RepoCacheKey, Arc<tokio::sync::Notify>>>,
+    cache_key: RepoCacheKey,
+    notify: Arc<tokio::sync::Notify>,
+}
+
+impl Drop for InflightFetchGuard<'_> {
+    fn drop(&mut self) {
+        self.inflight_fetches.lock().remove(&self.cache_key);
+        self.notify.notify_waiters();
     }
 }
 
@@ -176,8 +190,8 @@ impl SkillService {
         self.collect_local_skills(app_type, &roots, &mut all_skills)?;
 
         for repo in repos.iter().filter(|repo| repo.enabled) {
-            match timeout(DOWNLOAD_TIMEOUT, self.fetch_skills_from_repo_cached(repo)).await {
-                Ok(Ok(remote_skills)) => {
+            match self.fetch_skills_from_repo_cached(repo).await {
+                Ok(remote_skills) => {
                     for mut skill in remote_skills {
                         if all_skills
                             .values()
@@ -197,16 +211,13 @@ impl SkillService {
                         all_skills.insert(skill.key.clone(), skill);
                     }
                 }
-                Ok(Err(error)) => {
-                    tracing::warn!(
-                        "Failed to fetch skills from {}/{}: {}",
+                Err(error) => {
+                    tracing::info!(
+                        "[SkillService] 远程技能仓库 {}/{} 暂时不可用，已跳过: {}",
                         repo.owner,
                         repo.name,
                         error
                     );
-                }
-                Err(_) => {
-                    tracing::warn!("Timeout fetching skills from {}/{}", repo.owner, repo.name)
                 }
             }
         }
@@ -305,24 +316,41 @@ impl SkillService {
             ));
         }
 
-        let result = self
-            .fetch_skills_from_repo_uncached(repo)
-            .await
-            .map_err(|error| error.to_string());
+        let _inflight_guard = InflightFetchGuard {
+            inflight_fetches: &self.inflight_fetches,
+            cache_key: cache_key.clone(),
+            notify,
+        };
 
+        let result = match timeout(
+            REMOTE_SKILLS_LIST_TIMEOUT,
+            self.fetch_skills_from_repo_uncached(repo),
+        )
+        .await
         {
-            let mut cache = self.repo_cache.write();
-            let entry = match &result {
-                Ok(skills) => RepoCacheEntry::success(skills.clone()),
-                Err(error) => RepoCacheEntry::error(error.clone()),
-            };
-            cache.insert(cache_key.clone(), entry);
-        }
+            Ok(Ok(skills)) => Ok(skills),
+            Ok(Err(error)) => Err(error.to_string()),
+            Err(_) => Err(format!(
+                "拉取技能清单超时（{} 秒）",
+                REMOTE_SKILLS_LIST_TIMEOUT.as_secs()
+            )),
+        };
 
-        self.inflight_fetches.lock().remove(&cache_key);
-        notify.notify_waiters();
+        self.cache_repo_result(&cache_key, &result);
 
         result.map_err(|error| anyhow!(error))
+    }
+
+    fn cache_repo_result(
+        &self,
+        cache_key: &RepoCacheKey,
+        result: &std::result::Result<Vec<Skill>, String>,
+    ) {
+        let entry = match result {
+            Ok(skills) => RepoCacheEntry::success(skills.clone()),
+            Err(error) => RepoCacheEntry::error(error.clone()),
+        };
+        self.repo_cache.write().insert(cache_key.clone(), entry);
     }
 
     fn read_cached_repo_result(&self, cache_key: &RepoCacheKey) -> Option<Result<Vec<Skill>>> {

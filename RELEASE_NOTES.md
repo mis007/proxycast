@@ -1,18 +1,18 @@
-## Lime v0.89.1
+## Lime v0.90.0
 
 ### ✨ 主要更新
 
-- **品牌正式更名为 Lime**：主程序名称、仓库链接、安装包命名、Tauri `productName` / `identifier`、深链 scheme、浏览器桥扩展目录与发布文案已统一从 `Proxycast` 切换到 `Lime`
-- **品牌图标与启动形象刷新**：应用图标、安装包图标、通知图标与启动页专用 Logo 已统一替换为新的青柠小龙虾主视觉，启动页继续保留独立图像资源
-- **ThemeWorkbench 侧边栏完成职责拆分**：上下文面板、工作流面板、执行日志与编排状态拆成独立构建模块，侧边栏主组件进一步收口
-- **版本事实源继续收口**：统一 `package.json`、Cargo workspace / package、两份 Tauri 配置与 `RELEASE_NOTES.md` 的版本入口，发布流程继续只读取这一套版本源
-- **运行时命名继续收口**：Tool Calling、Web Search、Durable Memory、workspace sandbox、真实测试与浏览器桥接等运行时环境变量统一以 `LIME_*` / `__LIME_*` 为现役事实源，旧 `PROXYCAST_*` 仅保留兼容读取
-- **生态入口同步完成**：README、插件升级入口、About 页、扩展说明与下载地址等对外入口统一使用 `Lime`
+- **Aster Agent 聊天链路完成收口**：前端统一走 `useAgentChatUnified -> useAsterAgentChat`，移除旧 `useAgentChat` / `agentStore` compat 路径；会话恢复、流式消息、工具状态与 topic snapshot 改为模块化协作
+- **Agent 会话与时间线持久化增强**：Aster session store、agent timeline DAO、数据库 schema 与迁移链路继续补强，聊天历史、统计与项目上下文构建更稳定
+- **托盘模型快捷切换上线**：新增全局托盘模型同步、主题感知的快捷模型组与模型选择联动，聊天页、侧边栏和模型选择器体验同步更新
+- **调试与性能诊断能力补齐**：新增前端 debug 上报 API、Tauri profiling 启动脚本、Perfetto / Tokio Console 支持与配套文档，运行时排障更直接
+- **OpenClaw 与运行时集成继续完善**：Browser Runtime、OpenClaw 页面与后端服务、Dev Bridge 查询和技能服务继续收口，提升桌面侧运行时协同
+- **品牌图标与托盘资产刷新**：应用图标、托盘状态图与启动页、侧边栏视觉资源同步更新
 
 ### ⚠️ 兼容性说明
 
-- 旧 `proxycast` 数据目录、数据库文件与历史路径仍保留启动迁移兼容，现有数据会继续被识别并迁移到 `lime` 目录
-- 后续对外暴露的现役命名统一使用 `Lime`；旧 `Proxycast` 命名仅作为兼容层保留，不再继续扩展
+- Agent 聊天现役事实源已统一到 Aster 后端；旧 `useAgentChat` / `agentStore` 已移除，后续新功能不再沿 compat 路径扩展
+- Profiling 诊断能力仅在显式开发启动流程下启用；release / 生产构建默认忽略这些调试开关
 
 ### 🧪 测试
 
@@ -20,7 +20,7 @@
 
 ### 📝 文档
 
-- 更新发布说明、仓库链接、安装与分发文案，统一使用 `Lime`
+- 更新 Agent / Aster 集成、治理与 profiling 相关文档，补充前端诊断与发布说明
 
 ### 📦 Windows 下载说明
 
@@ -30,4 +30,4 @@
 
 ---
 
-**完整变更**: v0.89.0...v0.89.1
+**完整变更**: v0.89.1...v0.90.0

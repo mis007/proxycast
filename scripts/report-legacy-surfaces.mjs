@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import agentCommandCatalog from "../src/lib/governance/agentCommandCatalog.json" with { type: "json" };
 
 const repoRoot = path.resolve(process.cwd());
 const sourceRoots = ["src"];
@@ -26,6 +27,16 @@ const ignoredDirs = new Set([
   ".turbo",
   ".next",
 ]);
+
+const agentLegacyCommandSurfaceMonitors =
+  agentCommandCatalog.legacyCommandSurfaceMonitors;
+
+const agentLegacyHelperSurfaceMonitors = (
+  agentCommandCatalog.legacyHelperSurfaceMonitors ?? []
+).map(({ helpers, ...monitor }) => ({
+  ...monitor,
+  patterns: helpers.map((helper) => `${helper}(`),
+}));
 
 const importSurfaceMonitors = [
   {
@@ -71,6 +82,20 @@ const importSurfaceMonitors = [
     allowedPaths: [],
   },
   {
+    id: "agent-api-facade-entry",
+    classification: "dead-candidate",
+    description: "已删除 Agent API 门面入口",
+    targets: ["src/lib/api/agent.ts"],
+    allowedPaths: [],
+  },
+  {
+    id: "agent-legacy-hook-entry",
+    classification: "dead-candidate",
+    description: "旧 Agent Chat Hook 入口",
+    targets: ["src/components/agent/chat/hooks/useAgentChat.ts"],
+    allowedPaths: [],
+  },
+  {
     id: "heartbeat-api-gateway",
     classification: "deprecated",
     description: "旧 heartbeat 前端 API 入口",
@@ -91,9 +116,24 @@ const importSurfaceMonitors = [
     targets: ["src/components/settings-v2/agent/assistant/index.tsx"],
     allowedPaths: [],
   },
+  {
+    id: "stores-root-barrel-entry",
+    classification: "dead-candidate",
+    description: "旧 stores 根 barrel 入口",
+    targets: ["src/stores/index.ts"],
+    allowedPaths: [],
+  },
+  {
+    id: "agent-legacy-store-entry",
+    classification: "dead-candidate",
+    description: "旧 Agent Zustand store 入口",
+    targets: ["src/stores/agentStore.ts"],
+    allowedPaths: [],
+  },
 ];
 
 const commandSurfaceMonitors = [
+  ...agentLegacyCommandSurfaceMonitors,
   {
     id: "general-chat-compat-commands",
     classification: "compat",
@@ -166,6 +206,7 @@ const commandSurfaceMonitors = [
 ];
 
 const frontendTextSurfaceMonitors = [
+  ...agentLegacyHelperSurfaceMonitors,
   {
     id: "frontend-assistant-settings-surfaces",
     classification: "deprecated",
@@ -180,6 +221,13 @@ const frontendTextSurfaceMonitors = [
       "show_suggestions",
       "auto_select",
     ],
+    allowedPaths: [],
+  },
+  {
+    id: "stores-root-barrel-imports",
+    classification: "deprecated",
+    description: "从 @/stores 根 barrel 回流遗留 store 导入",
+    patterns: ['from "@/stores"', "from '@/stores'"],
     allowedPaths: [],
   },
 ];
@@ -303,6 +351,57 @@ const rustTextSurfaceMonitors = [
     allowedPaths: [],
   },
   {
+    id: "rust-service-agent-table-query-leak",
+    classification: "deprecated",
+    description: "Tauri service 层 direct agent_sessions/agent_messages 查询回流",
+    patterns: [
+      "FROM agent_sessions s",
+      "FROM agent_messages m",
+      "JOIN agent_sessions s ON s.id = m.session_id",
+    ],
+    includePathPrefixes: ["src-tauri/src/services"],
+    allowedPaths: [],
+  },
+  {
+    id: "rust-service-model-usage-table-query-leak",
+    classification: "deprecated",
+    description: "Tauri service 层 direct model_usage_stats 查询回流",
+    patterns: ["FROM model_usage_stats", "SELECT COUNT(*) FROM model_usage_stats"],
+    includePathPrefixes: ["src-tauri/src/services"],
+    allowedPaths: [],
+  },
+  {
+    id: "rust-agent-session-direct-record-access",
+    classification: "deprecated",
+    description: "Rust 上层模块 direct Agent session 记录与消息读写回流",
+    patterns: [
+      "AgentDao::get_session(",
+      "AgentDao::list_sessions(",
+      "AgentDao::get_message_count(",
+      "AgentDao::get_messages(",
+      "AgentDao::session_exists(",
+      "AgentDao::update_title(",
+      "AgentDao::update_session_time(",
+      "AgentDao::update_working_dir(",
+      "AgentDao::update_execution_strategy(",
+    ],
+    allowedPaths: ["src-tauri/crates/agent/src/session_store.rs"],
+  },
+  {
+    id: "rust-agent-session-direct-delete",
+    classification: "deprecated",
+    description: "Rust 业务层 direct AgentDao::delete_session 回流",
+    patterns: ["AgentDao::delete_session("],
+    allowedPaths: [],
+  },
+  {
+    id: "rust-agent-session-direct-create",
+    classification: "deprecated",
+    description: "Rust 业务层 direct AgentDao::create_session 回流",
+    patterns: ["AgentDao::create_session("],
+    allowedPaths: ["src-tauri/crates/agent/src/session_store.rs"],
+  },
+  {
     id: "rust-heartbeat-business-surfaces",
     classification: "deprecated",
     description: "Rust 业务层 heartbeat 旧实现回流",
@@ -315,7 +414,7 @@ const rustTextSurfaceMonitors = [
       "heartbeat_tool",
       "RunSource::Heartbeat",
       "source = 'heartbeat'",
-      "source: \"heartbeat\".to_string()",
+      'source: "heartbeat".to_string()',
     ],
     allowedPaths: [],
   },
@@ -331,7 +430,10 @@ const rustTextSurfaceMonitors = [
       "show_suggestions",
       "auto_select",
     ],
-    includePathPrefixes: ["src-tauri/crates/core/src/config", "src-tauri/src/config"],
+    includePathPrefixes: [
+      "src-tauri/crates/core/src/config",
+      "src-tauri/src/config",
+    ],
     allowedPaths: [],
   },
   {
@@ -339,13 +441,13 @@ const rustTextSurfaceMonitors = [
     classification: "deprecated",
     description: "Rust 迁移 settings 标记字符串扩散",
     patterns: [
-      "\"migrated_api_keys_to_pool\"",
-      "\"migrated_provider_ids_v1\"",
-      "\"cleaned_legacy_api_key_credentials\"",
-      "\"migrated_mcp_lime_enabled\"",
-      "\"migrated_mcp_created_at_to_integer\"",
-      "\"model_registry_refresh_needed\"",
-      "\"model_registry_version\"",
+      '"migrated_api_keys_to_pool"',
+      '"migrated_provider_ids_v1"',
+      '"cleaned_legacy_api_key_credentials"',
+      '"migrated_mcp_lime_enabled"',
+      '"migrated_mcp_created_at_to_integer"',
+      '"model_registry_refresh_needed"',
+      '"model_registry_version"',
     ],
     allowedPaths: [
       "src-tauri/crates/core/src/database/migration.rs",
@@ -408,9 +510,9 @@ const rustTextSurfaceMonitors = [
     classification: "deprecated",
     description: "versioned migration 直接手写事务样板回流",
     patterns: [
-      "conn.execute(\"BEGIN TRANSACTION\"",
-      "conn.execute(\"COMMIT\"",
-      "conn.execute(\"ROLLBACK\"",
+      'conn.execute("BEGIN TRANSACTION"',
+      'conn.execute("COMMIT"',
+      'conn.execute("ROLLBACK"',
     ],
     includePathPrefixes: ["src-tauri/crates/core/src/database/migration_v"],
     allowedPaths: [],
@@ -419,7 +521,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-projects-path-leak",
     classification: "deprecated",
     description: "数据库迁移硬编码 legacy projects 路径",
-    patterns: ["\".lime/projects\"", "join(\".lime\").join(\"projects\")"],
+    patterns: ['".lime/projects"', 'join(".lime").join("projects")'],
     includePathPrefixes: ["src-tauri/crates/core/src/database"],
     allowedPaths: [],
   },
@@ -427,7 +529,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-session-files-path-leak",
     classification: "deprecated",
     description: "session files 硬编码 legacy sessions 路径",
-    patterns: ["~/.lime/sessions", "join(\".lime\").join(\"sessions\")"],
+    patterns: ["~/.lime/sessions", 'join(".lime").join("sessions")'],
     includePathPrefixes: ["src-tauri/crates/core/src/session_files"],
     allowedPaths: [],
   },
@@ -435,7 +537,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-legacy-config-path-leak",
     classification: "deprecated",
     description: "数据库迁移硬编码 legacy config 路径",
-    patterns: ["~/.lime/config.json", "join(\".lime\").join(\"config.json\")"],
+    patterns: ["~/.lime/config.json", 'join(".lime").join("config.json")'],
     includePathPrefixes: ["src-tauri/crates/core/src/database"],
     allowedPaths: [],
   },
@@ -443,7 +545,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-workspace-projects-path-leak",
     classification: "deprecated",
     description: "上层命令或桥接层硬编码 workspace projects 路径",
-    patterns: ["~/.lime/projects", "join(\".lime\").join(\"projects\")"],
+    patterns: ["~/.lime/projects", 'join(".lime").join("projects")'],
     includePathPrefixes: ["src-tauri/src"],
     allowedPaths: [],
   },
@@ -451,7 +553,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-logger-path-leak",
     classification: "deprecated",
     description: "logger fallback 硬编码 legacy logs 路径",
-    patterns: ["~/.lime/logs", "join(\".lime\").join(\"logs\")"],
+    patterns: ["~/.lime/logs", 'join(".lime").join("logs")'],
     includePathPrefixes: ["src-tauri/crates/core/src/logger.rs"],
     allowedPaths: [],
   },
@@ -459,7 +561,7 @@ const rustTextSurfaceMonitors = [
     id: "rust-hardcoded-skills-path-leak",
     classification: "deprecated",
     description: "skills 相关模块硬编码 legacy skills 路径",
-    patterns: ["~/.lime/skills", "join(\".lime\").join(\"skills\")"],
+    patterns: ["~/.lime/skills", 'join(".lime").join("skills")'],
     includePathPrefixes: ["src-tauri/src"],
     allowedPaths: [],
   },
@@ -469,8 +571,8 @@ const rustTextSurfaceMonitors = [
     description: "memory 相关模块硬编码 legacy memory 或 AGENTS 路径",
     patterns: [
       "~/.lime/AGENTS.md",
-      "join(\".lime\").join(\"AGENTS.md\")",
-      "join(\".lime\").join(\"memory\")",
+      'join(".lime").join("AGENTS.md")',
+      'join(".lime").join("memory")',
       ".lime/memory",
     ],
     includePathPrefixes: ["src-tauri/src"],
@@ -892,7 +994,10 @@ function evaluateTextCountMonitor(monitor, runtimeSources, testSources) {
     const counts = monitor.occurrences
       .map((rule) => ({
         ...rule,
-        count: countOccurrences(file.rawSourceCode ?? file.sourceCode, rule.pattern),
+        count: countOccurrences(
+          file.rawSourceCode ?? file.sourceCode,
+          rule.pattern,
+        ),
       }))
       .filter((rule) => rule.count > 0);
 
@@ -1032,8 +1137,10 @@ function printTextCountReport(result) {
 }
 
 const { runtimeSources, testSources } = collectSources();
-const { runtimeSources: frontendRuntimeTextSources, testSources: frontendTestTextSources } =
-  collectTextSources(sourceRoots, sourceExtensions);
+const {
+  runtimeSources: frontendRuntimeTextSources,
+  testSources: frontendTestTextSources,
+} = collectTextSources(sourceRoots, sourceExtensions);
 const { runtimeSources: rustRuntimeSources, testSources: rustTestSources } =
   collectTextSources(rustSourceRoots, rustSourceExtensions);
 const importResults = importSurfaceMonitors.map((monitor) =>
@@ -1043,7 +1150,11 @@ const commandResults = commandSurfaceMonitors.map((monitor) =>
   evaluateCommandMonitor(monitor, runtimeSources, testSources),
 );
 const frontendTextResults = frontendTextSurfaceMonitors.map((monitor) =>
-  evaluateTextMonitor(monitor, frontendRuntimeTextSources, frontendTestTextSources),
+  evaluateTextMonitor(
+    monitor,
+    frontendRuntimeTextSources,
+    frontendTestTextSources,
+  ),
 );
 const rustTextResults = rustTextSurfaceMonitors.map((monitor) =>
   evaluateTextMonitor(monitor, rustRuntimeSources, rustTestSources),

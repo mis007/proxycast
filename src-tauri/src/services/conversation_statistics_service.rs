@@ -2,12 +2,14 @@
 //!
 //! 从数据库查询真实的对话和使用统计数据
 
+use crate::database::dao::agent::{AgentDao, AgentModelPatternMatch};
+use crate::database::dao::orchestrator::OrchestratorDao;
 use crate::database::{
     count_pending_general_messages, count_pending_general_sessions,
     sum_pending_general_message_chars,
 };
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
 const GENERAL_MODE_PATTERN: &str = "general:%";
@@ -210,17 +212,14 @@ fn query_general_session_count(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    let unified_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*)
-             FROM agent_sessions s
-             WHERE s.model LIKE ?1
-               AND (?2 IS NULL OR datetime(s.created_at) >= datetime(?2))
-               AND (?3 IS NULL OR datetime(s.created_at) < datetime(?3))",
-            params![GENERAL_MODE_PATTERN, from_text, to_text],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("查询 unified general 会话数失败: {e}"))?;
+    let unified_count = AgentDao::count_sessions_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::Like,
+        from_text.as_deref(),
+        to_text.as_deref(),
+    )
+    .map_err(|e| format!("查询 unified general 会话数失败: {e}"))?;
 
     let pending_count = count_pending_general_sessions(conn, from_timestamp_ms, to_timestamp_ms)
         .map_err(|e| format!("查询待迁移 general 会话数失败: {e}"))?;
@@ -236,18 +235,14 @@ fn query_general_message_count(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    let unified_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*)
-             FROM agent_messages m
-             JOIN agent_sessions s ON s.id = m.session_id
-             WHERE s.model LIKE ?1
-               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-               AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
-            params![GENERAL_MODE_PATTERN, from_text, to_text],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("查询 unified general 消息数失败: {e}"))?;
+    let unified_count = AgentDao::count_messages_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::Like,
+        from_text.as_deref(),
+        to_text.as_deref(),
+    )
+    .map_err(|e| format!("查询 unified general 消息数失败: {e}"))?;
 
     let pending_count = count_pending_general_messages(conn, from_timestamp_ms, to_timestamp_ms)
         .map_err(|e| format!("查询待迁移 general 消息数失败: {e}"))?;
@@ -263,18 +258,14 @@ fn sum_general_message_chars(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    let unified_chars: i64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(LENGTH(m.content_json)), 0)
-             FROM agent_messages m
-             JOIN agent_sessions s ON s.id = m.session_id
-             WHERE s.model LIKE ?1
-               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-               AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
-            params![GENERAL_MODE_PATTERN, from_text, to_text],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("估算 unified general Token 失败: {e}"))?;
+    let unified_chars = AgentDao::sum_message_chars_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::Like,
+        from_text.as_deref(),
+        to_text.as_deref(),
+    )
+    .map_err(|e| format!("估算 unified general Token 失败: {e}"))?;
 
     let pending_chars = sum_pending_general_message_chars(conn, from_timestamp_ms, to_timestamp_ms)
         .map_err(|e| format!("估算待迁移 general Token 失败: {e}"))?;
@@ -290,14 +281,12 @@ fn query_non_general_session_count(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    conn.query_row(
-        "SELECT COUNT(*)
-         FROM agent_sessions s
-         WHERE s.model NOT LIKE ?1
-           AND (?2 IS NULL OR datetime(s.created_at) >= datetime(?2))
-           AND (?3 IS NULL OR datetime(s.created_at) < datetime(?3))",
-        params![GENERAL_MODE_PATTERN, from_text, to_text],
-        |row| row.get(0),
+    AgentDao::count_sessions_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::NotLike,
+        from_text.as_deref(),
+        to_text.as_deref(),
     )
     .map_err(|e| format!("查询非通用 unified 会话数失败: {e}"))
 }
@@ -310,15 +299,12 @@ fn query_non_general_message_count(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    conn.query_row(
-        "SELECT COUNT(*)
-         FROM agent_messages m
-         JOIN agent_sessions s ON s.id = m.session_id
-         WHERE s.model NOT LIKE ?1
-           AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-           AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
-        params![GENERAL_MODE_PATTERN, from_text, to_text],
-        |row| row.get(0),
+    AgentDao::count_messages_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::NotLike,
+        from_text.as_deref(),
+        to_text.as_deref(),
     )
     .map_err(|e| format!("查询非通用 unified 消息数失败: {e}"))
 }
@@ -331,15 +317,12 @@ fn sum_non_general_message_chars(
     let from_text = from_timestamp_ms.map(format_sqlite_datetime);
     let to_text = to_timestamp_ms.map(format_sqlite_datetime);
 
-    conn.query_row(
-        "SELECT COALESCE(SUM(LENGTH(m.content_json)), 0)
-         FROM agent_messages m
-         JOIN agent_sessions s ON s.id = m.session_id
-         WHERE s.model NOT LIKE ?1
-           AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-           AND (?3 IS NULL OR datetime(m.timestamp) < datetime(?3))",
-        params![GENERAL_MODE_PATTERN, from_text, to_text],
-        |row| row.get(0),
+    AgentDao::sum_message_chars_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::NotLike,
+        from_text.as_deref(),
+        to_text.as_deref(),
     )
     .map_err(|e| format!("估算非通用 unified Token 失败: {e}"))
 }
@@ -413,41 +396,22 @@ fn query_model_usage_table_tokens(
     today_start: &DateTime<Local>,
     month_start: &DateTime<Local>,
 ) -> Result<Option<TokenStats>, String> {
-    let row_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM model_usage_stats", [], |row| {
-            row.get(0)
-        })
-        .map_err(|e| format!("查询 model_usage_stats 行数失败: {e}"))?;
-
-    if row_count <= 0 {
+    if !OrchestratorDao::has_model_usage_stats(conn)
+        .map_err(|e| format!("查询 model_usage_stats 行数失败: {e}"))?
+    {
         return Ok(None);
     }
 
     let today_key = today_start.format("%Y-%m-%d").to_string();
     let month_key = month_start.format("%Y-%m-%d").to_string();
 
-    let total_tokens: i64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats",
-            [],
-            |row| row.get(0),
-        )
+    let total_tokens = OrchestratorDao::get_total_model_usage_tokens(conn)
         .map_err(|e| format!("查询总 Token 失败: {e}"))?;
 
-    let monthly_tokens: i64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats WHERE date >= ?",
-            [month_key],
-            |row| row.get(0),
-        )
+    let monthly_tokens = OrchestratorDao::get_model_usage_tokens_since(conn, &month_key)
         .map_err(|e| format!("查询本月 Token 失败: {e}"))?;
 
-    let today_tokens: i64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats WHERE date = ?",
-            [today_key],
-            |row| row.get(0),
-        )
+    let today_tokens = OrchestratorDao::get_model_usage_tokens_on(conn, &today_key)
         .map_err(|e| format!("查询今日 Token 失败: {e}"))?;
 
     Ok(Some(TokenStats {
@@ -499,150 +463,42 @@ fn query_model_usage_from_stats_table(
     conn: &Connection,
     range_start: Option<DateTime<Local>>,
 ) -> Result<Vec<RawModelUsage>, String> {
-    let mut result = Vec::new();
-
-    if let Some(start) = range_start {
-        let start_key = start.format("%Y-%m-%d").to_string();
-        let mut stmt = conn
-            .prepare(
-                "SELECT model_id,
-                        COALESCE(SUM(request_count), 0) AS conversations,
-                        COALESCE(SUM(total_tokens), 0) AS tokens
-                 FROM model_usage_stats
-                 WHERE date >= ?
-                 GROUP BY model_id
-                 ORDER BY tokens DESC, conversations DESC
-                 LIMIT 20",
-            )
-            .map_err(|e| format!("准备模型统计查询失败: {e}"))?;
-
-        let rows = stmt
-            .query_map([start_key], |row| {
-                let model: String = row.get(0)?;
-                let conversations: i64 = row.get(1)?;
-                let tokens: i64 = row.get(2)?;
-                Ok(RawModelUsage {
-                    model,
-                    conversations: clamp_i64_to_u64(conversations),
-                    tokens: clamp_i64_to_u64(tokens),
-                })
-            })
-            .map_err(|e| format!("执行模型统计查询失败: {e}"))?;
-
-        for row in rows {
-            result.push(row.map_err(|e| format!("读取模型统计行失败: {e}"))?);
-        }
-
-        return Ok(result);
-    }
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT model_id,
-                    COALESCE(SUM(request_count), 0) AS conversations,
-                    COALESCE(SUM(total_tokens), 0) AS tokens
-             FROM model_usage_stats
-             GROUP BY model_id
-             ORDER BY tokens DESC, conversations DESC
-             LIMIT 20",
-        )
-        .map_err(|e| format!("准备模型统计查询失败: {e}"))?;
-
-    let rows = stmt
-        .query_map([], |row| {
-            let model: String = row.get(0)?;
-            let conversations: i64 = row.get(1)?;
-            let tokens: i64 = row.get(2)?;
-            Ok(RawModelUsage {
-                model,
-                conversations: clamp_i64_to_u64(conversations),
-                tokens: clamp_i64_to_u64(tokens),
-            })
-        })
+    let start_key = range_start.map(|start| start.format("%Y-%m-%d").to_string());
+    let rows = OrchestratorDao::list_model_usage_aggregates(conn, start_key.as_deref(), 20)
         .map_err(|e| format!("执行模型统计查询失败: {e}"))?;
 
-    for row in rows {
-        result.push(row.map_err(|e| format!("读取模型统计行失败: {e}"))?);
-    }
-
-    Ok(result)
+    Ok(rows
+        .into_iter()
+        .map(|row| RawModelUsage {
+            model: row.model_id,
+            conversations: clamp_i64_to_u64(row.request_count),
+            tokens: clamp_i64_to_u64(row.total_tokens),
+        })
+        .collect())
 }
 
 fn query_model_usage_from_agent_messages(
     conn: &Connection,
     range_start: Option<DateTime<Local>>,
 ) -> Result<Vec<RawModelUsage>, String> {
-    let mut result = Vec::new();
+    let start_str = range_start.map(|start| start.format("%Y-%m-%d %H:%M:%S").to_string());
+    let rows = AgentDao::list_model_usage_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::NotLike,
+        start_str.as_deref(),
+        20,
+    )
+    .map_err(|e| format!("查询 Agent 模型排行失败: {e}"))?;
 
-    if let Some(start) = range_start {
-        let start_str = start.format("%Y-%m-%d %H:%M:%S").to_string();
-        let mut stmt = conn
-            .prepare(
-                "SELECT s.model,
-                        COUNT(DISTINCT m.session_id) AS conversations,
-                        COALESCE(SUM(LENGTH(m.content_json)), 0) AS content_chars
-                 FROM agent_messages m
-                 JOIN agent_sessions s ON s.id = m.session_id
-                 WHERE s.model NOT LIKE ?1
-                   AND datetime(m.timestamp) >= datetime(?2)
-                 GROUP BY s.model
-                 ORDER BY content_chars DESC, conversations DESC
-                 LIMIT 20",
-            )
-            .map_err(|e| format!("准备 Agent 模型排行查询失败: {e}"))?;
-
-        let rows = stmt
-            .query_map(params![GENERAL_MODE_PATTERN, start_str], |row| {
-                let model: String = row.get(0)?;
-                let conversations: i64 = row.get(1)?;
-                let chars: i64 = row.get(2)?;
-                Ok(RawModelUsage {
-                    model,
-                    conversations: clamp_i64_to_u64(conversations),
-                    tokens: chars_to_estimated_tokens(chars),
-                })
-            })
-            .map_err(|e| format!("执行 Agent 模型排行查询失败: {e}"))?;
-
-        for row in rows {
-            result.push(row.map_err(|e| format!("读取 Agent 模型排行行失败: {e}"))?);
-        }
-
-        return Ok(result);
-    }
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.model,
-                    COUNT(DISTINCT m.session_id) AS conversations,
-                    COALESCE(SUM(LENGTH(m.content_json)), 0) AS content_chars
-             FROM agent_messages m
-             JOIN agent_sessions s ON s.id = m.session_id
-             WHERE s.model NOT LIKE ?1
-             GROUP BY s.model
-             ORDER BY content_chars DESC, conversations DESC
-             LIMIT 20",
-        )
-        .map_err(|e| format!("准备 Agent 模型排行查询失败: {e}"))?;
-
-    let rows = stmt
-        .query_map([GENERAL_MODE_PATTERN], |row| {
-            let model: String = row.get(0)?;
-            let conversations: i64 = row.get(1)?;
-            let chars: i64 = row.get(2)?;
-            Ok(RawModelUsage {
-                model,
-                conversations: clamp_i64_to_u64(conversations),
-                tokens: chars_to_estimated_tokens(chars),
-            })
+    Ok(rows
+        .into_iter()
+        .map(|row| RawModelUsage {
+            model: row.model,
+            conversations: row.conversations,
+            tokens: chars_to_estimated_tokens(row.content_chars as i64),
         })
-        .map_err(|e| format!("执行 Agent 模型排行查询失败: {e}"))?;
-
-    for row in rows {
-        result.push(row.map_err(|e| format!("读取 Agent 模型排行行失败: {e}"))?);
-    }
-
-    Ok(result)
+        .collect())
 }
 
 fn build_model_usage_response(usages: Vec<RawModelUsage>) -> Vec<ModelUsage> {
@@ -689,12 +545,8 @@ pub fn get_daily_usage_trends_from_db(
 ) -> Result<Vec<DailyUsage>, String> {
     let days = resolve_range_days(time_range)?;
 
-    let has_model_usage_data: i64 = conn
-        .query_row("SELECT COUNT(*) FROM model_usage_stats", [], |row| {
-            row.get(0)
-        })
+    let use_actual_tokens = OrchestratorDao::has_model_usage_stats(conn)
         .map_err(|e| format!("检查 model_usage_stats 失败: {e}"))?;
-    let use_actual_tokens = has_model_usage_data > 0;
 
     let mut daily_usage = Vec::new();
 
@@ -718,12 +570,7 @@ pub fn get_daily_usage_trends_from_db(
         let total_conversations = conversations + agent_conversations;
 
         let tokens = if use_actual_tokens {
-            let day_tokens: i64 = conn
-                .query_row(
-                    "SELECT COALESCE(SUM(total_tokens), 0) FROM model_usage_stats WHERE date = ?",
-                    [day_key.clone()],
-                    |row| row.get(0),
-                )
+            let day_tokens = OrchestratorDao::get_model_usage_tokens_on(conn, &day_key)
                 .map_err(|e| format!("查询模型日 Token 失败: {e}"))?;
 
             clamp_i64_to_u64(day_tokens)
@@ -751,7 +598,10 @@ pub fn get_daily_usage_trends_from_db(
 
 #[cfg(test)]
 mod tests {
-    use super::{query_agent_chat_stats, query_general_chat_stats, start_of_day, start_of_month};
+    use super::{
+        get_model_usage_ranking_from_db, query_agent_chat_stats, query_general_chat_stats,
+        start_of_day, start_of_month,
+    };
     use chrono::{Local, TimeZone};
     use rusqlite::{params, Connection};
 
@@ -896,5 +746,61 @@ mod tests {
         assert_eq!(general_stats.total_messages, 0);
         assert_eq!(general_stats.monthly_conversations, 0);
         assert_eq!(general_stats.today_messages, 0);
+    }
+
+    #[test]
+    fn model_usage_ranking_fallback_should_only_include_non_general_models() {
+        let conn = Connection::open_in_memory().expect("open in memory db");
+        create_test_schema(&conn);
+
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params![
+                "general-1",
+                "general:default",
+                "通用会话",
+                "2026-03-12T10:00:00+08:00",
+                "2026-03-12T10:00:00+08:00"
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_sessions (id, model, system_prompt, title, created_at, updated_at) VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params![
+                "agent-1",
+                "claude-sonnet-4",
+                "Agent 会话",
+                "2026-03-12T10:05:00+08:00",
+                "2026-03-12T10:05:00+08:00"
+            ],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                "general-1",
+                "user",
+                r#"[{"type":"text","text":"这条 general 消息不应进入 Agent 排行"}]"#,
+                "2026-03-12T10:00:00+08:00"
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_messages (session_id, role, content_json, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                "agent-1",
+                "assistant",
+                r#"[{"type":"text","text":"这是 agent 模型排行候选"}]"#,
+                "2026-03-12T10:05:00+08:00"
+            ],
+        )
+        .unwrap();
+
+        let ranking = get_model_usage_ranking_from_db("all", &conn).expect("load ranking");
+        assert_eq!(ranking.len(), 1);
+        assert_eq!(ranking[0].model, "claude-sonnet-4");
+        assert_eq!(ranking[0].conversations, 1);
+        assert!(ranking[0].tokens > 0);
     }
 }

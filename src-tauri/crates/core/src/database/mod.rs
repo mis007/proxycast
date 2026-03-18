@@ -14,6 +14,13 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+/// 进程内共享的 SQLite 连接。
+///
+/// 注意：
+/// - `DbConnection` 底层是单个 `Mutex<Connection>`，不支持同调用链重入获取锁。
+/// - 持有 `lock_db()` / `db.lock()` 返回的 guard 时，不要再调用会再次依赖
+///   `DbConnection` 的 manager / service / wrapper。
+/// - 如果调用方已经拿到了 `&Connection`，优先沿用该连接向下传递。
 pub type DbConnection = Arc<Mutex<Connection>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

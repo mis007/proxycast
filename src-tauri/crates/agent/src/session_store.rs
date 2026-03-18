@@ -11,6 +11,8 @@ use lime_core::database::dao::agent_timeline::{
 };
 use lime_core::database::DbConnection;
 use lime_core::workspace::WorkspaceManager;
+use lime_services::aster_session_store::LimeSessionStore;
+use rusqlite::{Connection, OptionalExtension};
 use uuid::Uuid;
 
 use crate::event_converter::{TauriMessage, TauriMessageContent};
@@ -29,6 +31,9 @@ pub struct SessionInfo {
     pub updated_at: i64,
     pub messages_count: usize,
     pub execution_strategy: Option<String>,
+    pub model: Option<String>,
+    pub working_dir: Option<String>,
+    pub workspace_id: Option<String>,
 }
 
 /// 会话详情（包含消息）
@@ -39,10 +44,160 @@ pub struct SessionDetail {
     pub created_at: i64,
     pub updated_at: i64,
     pub thread_id: String,
+    pub model: Option<String>,
+    pub working_dir: Option<String>,
+    pub workspace_id: Option<String>,
     pub messages: Vec<TauriMessage>,
     pub execution_strategy: Option<String>,
     pub turns: Vec<AgentThreadTurn>,
     pub items: Vec<AgentThreadItem>,
+}
+
+/// 兼容旧 Agent API 的会话摘要
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CompatSessionInfo {
+    pub session_id: String,
+    pub provider_type: String,
+    pub model: Option<String>,
+    pub title: Option<String>,
+    pub created_at: String,
+    pub last_activity: String,
+    pub messages_count: usize,
+    pub workspace_id: Option<String>,
+    pub working_dir: Option<String>,
+    pub execution_strategy: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CreateSessionRecordInput {
+    pub session_id: Option<String>,
+    pub title: Option<String>,
+    pub model: Option<String>,
+    pub system_prompt: Option<String>,
+    pub working_dir: Option<String>,
+    pub workspace_id: Option<String>,
+    pub execution_strategy: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PersistedSessionMetadata {
+    pub system_prompt: Option<String>,
+    pub working_dir: Option<String>,
+    pub execution_strategy: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionTitlePreviewMessage {
+    pub role: String,
+    pub content: String,
+}
+
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    let trimmed = value?.trim().to_string();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+fn normalize_optional_nonempty_body(value: Option<String>) -> Option<String> {
+    let text = value?;
+    if text.trim().is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
+fn load_agent_session_record(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Option<AgentSession>, String> {
+    AgentDao::get_session(conn, session_id).map_err(|e| format!("获取会话失败: {e}"))
+}
+
+fn load_agent_session_messages(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Vec<AgentMessage>, String> {
+    AgentDao::get_messages(conn, session_id).map_err(|e| format!("获取消息失败: {e}"))
+}
+
+fn resolve_workspace_id_by_working_dir(
+    conn: &Connection,
+    working_dir: Option<&str>,
+) -> Option<String> {
+    let resolved_working_dir = working_dir?.trim();
+    if resolved_working_dir.is_empty() {
+        return None;
+    }
+
+    match conn
+        .query_row(
+            "SELECT id FROM workspaces WHERE root_path = ? LIMIT 1",
+            [resolved_working_dir],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+    {
+        Ok(workspace_id) => workspace_id,
+        Err(error) => {
+            tracing::warn!(
+                "[SessionStore] 解析 workspace_id 失败，已降级忽略: working_dir={}, error={}",
+                resolved_working_dir,
+                error
+            );
+            None
+        }
+    }
+}
+
+fn build_runtime_session_info(
+    conn: &Connection,
+    session: AgentSession,
+    messages_count: usize,
+) -> SessionInfo {
+    let working_dir = session.working_dir.clone();
+    let workspace_id = resolve_workspace_id_by_working_dir(conn, working_dir.as_deref());
+
+    SessionInfo {
+        id: session.id,
+        name: session.title.unwrap_or_else(|| "未命名".to_string()),
+        created_at: chrono::DateTime::parse_from_rfc3339(&session.created_at)
+            .map(|dt| dt.timestamp())
+            .unwrap_or(0),
+        updated_at: chrono::DateTime::parse_from_rfc3339(&session.updated_at)
+            .map(|dt| dt.timestamp())
+            .unwrap_or(0),
+        messages_count,
+        execution_strategy: session.execution_strategy,
+        model: Some(session.model),
+        working_dir,
+        workspace_id,
+    }
+}
+
+fn build_compat_session_info(
+    conn: &Connection,
+    session: AgentSession,
+    messages_count: usize,
+) -> CompatSessionInfo {
+    let working_dir = session.working_dir.clone();
+    let workspace_id = resolve_workspace_id_by_working_dir(conn, working_dir.as_deref());
+
+    CompatSessionInfo {
+        session_id: session.id,
+        provider_type: "aster".to_string(),
+        model: Some(session.model),
+        title: session.title,
+        created_at: session.created_at,
+        last_activity: session.updated_at,
+        messages_count,
+        workspace_id,
+        working_dir,
+        execution_strategy: session.execution_strategy,
+    }
 }
 
 /// 解析会话 working_dir（优先入参，其次 workspace_id）
@@ -79,6 +234,50 @@ fn normalize_execution_strategy(execution_strategy: Option<String>) -> String {
     }
 }
 
+fn resolve_optional_session_working_dir(
+    db: &DbConnection,
+    working_dir: Option<String>,
+    workspace_id: Option<String>,
+) -> Result<Option<String>, String> {
+    if let Some(path) = normalize_optional_text(working_dir) {
+        return Ok(Some(path));
+    }
+
+    if let Some(workspace_id) = normalize_optional_text(workspace_id) {
+        return resolve_session_working_dir(db, None, workspace_id);
+    }
+
+    Ok(None)
+}
+
+/// 创建并持久化会话记录
+pub fn create_session_record_sync(
+    db: &DbConnection,
+    input: CreateSessionRecordInput,
+) -> Result<AgentSession, String> {
+    let now = Utc::now().to_rfc3339();
+    let session = AgentSession {
+        id: normalize_optional_text(input.session_id).unwrap_or_else(|| Uuid::new_v4().to_string()),
+        model: normalize_optional_text(input.model).unwrap_or_else(|| "agent:default".to_string()),
+        messages: Vec::new(),
+        system_prompt: normalize_optional_nonempty_body(input.system_prompt),
+        title: normalize_optional_text(input.title),
+        working_dir: resolve_optional_session_working_dir(
+            db,
+            input.working_dir,
+            input.workspace_id,
+        )?,
+        execution_strategy: Some(normalize_execution_strategy(input.execution_strategy)),
+        created_at: now.clone(),
+        updated_at: now,
+    };
+
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    AgentDao::create_session(&conn, &session).map_err(|e| format!("创建会话失败: {e}"))?;
+
+    Ok(session)
+}
+
 /// 创建新会话
 pub fn create_session_sync(
     db: &DbConnection,
@@ -87,32 +286,18 @@ pub fn create_session_sync(
     workspace_id: String,
     execution_strategy: Option<String>,
 ) -> Result<String, String> {
-    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-    let session_name = name.unwrap_or_else(|| "新对话".to_string());
-    let session_id = Uuid::new_v4().to_string();
-    let now = Utc::now().to_rfc3339();
-    drop(conn);
+    let session = create_session_record_sync(
+        db,
+        CreateSessionRecordInput {
+            title: Some(normalize_optional_text(name).unwrap_or_else(|| "新对话".to_string())),
+            working_dir,
+            workspace_id: Some(workspace_id),
+            execution_strategy,
+            ..CreateSessionRecordInput::default()
+        },
+    )?;
 
-    let resolved_working_dir = resolve_session_working_dir(db, working_dir, workspace_id)?;
-    let normalized_execution_strategy = normalize_execution_strategy(execution_strategy);
-
-    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-
-    let session = AgentSession {
-        id: session_id.clone(),
-        model: "agent:default".to_string(),
-        messages: Vec::new(),
-        system_prompt: None,
-        title: Some(session_name),
-        working_dir: resolved_working_dir,
-        execution_strategy: Some(normalized_execution_strategy),
-        created_at: now.clone(),
-        updated_at: now,
-    };
-
-    AgentDao::create_session(&conn, &session).map_err(|e| format!("创建会话失败: {e}"))?;
-
-    Ok(session_id)
+    Ok(session.id)
 }
 
 /// 列出所有会话
@@ -125,18 +310,58 @@ pub fn list_sessions_sync(db: &DbConnection) -> Result<Vec<SessionInfo>, String>
         .into_iter()
         .map(|session| {
             let messages_count = AgentDao::get_message_count(&conn, &session.id).unwrap_or(0);
-            SessionInfo {
-                id: session.id,
-                name: session.title.unwrap_or_else(|| "未命名".to_string()),
-                created_at: chrono::DateTime::parse_from_rfc3339(&session.created_at)
-                    .map(|dt| dt.timestamp())
-                    .unwrap_or(0),
-                updated_at: chrono::DateTime::parse_from_rfc3339(&session.updated_at)
-                    .map(|dt| dt.timestamp())
-                    .unwrap_or(0),
-                messages_count,
-                execution_strategy: session.execution_strategy,
-            }
+            build_runtime_session_info(&conn, session, messages_count)
+        })
+        .collect())
+}
+
+/// 列出兼容旧 Agent API 的会话摘要
+pub fn list_compat_sessions_sync(db: &DbConnection) -> Result<Vec<CompatSessionInfo>, String> {
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    let sessions = AgentDao::list_sessions(&conn).map_err(|e| format!("获取会话列表失败: {e}"))?;
+
+    Ok(sessions
+        .into_iter()
+        .map(|session| {
+            let messages_count = AgentDao::get_message_count(&conn, &session.id).unwrap_or(0);
+            build_compat_session_info(&conn, session, messages_count)
+        })
+        .collect())
+}
+
+pub fn get_persisted_session_metadata_sync(
+    db: &DbConnection,
+    session_id: &str,
+) -> Result<Option<PersistedSessionMetadata>, String> {
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    let session = load_agent_session_record(&conn, session_id)?;
+
+    Ok(session.map(|session| PersistedSessionMetadata {
+        system_prompt: session.system_prompt,
+        working_dir: session.working_dir,
+        execution_strategy: session.execution_strategy,
+    }))
+}
+
+pub fn list_title_preview_messages_sync(
+    db: &DbConnection,
+    session_id: &str,
+    limit: usize,
+) -> Result<Vec<SessionTitlePreviewMessage>, String> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    let messages = load_agent_session_messages(&conn, session_id)?;
+
+    Ok(messages
+        .into_iter()
+        .filter(|msg| msg.role == "user" || msg.role == "assistant")
+        .take(limit)
+        .map(|msg| SessionTitlePreviewMessage {
+            role: msg.role,
+            content: msg.content.as_text(),
         })
         .collect())
 }
@@ -145,16 +370,16 @@ pub fn list_sessions_sync(db: &DbConnection) -> Result<Vec<SessionInfo>, String>
 pub fn get_session_sync(db: &DbConnection, session_id: &str) -> Result<SessionDetail, String> {
     let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
 
-    let session = AgentDao::get_session(&conn, session_id)
-        .map_err(|e| format!("获取会话失败: {e}"))?
+    let session = load_agent_session_record(&conn, session_id)?
         .ok_or_else(|| format!("会话不存在: {session_id}"))?;
 
-    let messages =
-        AgentDao::get_messages(&conn, session_id).map_err(|e| format!("获取消息失败: {e}"))?;
+    let messages = load_agent_session_messages(&conn, session_id)?;
     let turns = AgentTimelineDao::list_turns_by_thread(&conn, session_id)
         .map_err(|e| format!("获取 turn 历史失败: {e}"))?;
     let items = AgentTimelineDao::list_items_by_thread(&conn, session_id)
         .map_err(|e| format!("获取 item 历史失败: {e}"))?;
+    let working_dir = session.working_dir.clone();
+    let workspace_id = resolve_workspace_id_by_working_dir(&conn, working_dir.as_deref());
 
     let tauri_messages = convert_agent_messages(&messages, Some(session.model.as_str()));
 
@@ -174,11 +399,28 @@ pub fn get_session_sync(db: &DbConnection, session_id: &str) -> Result<SessionDe
             .map(|dt| dt.timestamp())
             .unwrap_or(0),
         thread_id: session_id.to_string(),
+        model: Some(session.model),
+        working_dir,
+        workspace_id,
         messages: tauri_messages,
         execution_strategy: session.execution_strategy,
         turns,
         items,
     })
+}
+
+/// 获取兼容旧 Agent API 的单个会话摘要
+pub fn get_compat_session_sync(
+    db: &DbConnection,
+    session_id: &str,
+) -> Result<CompatSessionInfo, String> {
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    let session = load_agent_session_record(&conn, session_id)?
+        .ok_or_else(|| format!("会话不存在: {session_id}"))?;
+
+    let messages_count = AgentDao::get_message_count(&conn, session_id).unwrap_or(0);
+
+    Ok(build_compat_session_info(&conn, session, messages_count))
 }
 
 /// 重命名会话
@@ -199,11 +441,39 @@ pub fn rename_session_sync(db: &DbConnection, session_id: &str, name: &str) -> R
     Ok(())
 }
 
-/// 删除会话
-pub fn delete_session_sync(db: &DbConnection, session_id: &str) -> Result<(), String> {
+pub fn update_session_working_dir_sync(
+    db: &DbConnection,
+    session_id: &str,
+    working_dir: &str,
+) -> Result<(), String> {
+    let trimmed_working_dir = working_dir.trim();
+    if trimmed_working_dir.is_empty() {
+        return Err("working_dir 不能为空".to_string());
+    }
+
     let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
-    AgentDao::delete_session(&conn, session_id).map_err(|e| format!("删除会话失败: {e}"))?;
+    AgentDao::update_working_dir(&conn, session_id, trimmed_working_dir)
+        .map_err(|e| format!("更新 session working_dir 失败: {e}"))?;
+
     Ok(())
+}
+
+pub fn update_session_execution_strategy_sync(
+    db: &DbConnection,
+    session_id: &str,
+    execution_strategy: &str,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("数据库锁定失败: {e}"))?;
+    AgentDao::update_execution_strategy(&conn, session_id, execution_strategy)
+        .map_err(|e| format!("更新会话执行策略失败: {e}"))?;
+    Ok(())
+}
+
+/// 删除会话
+pub async fn delete_session(db: &DbConnection, session_id: &str) -> Result<(), String> {
+    aster::session::SessionStore::delete_session(&LimeSessionStore::new(db.clone()), session_id)
+        .await
+        .map_err(|e| format!("删除会话失败: {e}"))
 }
 
 fn parse_tool_call_arguments(arguments: &str) -> serde_json::Value {
@@ -379,8 +649,9 @@ fn convert_agent_message(
 mod tests {
     use super::*;
     use lime_core::agent::types::{FunctionCall, ImageUrl, ToolCall};
+    use lime_core::database::{schema, DbConnection};
     use std::ffi::OsString;
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::{Arc, Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -412,6 +683,57 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn create_test_db() -> DbConnection {
+        let conn = rusqlite::Connection::open_in_memory().expect("open in-memory db");
+        schema::create_tables(&conn).expect("create tables");
+        Arc::new(Mutex::new(conn))
+    }
+
+    fn insert_test_workspace(db: &DbConnection, workspace_id: &str, root_path: &str) {
+        let conn = db.lock().expect("lock db");
+        conn.execute(
+            "INSERT INTO workspaces (id, name, workspace_type, root_path, is_default, settings_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 0, '{}', 0, 0)",
+            rusqlite::params![workspace_id, "测试工作区", "general", root_path],
+        )
+        .expect("insert workspace");
+    }
+
+    fn insert_test_session_with_message(
+        db: &DbConnection,
+        session_id: &str,
+        working_dir: &str,
+        message_text: &str,
+    ) {
+        create_session_record_sync(
+            db,
+            CreateSessionRecordInput {
+                session_id: Some(session_id.to_string()),
+                title: Some("测试会话".to_string()),
+                model: Some("agent:test".to_string()),
+                working_dir: Some(working_dir.to_string()),
+                execution_strategy: Some("react".to_string()),
+                ..CreateSessionRecordInput::default()
+            },
+        )
+        .expect("create session");
+
+        let conn = db.lock().expect("lock db");
+        AgentDao::add_message(
+            &conn,
+            session_id,
+            &AgentMessage {
+                role: "user".to_string(),
+                content: MessageContent::Text(message_text.to_string()),
+                timestamp: "2026-03-18T08:00:00Z".to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+                reasoning_content: None,
+            },
+        )
+        .expect("add message");
     }
 
     #[test]
@@ -620,5 +942,140 @@ mod tests {
             .as_object()
             .expect("offloaded request should be object");
         assert!(record.contains_key(crate::tool_io_offload::LIME_TOOL_ARGUMENTS_OFFLOAD_KEY));
+    }
+
+    #[test]
+    fn list_sessions_sync_should_resolve_workspace_id_from_working_dir() {
+        let db = create_test_db();
+        insert_test_workspace(&db, "workspace-1", "/tmp/lime-workspace-1");
+        insert_test_session_with_message(&db, "session-1", "/tmp/lime-workspace-1", "你好，世界");
+
+        let sessions = list_sessions_sync(&db).expect("list sessions");
+        let session = sessions
+            .iter()
+            .find(|item| item.id == "session-1")
+            .expect("session exists");
+
+        assert_eq!(session.workspace_id.as_deref(), Some("workspace-1"));
+        assert_eq!(
+            session.working_dir.as_deref(),
+            Some("/tmp/lime-workspace-1")
+        );
+        assert_eq!(session.messages_count, 1);
+    }
+
+    #[test]
+    fn get_session_sync_should_resolve_workspace_id_from_working_dir() {
+        let db = create_test_db();
+        insert_test_workspace(&db, "workspace-2", "/tmp/lime-workspace-2");
+        insert_test_session_with_message(&db, "session-2", "/tmp/lime-workspace-2", "继续处理");
+
+        let detail = get_session_sync(&db, "session-2").expect("get session");
+
+        assert_eq!(detail.workspace_id.as_deref(), Some("workspace-2"));
+        assert_eq!(detail.working_dir.as_deref(), Some("/tmp/lime-workspace-2"));
+        assert_eq!(detail.messages.len(), 1);
+    }
+
+    #[test]
+    fn update_session_working_dir_sync_should_refresh_workspace_binding() {
+        let db = create_test_db();
+        insert_test_workspace(&db, "workspace-3", "/tmp/lime-workspace-3");
+        insert_test_workspace(&db, "workspace-4", "/tmp/lime-workspace-4");
+        insert_test_session_with_message(&db, "session-3", "/tmp/lime-workspace-3", "切换目录");
+
+        update_session_working_dir_sync(&db, "session-3", "/tmp/lime-workspace-4")
+            .expect("update working_dir");
+
+        let detail = get_session_sync(&db, "session-3").expect("get session");
+        assert_eq!(detail.working_dir.as_deref(), Some("/tmp/lime-workspace-4"));
+        assert_eq!(detail.workspace_id.as_deref(), Some("workspace-4"));
+    }
+
+    #[test]
+    fn list_title_preview_messages_sync_should_only_keep_chat_roles() {
+        let db = create_test_db();
+        create_session_record_sync(
+            &db,
+            CreateSessionRecordInput {
+                session_id: Some("session-title".to_string()),
+                title: Some("测试标题".to_string()),
+                model: Some("agent:test".to_string()),
+                execution_strategy: Some("react".to_string()),
+                ..CreateSessionRecordInput::default()
+            },
+        )
+        .expect("create session");
+
+        let conn = db.lock().expect("lock db");
+        AgentDao::add_message(
+            &conn,
+            "session-title",
+            &AgentMessage {
+                role: "system".to_string(),
+                content: MessageContent::Text("忽略这条系统消息".to_string()),
+                timestamp: "2026-03-18T08:00:00Z".to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+                reasoning_content: None,
+            },
+        )
+        .expect("add system message");
+        AgentDao::add_message(
+            &conn,
+            "session-title",
+            &AgentMessage {
+                role: "user".to_string(),
+                content: MessageContent::Text("第一条用户消息".to_string()),
+                timestamp: "2026-03-18T08:01:00Z".to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+                reasoning_content: None,
+            },
+        )
+        .expect("add user message");
+        AgentDao::add_message(
+            &conn,
+            "session-title",
+            &AgentMessage {
+                role: "assistant".to_string(),
+                content: MessageContent::Text("第一条助手消息".to_string()),
+                timestamp: "2026-03-18T08:02:00Z".to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+                reasoning_content: None,
+            },
+        )
+        .expect("add assistant message");
+        AgentDao::add_message(
+            &conn,
+            "session-title",
+            &AgentMessage {
+                role: "tool".to_string(),
+                content: MessageContent::Text("忽略工具输出".to_string()),
+                timestamp: "2026-03-18T08:03:00Z".to_string(),
+                tool_calls: None,
+                tool_call_id: Some("tool-1".to_string()),
+                reasoning_content: None,
+            },
+        )
+        .expect("add tool message");
+        drop(conn);
+
+        let preview =
+            list_title_preview_messages_sync(&db, "session-title", 4).expect("load preview");
+        assert_eq!(
+            preview,
+            vec![
+                SessionTitlePreviewMessage {
+                    role: "user".to_string(),
+                    content: "第一条用户消息".to_string(),
+                },
+                SessionTitlePreviewMessage {
+                    role: "assistant".to_string(),
+                    content: "第一条助手消息".to_string(),
+                },
+            ]
+        );
     }
 }

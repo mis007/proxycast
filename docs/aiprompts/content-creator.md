@@ -9,7 +9,9 @@
 ```
 用户选择主题 → AgentChatPage 生成 systemPrompt
      ↓
-用户发送消息 → useAgentChat.sendMessage()
+用户发送消息 → useAgentChatUnified.sendMessage()
+     ↓
+统一收口到 useAsterAgentChat / agent_runtime_*
      ↓
 第一条消息时注入 systemPrompt → 发送到 Aster Agent
      ↓
@@ -38,7 +40,8 @@ src/components/
 │       └── parser.ts            # A2UI 和 write_file 解析器
 ├── agent/chat/
 │   ├── hooks/
-│   │   └── useAgentChat.ts      # Agent 聊天 Hook
+│   │   ├── index.ts             # useAgentChatUnified 统一入口
+│   │   └── useAsterAgentChat.ts # Agent 聊天主 Hook
 │   ├── components/
 │   │   ├── StreamingRenderer.tsx # 流式渲染（解析 write_file）
 │   │   └── MessageList.tsx      # 消息列表
@@ -116,12 +119,12 @@ export function parseAIResponse(
 - `write_file` - 完整的文件写入
 - `pending_write_file` - 流式传输中的文件写入
 
-### 3. useAgentChat.ts - systemPrompt 注入
+### 3. useAgentChatUnified / useAsterAgentChat - systemPrompt 注入
 
-在发送第一条消息时注入 systemPrompt。
+在发送第一条消息时注入 systemPrompt，并通过现役 runtime adapter 提交到 `agent_runtime_*`。
 
 ```typescript
-// src/components/agent/chat/hooks/useAgentChat.ts
+// src/components/agent/chat/hooks/useAsterAgentChat.ts
 
 interface UseAgentChatOptions {
   systemPrompt?: string;
@@ -137,7 +140,13 @@ const sendMessage = async (content: string, ...) => {
     messageToSend = `${systemPrompt}\n\n---\n\n用户请求：${content}`;
   }
 
-  await sendAsterMessageStream(messageToSend, ...);
+  await runtime.submitTurn({
+    message: messageToSend,
+    sessionId,
+    eventName,
+    workspaceId,
+    systemPrompt,
+  });
 };
 ```
 
@@ -225,7 +234,7 @@ const handleWriteFile = useCallback(
 
 ### Aster 框架限制
 
-Aster 框架的 `SessionConfig` 不支持 session 级别的 system prompt，因此采用**消息注入**方案：
+Aster 框架的 `SessionConfig` 不支持 session 级别的 system prompt，因此现役主链采用**消息注入**方案：
 
 - 在第一条用户消息前注入 systemPrompt
 - 后续消息不再注入（避免重复）

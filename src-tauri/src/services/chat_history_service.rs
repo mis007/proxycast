@@ -1,6 +1,7 @@
+use crate::database::dao::agent::{AgentDao, AgentModelPatternMatch};
 use crate::database::load_pending_general_messages;
 use chrono::{Local, TimeZone};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use std::collections::HashSet;
 
 const GENERAL_MODE_PATTERN: &str = "general:%";
@@ -96,49 +97,26 @@ fn load_unified_general_candidates(
     let from_datetime = from_timestamp.map(format_sqlite_datetime);
     let to_datetime = to_timestamp.map(format_sqlite_datetime);
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT m.session_id, m.role, m.content_json, m.timestamp
-             FROM agent_messages m
-             JOIN agent_sessions s ON s.id = m.session_id
-             WHERE s.model LIKE ?1
-               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-               AND (?3 IS NULL OR datetime(m.timestamp) <= datetime(?3))
-             ORDER BY datetime(m.timestamp) DESC
-             LIMIT ?4",
-        )
-        .map_err(|e| format!("查询 unified general agent_messages 失败: {e}"))?;
+    let rows = AgentDao::list_message_text_rows_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::Like,
+        from_datetime.as_deref(),
+        to_datetime.as_deref(),
+        limit,
+    )
+    .map_err(|e| format!("读取 unified general agent_messages 失败: {e}"))?;
 
-    let rows = stmt
-        .query_map(
-            params![
-                GENERAL_MODE_PATTERN,
-                from_datetime,
-                to_datetime,
-                limit as i64
-            ],
-            |row| {
-                let session_id: String = row.get(0)?;
-                let role: String = row.get(1)?;
-                let content_json: String = row.get(2)?;
-                let timestamp: String = row.get(3)?;
-                Ok((session_id, role, content_json, timestamp))
-            },
-        )
-        .map_err(|e| format!("读取 unified general agent_messages 失败: {e}"))?;
-
-    for row in rows.flatten() {
-        if let Some(timestamp_ms) = parse_rfc3339_to_timestamp(&row.3) {
-            push_candidate(
-                candidates,
-                seen,
-                row.0,
-                row.1,
-                extract_text_from_content_json(&row.2),
-                timestamp_ms,
-                min_message_length,
-            );
-        }
+    for row in rows {
+        push_candidate(
+            candidates,
+            seen,
+            row.session_id,
+            row.role,
+            row.content,
+            row.timestamp_ms,
+            min_message_length,
+        );
     }
 
     Ok(())
@@ -156,49 +134,26 @@ fn load_non_general_agent_candidates(
     let from_datetime = from_timestamp.map(format_sqlite_datetime);
     let to_datetime = to_timestamp.map(format_sqlite_datetime);
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT m.session_id, m.role, m.content_json, m.timestamp
-             FROM agent_messages m
-             JOIN agent_sessions s ON s.id = m.session_id
-             WHERE s.model NOT LIKE ?1
-               AND (?2 IS NULL OR datetime(m.timestamp) >= datetime(?2))
-               AND (?3 IS NULL OR datetime(m.timestamp) <= datetime(?3))
-             ORDER BY datetime(m.timestamp) DESC
-             LIMIT ?4",
-        )
-        .map_err(|e| format!("查询非通用 agent_messages 失败: {e}"))?;
+    let rows = AgentDao::list_message_text_rows_by_model_pattern(
+        conn,
+        GENERAL_MODE_PATTERN,
+        AgentModelPatternMatch::NotLike,
+        from_datetime.as_deref(),
+        to_datetime.as_deref(),
+        limit,
+    )
+    .map_err(|e| format!("读取非通用 agent_messages 失败: {e}"))?;
 
-    let rows = stmt
-        .query_map(
-            params![
-                GENERAL_MODE_PATTERN,
-                from_datetime,
-                to_datetime,
-                limit as i64
-            ],
-            |row| {
-                let session_id: String = row.get(0)?;
-                let role: String = row.get(1)?;
-                let content_json: String = row.get(2)?;
-                let timestamp: String = row.get(3)?;
-                Ok((session_id, role, content_json, timestamp))
-            },
-        )
-        .map_err(|e| format!("读取非通用 agent_messages 失败: {e}"))?;
-
-    for row in rows.flatten() {
-        if let Some(timestamp_ms) = parse_rfc3339_to_timestamp(&row.3) {
-            push_candidate(
-                candidates,
-                seen,
-                row.0,
-                row.1,
-                extract_text_from_content_json(&row.2),
-                timestamp_ms,
-                min_message_length,
-            );
-        }
+    for row in rows {
+        push_candidate(
+            candidates,
+            seen,
+            row.session_id,
+            row.role,
+            row.content,
+            row.timestamp_ms,
+            min_message_length,
+        );
     }
 
     Ok(())
@@ -267,76 +222,6 @@ fn format_sqlite_datetime(timestamp_ms: i64) -> String {
         .single()
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
         .unwrap_or_else(|| Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
-}
-
-fn parse_rfc3339_to_timestamp(value: &str) -> Option<i64> {
-    chrono::DateTime::parse_from_rfc3339(value)
-        .ok()
-        .map(|dt| dt.timestamp_millis())
-        .or_else(|| parse_datetime_or_timestamp_to_millis(value))
-}
-
-fn parse_datetime_or_timestamp_to_millis(value: &str) -> Option<i64> {
-    if let Ok(v) = value.parse::<i64>() {
-        if v > 1_000_000_000_000 {
-            return Some(v);
-        }
-        return Some(v * 1000);
-    }
-
-    chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .and_then(|naive| {
-            Local
-                .from_local_datetime(&naive)
-                .single()
-                .map(|dt| dt.timestamp_millis())
-        })
-}
-
-fn extract_text_from_content_json(content_json: &str) -> String {
-    if let Ok(text) = serde_json::from_str::<String>(content_json) {
-        return text;
-    }
-
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(content_json) {
-        match value {
-            serde_json::Value::Array(items) => {
-                let texts = items
-                    .iter()
-                    .filter_map(extract_text_from_json_item)
-                    .collect::<Vec<_>>();
-                if !texts.is_empty() {
-                    return texts.join(" ");
-                }
-            }
-            serde_json::Value::Object(_) => {
-                if let Some(text) = extract_text_from_json_item(&value) {
-                    return text;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    content_json.to_string()
-}
-
-fn extract_text_from_json_item(value: &serde_json::Value) -> Option<String> {
-    if let Some(text) = value.get("Text").and_then(|v| v.as_str()) {
-        return Some(text.to_string());
-    }
-
-    if value.get("type").and_then(|v| v.as_str()) == Some("text") {
-        if let Some(text) = value.get("text").and_then(|v| v.as_str()) {
-            return Some(text.to_string());
-        }
-    }
-
-    value
-        .get("text")
-        .and_then(|v| v.as_str())
-        .map(|v| v.to_string())
 }
 
 #[cfg(test)]

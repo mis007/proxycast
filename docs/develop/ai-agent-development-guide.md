@@ -382,48 +382,24 @@ pub struct TokenUsage {
 ### 5.2 前端状态同步
 
 ```typescript
-// 历史示例：现代实现请优先使用
-// `src/lib/api/agentRuntime.ts` + `src/lib/api/agentStream.ts`
-// 不要在业务层直接 invoke Agent/Aster 命令。
+// 当前仓库的事实源是 Hook + runtime adapter，而不是根 store barrel。
+// 推荐边界：
+// - 会话 / turn / action：`src/lib/api/agentRuntime.ts`
+// - 流式协议：`src/lib/api/agentStream.ts`
+// - 前端主链：`useAgentChatUnified -> useAsterAgentChat`
+// - 已删除旧入口：`useAgentChat`、`useAgentStore`
 
-interface AgentState {
-  // Agent 定义
-  agents: AgentDefinition[];
-  currentAgent: string | null;
+const chat = useAsterAgentChat({
+  workspaceId,
+  systemPrompt,
+});
 
-  // 运行状态
-  isRunning: boolean;
-  phase: AgentPhase;
-  messages: Message[];
+await chat.sendMessage("请分析当前项目结构", []);
 
-  // 统计
-  tokenUsage: TokenUsage;
-  toolCallCount: number;
-}
-
-// 使用 Zustand 管理状态
-export const useAgentStore = create<AgentState>((set, get) => ({
-  // 初始状态
-  agents: [],
-  currentAgent: null,
-  isRunning: false,
-  phase: "idle",
-  messages: [],
-  tokenUsage: { input: 0, output: 0 },
-  toolCallCount: 0,
-
-  // Actions
-  startAgent: async (agentId: string, input: string) => {
-    set({ isRunning: true, phase: "thinking" });
-    // 调用 Tauri 命令
-    await invoke("run_agent", { agentId, input });
-  },
-
-  stopAgent: async () => {
-    await invoke("stop_agent");
-    set({ isRunning: false, phase: "idle" });
-  },
-}));
+// 如需更低层的 API 边界，统一走 agent_runtime_*：
+// - createAgentRuntimeSession()
+// - submitAgentRuntimeTurn()
+// - respondAgentRuntimeAction()
 ```
 
 ---

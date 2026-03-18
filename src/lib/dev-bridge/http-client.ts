@@ -5,6 +5,11 @@
  * 通过 HTTP 与运行中的 Tauri 后端通信。
  */
 
+import {
+  hasTauriInvokeCapability,
+  hasTauriRuntimeMarkers,
+} from "@/lib/tauri-runtime";
+
 const BRIDGE_URL = "http://127.0.0.1:3030/invoke";
 const BRIDGE_HEALTH_URL = "http://127.0.0.1:3030/health";
 
@@ -79,7 +84,8 @@ export function isDevBridgeAvailable(): boolean {
   // 检查是否在浏览器环境（非 Tauri webview）
   const isBrowser =
     typeof window !== "undefined" &&
-    !(window as any).__TAURI__ &&
+    !hasTauriRuntimeMarkers() &&
+    !hasTauriInvokeCapability() &&
     // 进一步检查是否在开发模式
     (import.meta.env.DEV ||
       location.hostname === "localhost" ||
@@ -156,7 +162,7 @@ export interface BridgeStatus {
  * 获取当前桥接状态
  */
 export function getBridgeStatus(): BridgeStatus {
-  const hasTauri = typeof window !== "undefined" && (window as any).__TAURI__;
+  const hasTauri = hasTauriInvokeCapability() || hasTauriRuntimeMarkers();
   const devAvailable = isDevBridgeAvailable();
 
   return {

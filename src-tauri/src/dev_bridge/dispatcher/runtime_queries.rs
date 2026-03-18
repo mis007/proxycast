@@ -1,4 +1,4 @@
-use super::{args_or_default, get_string_arg, parse_nested_arg};
+use super::{args_or_default, parse_nested_arg};
 use crate::dev_bridge::DevBridgeState;
 use serde_json::Value as JsonValue;
 
@@ -70,29 +70,6 @@ pub(super) async fn try_handle(
                 serde_json::json!([])
             }
         }
-        "aster_session_get" => {
-            let args = args_or_default(args);
-            let session_id = get_string_arg(&args, "session_id", "sessionId")?;
-
-            if let Some(db) = &state.db {
-                serde_json::to_value(
-                    crate::agent::AsterAgentWrapper::get_session_sync(db, &session_id)
-                        .map_err(|e| format!("获取 Aster 会话失败: {e}"))?,
-                )?
-            } else {
-                return Err("Database not initialized".into());
-            }
-        }
-        "aster_session_list" => {
-            if let Some(db) = &state.db {
-                serde_json::to_value(
-                    crate::agent::AsterAgentWrapper::list_sessions_sync(db)
-                        .map_err(|e| format!("获取 Aster 会话列表失败: {e}"))?,
-                )?
-            } else {
-                serde_json::json!([])
-            }
-        }
         "report_frontend_crash" => {
             let args = args_or_default(args);
             let report: crate::app::commands::FrontendCrashReport =
@@ -128,6 +105,56 @@ pub(super) async fn try_handle(
                 ),
             );
 
+            serde_json::json!({ "success": true })
+        }
+        "report_frontend_debug_log" => {
+            let args = args_or_default(args);
+            let report: crate::app::commands::FrontendDebugLogReport =
+                parse_nested_arg(&args, "report")?;
+
+            let sanitized_message = crate::logger::sanitize_log_message(&report.message);
+            let sanitized_category = report
+                .category
+                .as_deref()
+                .map(crate::logger::sanitize_log_message)
+                .unwrap_or_else(|| "general".to_string());
+            let level = match report
+                .level
+                .as_deref()
+                .unwrap_or("info")
+                .trim()
+                .to_ascii_lowercase()
+                .as_str()
+            {
+                "debug" => "debug",
+                "warn" | "warning" => "warn",
+                "error" => "error",
+                _ => "info",
+            };
+            let context_preview = report
+                .context
+                .as_ref()
+                .and_then(|context| serde_json::to_string(context).ok())
+                .map(|value| crate::logger::sanitize_log_message(&value))
+                .map(|value| {
+                    const MAX_LEN: usize = 1200;
+                    if value.len() > MAX_LEN {
+                        format!("{}...", &value[..MAX_LEN])
+                    } else {
+                        value
+                    }
+                })
+                .unwrap_or_default();
+
+            let message = if context_preview.is_empty() {
+                format!("[FrontendDebug] category={sanitized_category} message={sanitized_message}")
+            } else {
+                format!(
+                    "[FrontendDebug] category={sanitized_category} message={sanitized_message} context={context_preview}"
+                )
+            };
+
+            state.logs.write().await.add(level, &message);
             serde_json::json!({ "success": true })
         }
         _ => return Ok(None),

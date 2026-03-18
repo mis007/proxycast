@@ -30,8 +30,7 @@ export function useAgentChatUnified(options: UseAgentChatUnifiedOptions) {
   return useAsterAgentChat(options);
 }
 
-// 重新导出原有 hooks，便于直接使用
-export { useAgentChat } from "./useAgentChat";
+// 旧 useAgentChat 已删除，避免新代码继续沿 compat 路径扩展。
 export { useAsterAgentChat } from "./useAsterAgentChat";
 export { useThemeContextWorkspace } from "./useThemeContextWorkspace";
 export { useTopicBranchBoard } from "./useTopicBranchBoard";

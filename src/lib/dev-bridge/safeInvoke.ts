@@ -17,6 +17,13 @@ import {
   normalizeDevBridgeError,
 } from "./http-client";
 import { shouldPreferMockInBrowser } from "./mockPriorityCommands";
+import {
+  getTauriGlobal,
+  hasTauriEventCapability,
+  hasTauriEventListenerCapability,
+  hasTauriInvokeCapability,
+  hasTauriRuntimeMarkers,
+} from "@/lib/tauri-runtime";
 
 export interface InvokeErrorBufferEntry {
   timestamp: string;
@@ -41,6 +48,7 @@ const INVOKE_ERROR_BUFFER_LIMIT = 120;
 const INVOKE_TRACE_BUFFER_KEY = "lime_invoke_trace_buffer_v1";
 const INVOKE_TRACE_BUFFER_LIMIT = 240;
 const INVOKE_ERROR_TEXT_LIMIT = 800;
+const USER_TIMING_PREFIX = "lime:safeInvoke";
 
 const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/\bBearer\s+[A-Za-z0-9._-]+\b/gi, "Bearer ***"],
@@ -100,6 +108,63 @@ function toErrorMessage(error: unknown): string {
     0,
     INVOKE_ERROR_TEXT_LIMIT,
   );
+}
+
+function supportsUserTiming(): boolean {
+  return (
+    typeof performance !== "undefined" &&
+    typeof performance.mark === "function" &&
+    typeof performance.measure === "function"
+  );
+}
+
+function sanitizeTimingLabel(input: string): string {
+  const normalized = input.replace(/[^a-zA-Z0-9:_-]+/g, "_").slice(0, 120);
+  return normalized || "invoke";
+}
+
+function startInvokeTiming(command: string): string | null {
+  if (!supportsUserTiming()) {
+    return null;
+  }
+  const timingId = `${USER_TIMING_PREFIX}:${sanitizeTimingLabel(command)}:${Date.now()}:${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  try {
+    performance.mark(`${timingId}:start`);
+    return timingId;
+  } catch {
+    return null;
+  }
+}
+
+function finishInvokeTiming(
+  timingId: string | null,
+  command: string,
+  transport: InvokeTraceBufferEntry["transport"],
+  status: InvokeTraceBufferEntry["status"],
+): void {
+  if (!timingId || !supportsUserTiming()) {
+    return;
+  }
+
+  const startMark = `${timingId}:start`;
+  const endMark = `${timingId}:end`;
+  const measureName = `${USER_TIMING_PREFIX}:${sanitizeTimingLabel(command)}:${transport}:${status}`;
+
+  try {
+    performance.mark(endMark);
+    performance.measure(measureName, startMark, endMark);
+  } catch {
+    // ignore
+  } finally {
+    try {
+      performance.clearMarks(startMark);
+      performance.clearMarks(endMark);
+    } catch {
+      // ignore
+    }
+  }
 }
 
 function readInvokeErrorBuffer(): InvokeErrorBufferEntry[] {
@@ -279,6 +344,7 @@ export async function safeInvoke<T = any>(
   args?: Record<string, unknown>,
 ): Promise<T> {
   const startedAt = Date.now();
+  const timingId = startInvokeTiming(cmd);
 
   // 1. 优先使用 Tauri IPC (生产环境或 Tauri webview 可用时)
   if (
@@ -291,10 +357,12 @@ export async function safeInvoke<T = any>(
         args,
       )) as T;
       recordInvokeTrace(cmd, args, "tauri-ipc", "success", startedAt);
+      finishInvokeTiming(timingId, cmd, "tauri-ipc", "success");
       return result;
     } catch (error) {
       recordInvokeError(cmd, args, error, "tauri-ipc");
       recordInvokeTrace(cmd, args, "tauri-ipc", "error", startedAt, error);
+      finishInvokeTiming(timingId, cmd, "tauri-ipc", "error");
       throw error;
     }
   }
@@ -304,10 +372,28 @@ export async function safeInvoke<T = any>(
     try {
       const result = (await (window as any).__TAURI__.invoke(cmd, args)) as T;
       recordInvokeTrace(cmd, args, "tauri-legacy", "success", startedAt);
+      finishInvokeTiming(timingId, cmd, "tauri-legacy", "success");
       return result;
     } catch (error) {
       recordInvokeError(cmd, args, error, "tauri-legacy");
       recordInvokeTrace(cmd, args, "tauri-legacy", "error", startedAt, error);
+      finishInvokeTiming(timingId, cmd, "tauri-legacy", "error");
+      throw error;
+    }
+  }
+
+  // Tauri IPC 尚未就绪时不再轮询等待，直接 fall through 到后续通道。
+  // 避免首屏并发大量 safeInvoke 时全部阻塞在 waitForTauriCapability 上。
+  if (hasTauriInvokeCapability()) {
+    try {
+      const result = (await baseInvoke(cmd, args)) as T;
+      recordInvokeTrace(cmd, args, "tauri-ipc", "success", startedAt);
+      finishInvokeTiming(timingId, cmd, "tauri-ipc", "success");
+      return result;
+    } catch (error) {
+      recordInvokeError(cmd, args, error, "tauri-ipc");
+      recordInvokeTrace(cmd, args, "tauri-ipc", "error", startedAt, error);
+      finishInvokeTiming(timingId, cmd, "tauri-ipc", "error");
       throw error;
     }
   }
@@ -317,6 +403,7 @@ export async function safeInvoke<T = any>(
     try {
       const result = (await baseInvoke(cmd, args)) as T;
       recordInvokeTrace(cmd, args, "fallback-invoke", "success", startedAt);
+      finishInvokeTiming(timingId, cmd, "fallback-invoke", "success");
       return result;
     } catch (error) {
       recordInvokeError(cmd, args, error, "fallback-invoke");
@@ -328,6 +415,7 @@ export async function safeInvoke<T = any>(
         startedAt,
         error,
       );
+      finishInvokeTiming(timingId, cmd, "fallback-invoke", "error");
       throw error;
     }
   }
@@ -337,6 +425,7 @@ export async function safeInvoke<T = any>(
     try {
       const result = await invokeViaHttp(cmd, args);
       recordInvokeTrace(cmd, args, "http-bridge", "success", startedAt);
+      finishInvokeTiming(timingId, cmd, "http-bridge", "success");
       return result as T;
     } catch (error) {
       const normalizedError = normalizeDevBridgeError(cmd, error);
@@ -353,6 +442,7 @@ export async function safeInvoke<T = any>(
       try {
         const result = (await baseInvoke(cmd, args)) as T;
         recordInvokeTrace(cmd, args, "fallback-invoke", "success", startedAt);
+        finishInvokeTiming(timingId, cmd, "fallback-invoke", "success");
         return result;
       } catch (fallbackError) {
         recordInvokeError(cmd, args, fallbackError, "fallback-invoke");
@@ -364,6 +454,7 @@ export async function safeInvoke<T = any>(
           startedAt,
           fallbackError,
         );
+        finishInvokeTiming(timingId, cmd, "fallback-invoke", "error");
         throw normalizedError;
       }
     }
@@ -373,10 +464,12 @@ export async function safeInvoke<T = any>(
   try {
     const result = (await baseInvoke(cmd, args)) as T;
     recordInvokeTrace(cmd, args, "fallback-invoke", "success", startedAt);
+    finishInvokeTiming(timingId, cmd, "fallback-invoke", "success");
     return result;
   } catch (error) {
     recordInvokeError(cmd, args, error, "fallback-invoke");
     recordInvokeTrace(cmd, args, "fallback-invoke", "error", startedAt, error);
+    finishInvokeTiming(timingId, cmd, "fallback-invoke", "error");
     throw error;
   }
 }
@@ -389,22 +482,29 @@ export async function safeListen<T = any>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<UnlistenFn> {
-  // 1. 优先使用 Tauri event API
-  if (
-    typeof window !== "undefined" &&
-    (window as any).__TAURI__?.event?.listen
-  ) {
-    return (window as any).__TAURI__.event.listen(event, handler);
+  // 同步检查即可，不轮询等待，避免首屏并发监听全部阻塞
+  if (hasTauriEventListenerCapability()) {
+    try {
+      return await baseListen(event, handler);
+    } catch (error) {
+      if (hasTauriRuntimeMarkers()) {
+        console.warn(`[safeListen] Tauri 事件桥调用失败，跳过监听: ${event}`, error);
+        return () => {};
+      }
+      throw error;
+    }
   }
 
-  // 2. Fallback 到 mock（Vite alias 会替换 @tauri-apps 导入）
+  if (hasTauriRuntimeMarkers()) {
+    console.warn(`[safeListen] Tauri 事件桥未就绪，跳过监听: ${event}`);
+    return () => {};
+  }
+
   return baseListen(event, handler);
 }
 
 export function hasNativeTauriEventSupport(): boolean {
-  return Boolean(
-    typeof window !== "undefined" && (window as any).__TAURI__?.event?.listen,
-  );
+  return hasTauriEventListenerCapability();
 }
 
 /**
@@ -415,12 +515,28 @@ export async function safeEmit(
   event: string,
   payload?: unknown,
 ): Promise<void> {
-  // 1. 优先使用 Tauri event API
-  if (typeof window !== "undefined" && (window as any).__TAURI__?.event?.emit) {
-    return (window as any).__TAURI__.event.emit(event, payload);
+  const tauriGlobal = getTauriGlobal() as
+    | {
+        event?: {
+          emit?: (event: string, payload?: unknown) => Promise<void>;
+        };
+      }
+    | null;
+
+  if (typeof tauriGlobal?.event?.emit === "function") {
+    return tauriGlobal.event.emit(event, payload);
   }
 
-  // 2. Fallback 到 mock
+  // 同步检查，不轮询
+  if (hasTauriEventCapability()) {
+    return baseEmit(event, payload);
+  }
+
+  if (hasTauriRuntimeMarkers()) {
+    console.warn(`[safeEmit] Tauri 事件桥未就绪，跳过发送: ${event}`);
+    return;
+  }
+
   return baseEmit(event, payload);
 }
 

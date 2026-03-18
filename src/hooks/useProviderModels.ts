@@ -6,9 +6,13 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { modelRegistryApi } from "@/lib/api/modelRegistry";
 import { useModelRegistry } from "./useModelRegistry";
 import { useAliasConfig } from "./useAliasConfig";
-import { isAliasProvider } from "@/lib/constants/providerMappings";
+import {
+  getAliasConfigKey,
+  isAliasProvider,
+} from "@/lib/constants/providerMappings";
 import type { ConfiguredProvider } from "./useConfiguredProviders";
 import type {
   EnhancedModelMetadata,
@@ -53,6 +57,10 @@ interface FetchModelsResult {
     | "other"
     | null;
   should_prompt_error?: boolean;
+}
+
+interface LoadProviderModelsOptions {
+  forceRefresh?: boolean;
 }
 
 // ============================================================================
@@ -168,6 +176,165 @@ function convertAliasModelsToMetadata(
   });
 }
 
+function buildLocalProviderModels(
+  selectedProvider: ConfiguredProvider | undefined | null,
+  registryModels: EnhancedModelMetadata[],
+  aliasConfig: ProviderAliasConfig | null,
+): {
+  modelIds: string[];
+  models: EnhancedModelMetadata[];
+  hasLocalModels: boolean;
+} {
+  if (!selectedProvider) {
+    return { modelIds: [], models: [], hasLocalModels: false };
+  }
+
+  let allModels: EnhancedModelMetadata[] = [];
+  let allModelIds: string[] = [];
+
+  if (selectedProvider.customModels && selectedProvider.customModels.length > 0) {
+    const customModels = convertCustomModelsToMetadata(
+      selectedProvider.customModels,
+      selectedProvider.key,
+      selectedProvider.label,
+    );
+    allModels = [...customModels];
+    allModelIds = [...selectedProvider.customModels];
+  }
+
+  const findModelIndexById = (modelId: string): number => {
+    const targetId = modelId.toLowerCase();
+    return allModels.findIndex((model) => model.id.toLowerCase() === targetId);
+  };
+
+  if (isAliasProvider(selectedProvider.key) && aliasConfig) {
+    const aliasModels = convertAliasModelsToMetadata(
+      aliasConfig.models,
+      aliasConfig,
+      selectedProvider.key,
+      selectedProvider.label,
+    );
+    const newAliasModels = aliasModels.filter(
+      (model) =>
+        !allModelIds.some(
+          (existingModelId) =>
+            existingModelId.toLowerCase() === model.id.toLowerCase(),
+        ),
+    );
+    allModels = [...allModels, ...newAliasModels];
+    allModelIds = [...allModelIds, ...newAliasModels.map((model) => model.id)];
+  }
+
+  const registryFilteredModels = registryModels.filter(
+    (model) => model.provider_id === selectedProvider.registryId,
+  );
+  const sortedRegistryModels = sortModels(registryFilteredModels);
+
+  for (const registryModel of sortedRegistryModels) {
+    const existingIndex = findModelIndexById(registryModel.id);
+    if (existingIndex >= 0) {
+      allModels[existingIndex] = registryModel;
+      continue;
+    }
+
+    allModels.push(registryModel);
+    allModelIds.push(registryModel.id);
+  }
+
+  const hasLocalModels = Boolean(
+    sortedRegistryModels.length > 0 ||
+      (isAliasProvider(selectedProvider.key) &&
+        aliasConfig &&
+        aliasConfig.models.length > 0),
+  );
+
+  return {
+    modelIds: allModelIds,
+    models: allModels,
+    hasLocalModels,
+  };
+}
+
+async function fetchProviderModelsFromApi(
+  selectedProvider: ConfiguredProvider,
+  registryModels: EnhancedModelMetadata[],
+): Promise<EnhancedModelMetadata[]> {
+  try {
+    const result = await invoke<FetchModelsResult>("fetch_provider_models_auto", {
+      providerId: selectedProvider.key,
+    });
+
+    if (result && result.models && result.models.length > 0) {
+      return result.models;
+    }
+  } catch {
+    // ignore and fall back below
+  }
+
+  if (selectedProvider.fallbackRegistryId) {
+    const fallbackModels = registryModels.filter(
+      (model) => model.provider_id === selectedProvider.fallbackRegistryId,
+    );
+    if (fallbackModels.length > 0) {
+      return sortModels(fallbackModels);
+    }
+  }
+
+  return [];
+}
+
+export async function loadProviderModels(
+  selectedProvider: ConfiguredProvider | undefined | null,
+  options: LoadProviderModelsOptions = {},
+): Promise<EnhancedModelMetadata[]> {
+  if (!selectedProvider) {
+    return [];
+  }
+
+  const sourceOptions = options.forceRefresh ? { forceRefresh: true } : undefined;
+  const aliasConfigPromise = isAliasProvider(selectedProvider.key)
+    ? modelRegistryApi.getProviderAliasConfig(
+        getAliasConfigKey(selectedProvider.key),
+        sourceOptions,
+      )
+    : Promise.resolve(null);
+
+  const [registryModels, aliasConfig] = await Promise.all([
+    modelRegistryApi.getModelRegistry(sourceOptions),
+    aliasConfigPromise,
+  ]);
+
+  const localResult = buildLocalProviderModels(
+    selectedProvider,
+    registryModels,
+    aliasConfig,
+  );
+  if (localResult.hasLocalModels || localResult.models.length > 0) {
+    return localResult.models;
+  }
+
+  if (isAliasProvider(selectedProvider.key)) {
+    return localResult.models;
+  }
+
+  const apiModels = await fetchProviderModelsFromApi(selectedProvider, registryModels);
+  if (apiModels.length === 0) {
+    return localResult.models;
+  }
+
+  const customModels = selectedProvider.customModels || [];
+  const customModelMetadata =
+    customModels.length > 0
+      ? convertCustomModelsToMetadata(
+          customModels,
+          selectedProvider.key,
+          selectedProvider.label,
+        )
+      : [];
+
+  return [...customModelMetadata, ...apiModels];
+}
+
 // ============================================================================
 // Hook 实现
 // ============================================================================
@@ -209,7 +376,7 @@ export function useProviderModels(
 
   // 获取别名配置
   const { aliasConfig, loading: aliasLoading } =
-    useAliasConfig(selectedProvider);
+    useAliasConfig(selectedProvider, { autoLoad });
 
   // API 获取的模型缓存
   const [apiModels, setApiModels] = useState<EnhancedModelMetadata[]>([]);
@@ -217,94 +384,22 @@ export function useProviderModels(
   const [apiError, setApiError] = useState<string | null>(null);
 
   // 计算本地模型列表
-  const localResult = useMemo(() => {
-    if (!selectedProvider) {
-      return { modelIds: [], models: [], hasLocalModels: false };
-    }
-
-    // 收集所有模型
-    let allModels: EnhancedModelMetadata[] = [];
-    let allModelIds: string[] = [];
-
-    // 1. 首先添加自定义模型（排在最前面）
-    if (
-      selectedProvider.customModels &&
-      selectedProvider.customModels.length > 0
-    ) {
-      const customModels = convertCustomModelsToMetadata(
-        selectedProvider.customModels,
-        selectedProvider.key,
-        selectedProvider.label,
-      );
-      allModels = [...customModels];
-      allModelIds = [...selectedProvider.customModels];
-    }
-
-    const findModelIndexById = (modelId: string): number => {
-      const targetId = modelId.toLowerCase();
-      return allModels.findIndex(
-        (model) => model.id.toLowerCase() === targetId,
-      );
-    };
-
-    // 2. 对于别名 Provider，添加别名配置中的模型
-    if (isAliasProvider(selectedProvider.key) && aliasConfig) {
-      const aliasModels = convertAliasModelsToMetadata(
-        aliasConfig.models,
-        aliasConfig,
-        selectedProvider.key,
-        selectedProvider.label,
-      );
-      // 过滤掉已存在的模型（避免重复）
-      const newAliasModels = aliasModels.filter(
-        (m) =>
-          !allModelIds.some(
-            (existingModelId) =>
-              existingModelId.toLowerCase() === m.id.toLowerCase(),
-          ),
-      );
-      allModels = [...allModels, ...newAliasModels];
-      allModelIds = [...allModelIds, ...newAliasModels.map((m) => m.id)];
-    }
-
-    // 3. 从模型注册表获取模型
-    const registryFilteredModels = registryModels.filter(
-      (m) => m.provider_id === selectedProvider.registryId,
-    );
-
-    // 排序注册表模型，并用其覆盖同 ID 的别名/自定义占位元数据
-    const sortedRegistryModels = sortModels(registryFilteredModels);
-
-    for (const registryModel of sortedRegistryModels) {
-      const existingIndex = findModelIndexById(registryModel.id);
-
-      if (existingIndex >= 0) {
-        allModels[existingIndex] = registryModel;
-        continue;
-      }
-
-      allModels.push(registryModel);
-      allModelIds.push(registryModel.id);
-    }
-
-    // 判断是否有本地模型（不包括自定义模型）
-    const hasLocalModels =
-      sortedRegistryModels.length > 0 ||
-      (isAliasProvider(selectedProvider.key) &&
-        aliasConfig &&
-        aliasConfig.models.length > 0);
-
-    return {
-      modelIds: allModelIds,
-      models: allModels,
-      hasLocalModels,
-    };
-  }, [selectedProvider, registryModels, aliasConfig]);
+  const localResult = useMemo(
+    () => buildLocalProviderModels(selectedProvider, registryModels, aliasConfig),
+    [selectedProvider, registryModels, aliasConfig],
+  );
 
   // 当本地没有模型时，从 API 获取
   useEffect(() => {
     if (!selectedProvider) {
       setApiModels([]);
+      return;
+    }
+
+    if (!autoLoad) {
+      setApiModels([]);
+      setApiLoading(false);
+      setApiError(null);
       return;
     }
 
@@ -330,36 +425,12 @@ export function useProviderModels(
       setApiError(null);
 
       try {
-        const result = await invoke<FetchModelsResult>(
-          "fetch_provider_models_auto",
-          { providerId: selectedProvider.key },
+        setApiModels(
+          await fetchProviderModelsFromApi(selectedProvider, registryModels),
         );
-
-        if (result && result.models && result.models.length > 0) {
-          setApiModels(result.models);
-        } else {
-          // API 没有返回模型，尝试 fallback
-          if (selectedProvider.fallbackRegistryId) {
-            const fallbackModels = registryModels.filter(
-              (m) => m.provider_id === selectedProvider.fallbackRegistryId,
-            );
-            if (fallbackModels.length > 0) {
-              setApiModels(sortModels(fallbackModels));
-            }
-          }
-        }
       } catch (err) {
         setApiError(err instanceof Error ? err.message : String(err));
-
-        // API 失败，尝试 fallback
-        if (selectedProvider.fallbackRegistryId) {
-          const fallbackModels = registryModels.filter(
-            (m) => m.provider_id === selectedProvider.fallbackRegistryId,
-          );
-          if (fallbackModels.length > 0) {
-            setApiModels(sortModels(fallbackModels));
-          }
-        }
+        setApiModels([]);
       } finally {
         setApiLoading(false);
       }
@@ -368,6 +439,7 @@ export function useProviderModels(
     fetchFromApi();
   }, [
     selectedProvider,
+    autoLoad,
     localResult.hasLocalModels,
     registryLoading,
     aliasLoading,

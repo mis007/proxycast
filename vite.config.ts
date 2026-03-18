@@ -18,6 +18,7 @@ if (!process.env.VITE_APP_VERSION && cargoWorkspaceVersion) {
 
 // 获取 Tauri mock 目录路径
 const tauriMockDir = path.resolve(__dirname, "./src/lib/tauri-mock");
+const tauriEventWrapper = path.resolve(__dirname, "./src/lib/tauri-event.ts");
 
 export default defineConfig(({ mode }) => {
   const browserBridgeFlag =
@@ -30,17 +31,51 @@ export default defineConfig(({ mode }) => {
   const cacheDir = isTauri ? "node_modules/.vite-tauri" : "node_modules/.vite-web";
   
   // 只在非 Tauri 环境（纯浏览器开发）下使用 mock
-  const tauriAliases = isTauri ? {} : {
-    "@tauri-apps/api/core": path.resolve(tauriMockDir, "core.ts"),
-    "@tauri-apps/api/event": path.resolve(tauriMockDir, "event.ts"),
-    "@tauri-apps/api/window": path.resolve(tauriMockDir, "window.ts"),
-    "@tauri-apps/api/app": path.resolve(tauriMockDir, "window.ts"),
-    "@tauri-apps/api/path": path.resolve(tauriMockDir, "window.ts"),
-    "@tauri-apps/plugin-dialog": path.resolve(tauriMockDir, "plugin-dialog.ts"),
-    "@tauri-apps/plugin-shell": path.resolve(tauriMockDir, "plugin-shell.ts"),
-    "@tauri-apps/plugin-deep-link": path.resolve(tauriMockDir, "plugin-deep-link.ts"),
-    "@tauri-apps/plugin-global-shortcut": path.resolve(tauriMockDir, "plugin-global-shortcut.ts"),
-  };
+  const tauriAliases = isTauri
+    ? [
+        {
+          find: /^@tauri-apps\/api\/event$/,
+          replacement: tauriEventWrapper,
+        },
+      ]
+    : [
+        {
+          find: /^@tauri-apps\/api\/core$/,
+          replacement: path.resolve(tauriMockDir, "core.ts"),
+        },
+        {
+          find: /^@tauri-apps\/api\/event$/,
+          replacement: path.resolve(tauriMockDir, "event.ts"),
+        },
+        {
+          find: /^@tauri-apps\/api\/window$/,
+          replacement: path.resolve(tauriMockDir, "window.ts"),
+        },
+        {
+          find: /^@tauri-apps\/api\/app$/,
+          replacement: path.resolve(tauriMockDir, "window.ts"),
+        },
+        {
+          find: /^@tauri-apps\/api\/path$/,
+          replacement: path.resolve(tauriMockDir, "window.ts"),
+        },
+        {
+          find: /^@tauri-apps\/plugin-dialog$/,
+          replacement: path.resolve(tauriMockDir, "plugin-dialog.ts"),
+        },
+        {
+          find: /^@tauri-apps\/plugin-shell$/,
+          replacement: path.resolve(tauriMockDir, "plugin-shell.ts"),
+        },
+        {
+          find: /^@tauri-apps\/plugin-deep-link$/,
+          replacement: path.resolve(tauriMockDir, "plugin-deep-link.ts"),
+        },
+        {
+          find: /^@tauri-apps\/plugin-global-shortcut$/,
+          replacement: path.resolve(tauriMockDir, "plugin-global-shortcut.ts"),
+        },
+      ];
 
   return {
   cacheDir,
@@ -58,11 +93,13 @@ export default defineConfig(({ mode }) => {
     svgr(),
   ],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      // 只在非 Tauri 环境下拦截 @tauri-apps/* 导入
+    alias: [
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "./src"),
+      },
       ...tauriAliases,
-    },
+    ],
   },
   optimizeDeps: {
     // 强制每次启动时校验并重建依赖预构建，避免命中损坏缓存

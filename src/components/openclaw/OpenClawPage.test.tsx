@@ -34,6 +34,7 @@ const {
   mockRuntimePageRender,
   mockRefreshDashboardUrl,
   mockRefreshDashboardWindowState,
+  mockHandleOpenDashboardWindow,
   mockCheckHealth,
   mockGetChannels,
 } = vi.hoisted(() => ({
@@ -59,6 +60,7 @@ const {
   mockRuntimePageRender: vi.fn(),
   mockRefreshDashboardUrl: vi.fn(),
   mockRefreshDashboardWindowState: vi.fn(),
+  mockHandleOpenDashboardWindow: vi.fn(),
   mockCheckHealth: vi.fn(),
   mockGetChannels: vi.fn(),
 }));
@@ -131,7 +133,7 @@ vi.mock("./useOpenClawDashboardWindow", () => ({
     dashboardWindowOpen: false,
     refreshDashboardUrl: mockRefreshDashboardUrl,
     refreshDashboardWindowState: mockRefreshDashboardWindowState,
-    handleOpenDashboardWindow: vi.fn(),
+    handleOpenDashboardWindow: mockHandleOpenDashboardWindow,
     handleOpenDashboardExternal: vi.fn(),
     closeDashboardWindowSilently: vi.fn(),
   }),
@@ -283,8 +285,8 @@ function buildEnvironmentStatus(options?: {
   };
 }
 
-function renderPage() {
-  return renderIntoDom(<OpenClawPage isActive />, mountedRoots);
+function renderPage(props?: Partial<React.ComponentProps<typeof OpenClawPage>>) {
+  return renderIntoDom(<OpenClawPage isActive {...props} />, mountedRoots);
 }
 
 function findButton(container: HTMLElement, text: string): HTMLButtonElement {
@@ -603,6 +605,106 @@ describe("OpenClawPage", () => {
       40,
       "Gateway 已运行时仍被阻塞在安装页",
     );
+  });
+
+  it("命令待刷新时仍应允许进入安装页重新检测", async () => {
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "needs_reload",
+        openclawVersion: "2026.3.13-zh.1",
+        openclawPath: "/Users/demo/.nvm/versions/node/v23.4.0",
+        summary: "已检测到 OpenClaw 包，但命令尚未生效。",
+      }),
+    );
+    mockGetStatus.mockResolvedValue({ status: "running", port: 18790 });
+
+    const mounted = renderPage({
+      pageParams: { subpage: "install" },
+      onNavigate: vi.fn(),
+    });
+    await waitForInstallPage(mounted.container);
+    await flushEffects();
+
+    expect(
+      mounted.container.querySelector('[data-testid="openclaw-install-page"]'),
+    ).toBeTruthy();
+  });
+
+  it("工作台概览中的安装路径摘要应压缩显示长路径", async () => {
+    const longInstallPath =
+      "/Users/demo/Library/Application Support/lime/runtime/openclaw/node_modules/@qingchencloud/openclaw-zh/package.json";
+
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "ok",
+        openclawVersion: "2026.3.18",
+        openclawPath: longInstallPath,
+        summary: "OpenClaw 已安装。",
+      }),
+    );
+
+    const mounted = renderPage();
+    await flushEffects();
+
+    await waitForCondition(
+      () => mounted.container.textContent?.includes("OpenClaw 工作台") ?? false,
+      40,
+      "OpenClaw 工作台未在预期时间内渲染",
+    );
+
+    const compactedEntries = Array.from(
+      mounted.container.querySelectorAll("[title]"),
+    ).filter((item) => item.getAttribute("title") === longInstallPath);
+
+    expect(compactedEntries.length).toBeGreaterThan(0);
+    expect(
+      compactedEntries.some(
+        (item) =>
+          item.textContent !== longInstallPath &&
+          item.textContent?.includes("..."),
+      ),
+    ).toBe(true);
+  });
+
+  it("工作台摘要中的桌面面板快捷按钮应直接触发打开动作", async () => {
+    mockGetEnvironmentStatus.mockResolvedValue(
+      buildEnvironmentStatus({
+        nodeStatus: "ok",
+        gitStatus: "ok",
+        openclawStatus: "ok",
+        openclawVersion: "2026.3.13",
+        openclawPath:
+          "/Users/demo/.nvm/versions/node/v23.4.0/bin/openclaw",
+        summary: "OpenClaw 已安装。",
+      }),
+    );
+    mockGetStatus.mockResolvedValue({ status: "running", port: 18790 });
+
+    const mounted = renderPage();
+    await flushEffects();
+
+    await waitForCondition(
+      () => !!mounted.container.querySelector('[data-testid="openclaw-runtime-page"]'),
+      40,
+      "OpenClaw 运行页未在预期时间内渲染",
+    );
+
+    await act(async () => {
+      // 切换到快捷操作 tab
+      findButton(mounted.container, "快捷操作").click();
+      await flushEffects();
+    });
+
+    await act(async () => {
+      findButton(mounted.container, "打开桌面面板").click();
+      await flushEffects();
+    });
+
+    expect(mockHandleOpenDashboardWindow).toHaveBeenCalledTimes(1);
   });
 
   it("智能升级前会自动切到检测到 OpenClaw 的执行环境", async () => {

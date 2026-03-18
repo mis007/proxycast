@@ -5,6 +5,7 @@
  */
 
 import { safeInvoke } from "@/lib/dev-bridge";
+import { logAgentDebug } from "@/lib/agentDebug";
 
 // ==================== 类型定义 ====================
 
@@ -261,7 +262,64 @@ export async function deleteOutlineNode(id: string): Promise<boolean> {
 export async function getProjectMemory(
   projectId: string,
 ): Promise<ProjectMemory> {
-  return safeInvoke<ProjectMemory>("project_memory_get", { projectId });
+  const startedAt = Date.now();
+  let settled = false;
+  const slowTimer: ReturnType<typeof setTimeout> | null =
+    typeof window !== "undefined"
+      ? window.setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          logAgentDebug(
+            "AgentApi",
+            "projectMemoryGet.slow",
+            {
+              elapsedMs: Date.now() - startedAt,
+              projectId,
+            },
+            {
+              dedupeKey: `projectMemoryGet.slow:${projectId}`,
+              level: "warn",
+              throttleMs: 1000,
+            },
+          );
+        }, 1000)
+      : null;
+
+  logAgentDebug("AgentApi", "projectMemoryGet.start", { projectId });
+
+  try {
+    const memory = await safeInvoke<ProjectMemory>("project_memory_get", {
+      projectId,
+    });
+    settled = true;
+    logAgentDebug("AgentApi", "projectMemoryGet.success", {
+      charactersCount: memory.characters.length,
+      durationMs: Date.now() - startedAt,
+      hasStyleGuide: Boolean(memory.style_guide),
+      hasWorldBuilding: Boolean(memory.world_building),
+      outlineCount: memory.outline.length,
+      projectId,
+    });
+    return memory;
+  } catch (error) {
+    settled = true;
+    logAgentDebug(
+      "AgentApi",
+      "projectMemoryGet.error",
+      {
+        durationMs: Date.now() - startedAt,
+        error,
+        projectId,
+      },
+      { level: "error" },
+    );
+    throw error;
+  } finally {
+    if (slowTimer !== null) {
+      clearTimeout(slowTimer);
+    }
+  }
 }
 
 // ==================== 辅助函数 ====================

@@ -12,10 +12,10 @@ import { toast } from "sonner";
 import { safeListen } from "@/lib/dev-bridge";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
+  createAgentRuntimeSession,
   startAgentProcess,
   getAgentProcessStatus,
-  createAgentSession,
-  sendAsterMessageStream,
+  submitAgentRuntimeTurn,
   sendTerminalCommandResponse,
   sendTermScrollbackResponse,
   type TerminalCommandRequest,
@@ -47,6 +47,15 @@ const DEFAULT_CONFIG: TerminalAIConfig = {
   contextLines: 50,
   autoExecute: false, // 默认需要手动批准
 };
+
+const TERMINAL_AI_SYSTEM_PROMPT = `你是一个终端助手，帮助用户解决命令行相关的问题。
+你可以：
+- 解释命令的用法和参数
+- 帮助调试错误信息
+- 建议更好的命令或脚本
+- 解答 shell 脚本相关问题
+
+请用简洁清晰的语言回答，必要时提供代码示例。`;
 
 /**
  * 加载持久化数据
@@ -171,33 +180,19 @@ export function useTerminalAI(
     if (sessionId) return sessionId;
 
     try {
-      // 构建系统提示词
-      const systemPrompt = `你是一个终端助手，帮助用户解决命令行相关的问题。
-你可以：
-- 解释命令的用法和参数
-- 帮助调试错误信息
-- 建议更好的命令或脚本
-- 解答 shell 脚本相关问题
-
-请用简洁清晰的语言回答，必要时提供代码示例。`;
-
       const resolvedWorkspaceId = await ensureWorkspaceId();
-      const response = await createAgentSession(
-        providerId,
+      const createdSessionId = await createAgentRuntimeSession(
         resolvedWorkspaceId,
-        modelId,
-        systemPrompt,
-        undefined,
       );
 
-      setSessionId(response.session_id);
-      return response.session_id;
+      setSessionId(createdSessionId);
+      return createdSessionId;
     } catch (error) {
       console.error("[useTerminalAI] 创建会话失败:", error);
       toast.error("创建 AI 会话失败");
       return null;
     }
-  }, [sessionId, providerId, modelId, ensureWorkspaceId]);
+  }, [sessionId, ensureWorkspaceId]);
 
   /**
    * 获取终端上下文
@@ -435,20 +430,23 @@ export function useTerminalAI(
 
         const resolvedWorkspaceId = await ensureWorkspaceId();
 
-        await sendAsterMessageStream(
-          messageContent,
-          activeSessionId,
-          eventName,
-          resolvedWorkspaceId,
-          imagesToSend,
-          providerId
-            ? {
-                provider_id: providerId,
-                provider_name: providerId,
-                model_name: modelId || "claude-sonnet-4-20250514",
-              }
-            : undefined,
-        );
+        await submitAgentRuntimeTurn({
+          message: messageContent,
+          session_id: activeSessionId,
+          event_name: eventName,
+          workspace_id: resolvedWorkspaceId,
+          images: imagesToSend,
+          turn_config: {
+            provider_config: providerId
+              ? {
+                  provider_id: providerId,
+                  provider_name: providerId,
+                  model_name: modelId || "claude-sonnet-4-20250514",
+                }
+              : undefined,
+            system_prompt: TERMINAL_AI_SYSTEM_PROMPT,
+          },
+        });
       } catch (error) {
         console.error("[useTerminalAI] 发送消息失败:", error);
         toast.error(`发送失败: ${error}`);

@@ -141,6 +141,9 @@ async fn start_server_async(
     shared_logger: Arc<telemetry::RequestLogger>,
     app_handle: tauri::AppHandle,
 ) {
+    let mut available_credentials = 0usize;
+    let mut total_credentials = 0usize;
+
     // 先加载凭证池中的凭证
     {
         logs.write().await.add("info", "[启动] 正在加载凭证池...");
@@ -148,12 +151,20 @@ async fn start_server_async(
         match pool_service.get_overview(&db) {
             Ok(overview) => {
                 let mut loaded_types = Vec::new();
-                let mut total_credentials = 0;
 
                 for provider_overview in overview {
-                    let count = provider_overview.stats.total_count;
+                    let enabled_credentials: Vec<_> = provider_overview
+                        .credentials
+                        .iter()
+                        .filter(|credential| !credential.is_disabled)
+                        .collect();
+                    let count = enabled_credentials.len();
                     if count > 0 {
                         total_credentials += count;
+                        available_credentials += enabled_credentials
+                            .iter()
+                            .filter(|credential| credential.is_healthy)
+                            .count();
                         let provider_name = match provider_overview.provider_type.as_str() {
                             "kiro" => "Kiro",
                             "gemini" => "Gemini",
@@ -242,20 +253,30 @@ async fn start_server_async(
     if let Some(tray_state) = app_handle.try_state::<TrayManagerState<tauri::Wry>>() {
         let tray_guard = tray_state.0.read().await;
         if let Some(tray_manager) = tray_guard.as_ref() {
-            let icon_status = if server_started {
-                TrayIconStatus::Running
-            } else {
+            let current_state = tray_manager.get_state().await;
+            let icon_status = if !server_started {
                 TrayIconStatus::Stopped
+            } else if total_credentials > 0 && available_credentials == 0 {
+                TrayIconStatus::Error
+            } else if available_credentials < total_credentials {
+                TrayIconStatus::Warning
+            } else {
+                TrayIconStatus::Running
             };
 
             let snapshot = TrayStateSnapshot {
                 icon_status,
                 server_running: server_started,
                 server_address,
-                available_credentials: 0,
-                total_credentials: 0,
-                today_requests: 0,
-                auto_start_enabled: false,
+                available_credentials,
+                total_credentials,
+                today_requests: current_state.today_requests,
+                auto_start_enabled: current_state.auto_start_enabled,
+                current_model_provider_type: current_state.current_model_provider_type,
+                current_model_provider_label: current_state.current_model_provider_label,
+                current_model: current_state.current_model,
+                current_theme_label: current_state.current_theme_label,
+                quick_model_groups: current_state.quick_model_groups,
             };
 
             if let Err(e) = tray_manager.update_state(snapshot).await {

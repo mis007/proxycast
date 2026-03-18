@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
+  ChevronDown,
   Download,
   ExternalLink,
   GitBranch,
@@ -14,9 +15,15 @@ import type {
   OpenClawEnvironmentStatus,
   OpenClawRuntimeCandidate,
 } from "@/lib/api/openclaw";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { DesktopPlatform } from "@/lib/crashDiagnostic";
 import { cn } from "@/lib/utils";
 import { OpenClawExecutionEnvironmentCard } from "./OpenClawExecutionEnvironmentCard";
+import { compactPathLabel } from "./pathDisplay";
 import {
   openClawPanelClassName,
   openClawPrimaryButtonClassName,
@@ -128,7 +135,16 @@ function DependencyCard({
 
       <div className="mt-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs leading-6 text-slate-500">
         <div>版本：{resolvedStatus.version || "未检测到"}</div>
-        <div className="break-all">路径：{pathText}</div>
+        <div className="min-w-0">
+          <span>路径：</span>
+          <span className="inline-block max-w-full truncate align-bottom">
+            <span title={resolvedStatus.path || undefined}>
+              {resolvedStatus.path
+                ? compactPathLabel(resolvedStatus.path, 54)
+                : pathText}
+            </span>
+          </span>
+        </div>
       </div>
 
       {(primaryLabel || secondaryLabel) && (
@@ -191,6 +207,7 @@ export function OpenClawInstallPage({
   onDownloadGit,
   onSelectPreferredRuntime,
 }: OpenClawInstallPageProps) {
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const nodeReady = environmentStatus?.node.status === "ok";
   const gitReady = environmentStatus?.git.status === "ok";
   const openclawReady = environmentStatus?.openclaw.status === "ok";
@@ -238,6 +255,46 @@ export function OpenClawInstallPage({
   const openclawStatusLabel = environmentStatus
     ? resolveStatusLabel(environmentStatus.openclaw.status)
     : "未检测";
+  const diagnosticHighlights = [
+    {
+      key: "npm-command",
+      title: "npm 命令",
+      value: diagnostics?.npmPath || null,
+      fallback: "未检测到",
+    },
+    {
+      key: "npm-prefix",
+      title: "npm 全局前缀",
+      value: diagnostics?.npmGlobalPrefix || null,
+      fallback: "未检测到",
+    },
+    {
+      key: "openclaw-package",
+      title: "OpenClaw 包路径",
+      value: diagnostics?.openclawPackagePath || null,
+      fallback: "未检测到",
+    },
+  ];
+  const diagnosticLists = [
+    {
+      key: "where-candidates",
+      title: "`where openclaw` 命中",
+      values: diagnostics?.whereCandidates || [],
+      emptyText: "未命中",
+    },
+    {
+      key: "supplemental-search-dirs",
+      title: "补充搜索目录",
+      values: diagnostics?.supplementalSearchDirs || [],
+      emptyText: "无",
+    },
+    {
+      key: "supplemental-command-candidates",
+      title: "补充目录中的 OpenClaw 命中",
+      values: diagnostics?.supplementalCommandCandidates || [],
+      emptyText: "未命中",
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -426,73 +483,103 @@ export function OpenClawInstallPage({
 
       {hasDiagnostics ? (
         <section className={openClawPanelClassName}>
-          <div className="text-sm font-medium text-slate-900">检测诊断</div>
-          <div className="mt-3 grid gap-3 text-xs leading-6 text-slate-500 md:grid-cols-2">
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
-              <div className="font-medium text-slate-900">npm 命令</div>
-              <div className="mt-1 break-all">
-                {diagnostics?.npmPath || "未检测到"}
+          <Collapsible open={diagnosticsOpen} onOpenChange={setDiagnosticsOpen}>
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-2xl">
+                <div className="text-sm font-medium text-slate-900">
+                  检测诊断
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  主页面先展示关键探测结果，完整命中路径与搜索目录按需展开，避免把安装页变成长日志面板。
+                </p>
               </div>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  {diagnosticsOpen ? "收起详细诊断" : "查看详细诊断"}
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-200",
+                      diagnosticsOpen ? "rotate-180" : "rotate-0",
+                    )}
+                  />
+                </button>
+              </CollapsibleTrigger>
             </div>
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
-              <div className="font-medium text-slate-900">npm 全局前缀</div>
-              <div className="mt-1 break-all">
-                {diagnostics?.npmGlobalPrefix || "未检测到"}
-              </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {diagnosticHighlights.map((item) => (
+                <div
+                  key={item.key}
+                  className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3"
+                >
+                  <div className="text-[11px] font-medium text-slate-500">
+                    {item.title}
+                  </div>
+                  <div
+                    className="mt-2 truncate text-sm font-medium text-slate-900"
+                    title={item.value || undefined}
+                  >
+                    {item.value
+                      ? compactPathLabel(item.value, 60)
+                      : item.fallback}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 md:col-span-2">
-              <div className="font-medium text-slate-900">OpenClaw 包路径</div>
-              <div className="mt-1 break-all">
-                {diagnostics?.openclawPackagePath || "未检测到"}
-              </div>
-            </div>
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
-              <div className="font-medium text-slate-900">
-                `where openclaw` 命中
-              </div>
-              <div className="mt-1 space-y-1">
-                {diagnostics?.whereCandidates?.length ? (
-                  diagnostics.whereCandidates.map((item) => (
-                    <div key={item} className="break-all">
-                      {item}
+
+            <CollapsibleContent>
+              <div className="mt-4 border-t border-slate-200/80 pt-4">
+                <div className="grid gap-3 text-xs leading-6 text-slate-500 md:grid-cols-2">
+                  {diagnosticHighlights.map((item) => (
+                    <div
+                      key={`${item.key}-detail`}
+                      className={cn(
+                        "rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3",
+                        item.key === "openclaw-package" ? "md:col-span-2" : "",
+                      )}
+                    >
+                      <div className="font-medium text-slate-900">
+                        {item.title}
+                      </div>
+                      <div className="mt-1 break-all">
+                        {item.value || item.fallback}
+                      </div>
                     </div>
-                  ))
-                ) : (
-                  <div>未命中</div>
-                )}
-              </div>
-            </div>
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
-              <div className="font-medium text-slate-900">补充搜索目录</div>
-              <div className="mt-1 space-y-1">
-                {diagnostics?.supplementalSearchDirs?.length ? (
-                  diagnostics.supplementalSearchDirs.map((item) => (
-                    <div key={item} className="break-all">
-                      {item}
+                  ))}
+
+                  {diagnosticLists.map((item) => (
+                    <div
+                      key={item.key}
+                      className={cn(
+                        "rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3",
+                        item.key === "supplemental-command-candidates"
+                          ? "md:col-span-2"
+                          : "",
+                      )}
+                    >
+                      <div className="font-medium text-slate-900">
+                        {item.title}
+                      </div>
+                      <div className="mt-1 space-y-1">
+                        {item.values.length > 0 ? (
+                          item.values.map((entry) => (
+                            <div key={entry} className="break-all">
+                              {entry}
+                            </div>
+                          ))
+                        ) : (
+                          <div>{item.emptyText}</div>
+                        )}
+                      </div>
                     </div>
-                  ))
-                ) : (
-                  <div>无</div>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 md:col-span-2">
-              <div className="font-medium text-slate-900">
-                补充目录中的 OpenClaw 命中
-              </div>
-              <div className="mt-1 space-y-1">
-                {diagnostics?.supplementalCommandCandidates?.length ? (
-                  diagnostics.supplementalCommandCandidates.map((item) => (
-                    <div key={item} className="break-all">
-                      {item}
-                    </div>
-                  ))
-                ) : (
-                  <div>未命中</div>
-                )}
-              </div>
-            </div>
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
         </section>
       ) : null}
     </div>

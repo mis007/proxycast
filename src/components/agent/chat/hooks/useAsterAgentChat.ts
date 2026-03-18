@@ -7,7 +7,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AsterExecutionStrategy } from "@/lib/api/agentRuntime";
-import { defaultAgentRuntimeAdapter } from "./agentRuntimeAdapter";
+import { logAgentDebug } from "@/lib/agentDebug";
+import {
+  defaultAgentRuntimeAdapter,
+  type AgentRuntimeAdapter,
+} from "./agentRuntimeAdapter";
 import { useAgentContext } from "./useAgentContext";
 import { useAgentSession } from "./useAgentSession";
 import { useAgentTools } from "./useAgentTools";
@@ -20,15 +24,27 @@ import {
 
 export type { Topic } from "./agentChatShared";
 
-export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
-  const { systemPrompt, onWriteFile, workspaceId, disableSessionRestore = false } =
-    options;
-  const runtime = defaultAgentRuntimeAdapter;
+type UseAsterAgentChatRuntimeOptions = UseAsterAgentChatOptions & {
+  runtimeAdapter?: AgentRuntimeAdapter;
+  preserveRestoredMessages?: boolean;
+};
+
+export function useAsterAgentChat(options: UseAsterAgentChatRuntimeOptions) {
+  const {
+    systemPrompt,
+    onWriteFile,
+    workspaceId,
+    disableSessionRestore = false,
+    runtimeAdapter,
+    preserveRestoredMessages = false,
+  } = options;
+  const runtime = runtimeAdapter ?? defaultAgentRuntimeAdapter;
 
   const [isInitialized, setIsInitialized] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const currentAssistantMsgIdRef = useRef<string | null>(null);
   const currentStreamingSessionIdRef = useRef<string | null>(null);
+  const lastTopicSnapshotKeyRef = useRef<string | null>(null);
   const sendMessageRef = useRef<SendMessageFn | null>(null);
   const resetPendingActionsRef = useRef<(() => void) | null>(null);
   const topicsUpdaterRef = useRef<
@@ -52,7 +68,7 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
     runtime,
     workspaceId,
     disableSessionRestore,
-    isInitialized,
+    preserveRestoredMessages,
     executionStrategy: context.executionStrategy,
     providerTypeRef: context.providerTypeRef,
     modelRef: context.modelRef,
@@ -71,6 +87,7 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
     runtime,
     sessionIdRef,
     currentStreamingSessionIdRef,
+    messages: session.messages,
     setMessages: session.setMessages,
     setThreadItems: session.setThreadItems,
   });
@@ -103,22 +120,59 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
   sendMessageRef.current = stream.sendMessage;
   topicsUpdaterRef.current = session.updateTopicExecutionStrategy;
 
+  const hasActiveTopic = Boolean(
+    session.sessionId &&
+    session.topics.some((topic) => topic.id === session.sessionId),
+  );
+
+  useEffect(() => {
+    logAgentDebug(
+      "useAsterAgentChat",
+      "stateSnapshot",
+      {
+        hasActiveTopic,
+        isSending: stream.isSending,
+        messagesCount: session.messages.length,
+        pendingActionsCount: tools.pendingActions.length,
+        queuedTurnsCount: session.queuedTurns.length,
+        sessionId: session.sessionId ?? null,
+        threadTurnsCount: session.threadTurns.length,
+        topicsCount: session.topics.length,
+        workspaceId,
+        workspacePathMissing: context.workspacePathMissing,
+      },
+      {
+        dedupeKey: JSON.stringify({
+          hasActiveTopic,
+          isSending: stream.isSending,
+          messagesCount: session.messages.length,
+          pendingActionsCount: tools.pendingActions.length,
+          queuedTurnsCount: session.queuedTurns.length,
+          sessionId: session.sessionId ?? null,
+          threadTurnsCount: session.threadTurns.length,
+          topicsCount: session.topics.length,
+          workspaceId,
+          workspacePathMissing: context.workspacePathMissing,
+        }),
+        throttleMs: 800,
+      },
+    );
+  }, [
+    context.workspacePathMissing,
+    hasActiveTopic,
+    session.messages.length,
+    session.queuedTurns.length,
+    session.sessionId,
+    session.threadTurns.length,
+    session.topics.length,
+    stream.isSending,
+    tools.pendingActions.length,
+    workspaceId,
+  ]);
+
   useEffect(() => {
     tools.warnedKeysRef.current.clear();
   }, [tools.warnedKeysRef, workspaceId]);
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await runtime.init();
-        setIsInitialized(true);
-        console.log("[AsterChat] Agent 初始化成功");
-      } catch (err) {
-        console.error("[AsterChat] 初始化失败:", err);
-      }
-    };
-    init();
-  }, [runtime]);
 
   useEffect(() => {
     const refreshSessionDetail = session.refreshSessionDetail;
@@ -131,7 +185,8 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
     }
 
     const hasRecoveredQueueWork =
-      queuedTurnCount > 0 || threadTurns.some((turn) => turn.status === "running");
+      queuedTurnCount > 0 ||
+      threadTurns.some((turn) => turn.status === "running");
     if (!hasRecoveredQueueWork) {
       return;
     }
@@ -159,14 +214,20 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
     const pendingActionCount = tools.pendingActions.length;
     const workspacePathMissing = context.workspacePathMissing;
 
-    if (!activeSessionId) {
-      return;
-    }
-
-    const hasActiveTopic = session.topics.some(
-      (topic) => topic.id === activeSessionId,
-    );
-    if (!hasActiveTopic) {
+    if (!activeSessionId || !hasActiveTopic) {
+      if (activeSessionId && !hasActiveTopic) {
+        logAgentDebug(
+          "useAsterAgentChat",
+          "topicSnapshot.skipWithoutActiveTopic",
+          {
+            activeSessionId,
+            topicsCount: session.topics.length,
+            workspaceId,
+          },
+          { level: "warn", throttleMs: 1000 },
+        );
+      }
+      lastTopicSnapshotKeyRef.current = null;
       return;
     }
 
@@ -178,20 +239,61 @@ export function useAsterAgentChat(options: UseAsterAgentChatOptions) {
       workspaceError: Boolean(workspacePathMissing),
     });
 
+    const snapshotKey = JSON.stringify({
+      sessionId: activeSessionId,
+      updatedAt: snapshot.updatedAt?.getTime() ?? null,
+      messagesCount: snapshot.messagesCount,
+      status: snapshot.status,
+      statusReason: snapshot.statusReason ?? null,
+      lastPreview: snapshot.lastPreview,
+      hasUnread: snapshot.hasUnread,
+    });
+
+    if (lastTopicSnapshotKeyRef.current === snapshotKey) {
+      logAgentDebug(
+        "useAsterAgentChat",
+        "topicSnapshot.skipDuplicate",
+        {
+          activeSessionId,
+          snapshotKey,
+        },
+        { throttleMs: 1200 },
+      );
+      return;
+    }
+
+    lastTopicSnapshotKeyRef.current = snapshotKey;
+    logAgentDebug("useAsterAgentChat", "topicSnapshot.apply", {
+      activeSessionId,
+      hasUnread: snapshot.hasUnread,
+      messagesCount: snapshot.messagesCount,
+      status: snapshot.status,
+      statusReason: snapshot.statusReason ?? null,
+      updatedAt: snapshot.updatedAt?.toISOString() ?? null,
+    });
     updateTopicSnapshot(activeSessionId, snapshot);
   }, [
+    hasActiveTopic,
     session.sessionId,
     session.messages,
     session.queuedTurns.length,
-    session.topics,
+    session.topics.length,
     session.updateTopicSnapshot,
     stream.isSending,
     tools.pendingActions.length,
     context.workspacePathMissing,
+    workspaceId,
   ]);
 
   const handleStartProcess = async () => {
-    // Aster 不需要显式启动独立进程，初始化在 effect 中完成。
+    try {
+      await runtime.init();
+      setIsInitialized(true);
+      console.log("[AsterChat] Agent 初始化成功");
+    } catch (err) {
+      setIsInitialized(false);
+      console.error("[AsterChat] 初始化失败:", err);
+    }
   };
 
   const handleStopProcess = async () => {

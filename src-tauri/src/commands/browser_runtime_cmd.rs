@@ -25,7 +25,7 @@ use serde_json::json;
 use std::time::Instant;
 use tauri::AppHandle;
 use tokio::time::{sleep, Duration};
-use tracing::info;
+use tracing::{info, Instrument};
 
 const CDP_READY_MAX_ATTEMPTS: usize = 60;
 const CDP_READY_RETRY_INTERVAL_MS: u64 = 250;
@@ -318,6 +318,17 @@ pub async fn launch_browser_runtime_assist(
     launch_browser_runtime_assist_global(app_handle, app_state.inner().clone(), request).await
 }
 
+#[tracing::instrument(
+    name = "launch_browser_runtime_assist_global",
+    skip(app_handle, app_state, request),
+    fields(
+        profile_key = %request.profile_key,
+        profile_id = ?request.profile_id,
+        target_id = ?request.target_id,
+        open_window = request.open_window,
+        stream_mode = ?request.stream_mode
+    )
+)]
 pub async fn launch_browser_runtime_assist_global(
     app_handle: AppHandle,
     app_state: AppState,
@@ -343,6 +354,18 @@ pub async fn launch_browser_runtime_assist_global(
     .await
 }
 
+#[tracing::instrument(
+    name = "launch_browser_session_global",
+    skip(app_handle, app_state, request),
+    fields(
+        profile_key = %request.profile_key,
+        profile_id = ?request.profile_id,
+        environment_preset_id = ?request.environment_preset_id,
+        target_id = ?request.target_id,
+        open_window = request.open_window,
+        stream_mode = ?request.stream_mode
+    )
+)]
 pub async fn launch_browser_session_global(
     app_handle: AppHandle,
     app_state: AppState,
@@ -389,6 +412,9 @@ pub async fn launch_browser_session_global(
             launch_options: Some(chrome_launch_options),
         },
     )
+    .instrument(tracing::info_span!(
+        "launch_browser_session_global.open_profile"
+    ))
     .await
     {
         Ok(profile) => profile,
@@ -431,8 +457,12 @@ pub async fn launch_browser_session_global(
     launch_audit.remote_debugging_port = Some(remote_debugging_port);
 
     let cdp_ready_started_at = Instant::now();
-    if let Err(error) =
-        wait_for_cdp_ready(remote_debugging_port, request.target_id.as_deref()).await
+    if let Err(error) = wait_for_cdp_ready(remote_debugging_port, request.target_id.as_deref())
+        .instrument(tracing::info_span!(
+            "launch_browser_session_global.wait_for_cdp_ready",
+            remote_debugging_port
+        ))
+        .await
     {
         finalize_browser_runtime_launch_audit(launch_audit, Some(error.clone())).await;
         return Err(error);
@@ -458,6 +488,9 @@ pub async fn launch_browser_session_global(
             .as_ref()
             .and_then(|environment| environment.preset_name.clone()),
     })
+    .instrument(tracing::info_span!(
+        "launch_browser_session_global.open_cdp_session"
+    ))
     .await
     {
         Ok(session) => session,
@@ -481,6 +514,10 @@ pub async fn launch_browser_session_global(
         let runtime = shared_browser_runtime();
         if let Err(error) =
             apply_browser_environment_to_session(runtime.as_ref(), &session.session_id, environment)
+                .instrument(tracing::info_span!(
+                    "launch_browser_session_global.apply_environment",
+                    session_id = %session.session_id
+                ))
                 .await
         {
             finalize_browser_runtime_launch_audit(launch_audit, Some(error.clone())).await;
@@ -497,6 +534,10 @@ pub async fn launch_browser_session_global(
             mode: stream_mode,
         },
     )
+    .instrument(tracing::info_span!(
+        "launch_browser_session_global.start_stream",
+        session_id = %session.session_id
+    ))
     .await
     {
         Ok(session) => session,
@@ -516,13 +557,18 @@ pub async fn launch_browser_session_global(
 
     if request.open_window {
         let window_started_at = Instant::now();
-        if let Err(error) = browser_runtime_window::open_browser_runtime_window(
-            &app_handle,
-            Some(&session.session_id),
-            Some(&request.profile_key),
+        if let Err(error) = tracing::info_span!(
+            "launch_browser_session_global.open_debugger_window",
+            session_id = %session.session_id
         )
-        .map_err(|e| format!("打开浏览器运行时调试窗口失败: {e}"))
-        {
+        .in_scope(|| {
+            browser_runtime_window::open_browser_runtime_window(
+                &app_handle,
+                Some(&session.session_id),
+                Some(&request.profile_key),
+            )
+            .map_err(|e| format!("打开浏览器运行时调试窗口失败: {e}"))
+        }) {
             finalize_browser_runtime_launch_audit(launch_audit, Some(error.clone())).await;
             return Err(error);
         }
@@ -545,12 +591,23 @@ pub async fn launch_browser_session_global(
                     "url": launch_url,
                 }),
             )
+            .instrument(tracing::info_span!(
+                "launch_browser_session_global.navigate",
+                session_id = %session.session_id
+            ))
             .await
         {
             finalize_browser_runtime_launch_audit(launch_audit, Some(error.clone())).await;
             return Err(error);
         }
-        session = match runtime.refresh_page_info(&session.session_id).await {
+        session = match runtime
+            .refresh_page_info(&session.session_id)
+            .instrument(tracing::debug_span!(
+                "launch_browser_session_global.refresh_page_info",
+                session_id = %session.session_id
+            ))
+            .await
+        {
             Ok(session) => session,
             Err(error) => {
                 finalize_browser_runtime_launch_audit(launch_audit, Some(error.clone())).await;

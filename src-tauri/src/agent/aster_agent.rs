@@ -10,7 +10,9 @@ use futures::StreamExt;
 use lime_agent::{convert_agent_event, TauriAgentEvent, WriteArtifactEventEmitter};
 use tauri::{AppHandle, Emitter};
 
-pub use lime_agent::session_store::{SessionDetail, SessionInfo};
+pub use lime_agent::session_store::{
+    PersistedSessionMetadata, SessionDetail, SessionInfo, SessionTitlePreviewMessage,
+};
 
 /// Aster Agent 包装器
 ///
@@ -138,6 +140,21 @@ impl AsterAgentWrapper {
         lime_agent::session_store::get_session_sync(db, session_id)
     }
 
+    pub fn get_persisted_session_metadata_sync(
+        db: &DbConnection,
+        session_id: &str,
+    ) -> Result<Option<PersistedSessionMetadata>, String> {
+        lime_agent::session_store::get_persisted_session_metadata_sync(db, session_id)
+    }
+
+    pub fn list_title_preview_messages_sync(
+        db: &DbConnection,
+        session_id: &str,
+        limit: usize,
+    ) -> Result<Vec<SessionTitlePreviewMessage>, String> {
+        lime_agent::session_store::list_title_preview_messages_sync(db, session_id, limit)
+    }
+
     /// 重命名会话
     pub fn rename_session_sync(
         db: &DbConnection,
@@ -147,9 +164,29 @@ impl AsterAgentWrapper {
         lime_agent::session_store::rename_session_sync(db, session_id, name)
     }
 
+    pub fn update_session_working_dir_sync(
+        db: &DbConnection,
+        session_id: &str,
+        working_dir: &str,
+    ) -> Result<(), String> {
+        lime_agent::session_store::update_session_working_dir_sync(db, session_id, working_dir)
+    }
+
+    pub fn update_session_execution_strategy_sync(
+        db: &DbConnection,
+        session_id: &str,
+        execution_strategy: &str,
+    ) -> Result<(), String> {
+        lime_agent::session_store::update_session_execution_strategy_sync(
+            db,
+            session_id,
+            execution_strategy,
+        )
+    }
+
     /// 删除会话
-    pub fn delete_session_sync(db: &DbConnection, session_id: &str) -> Result<(), String> {
-        lime_agent::session_store::delete_session_sync(db, session_id)
+    pub async fn delete_session(db: &DbConnection, session_id: &str) -> Result<(), String> {
+        lime_agent::session_store::delete_session(db, session_id).await
     }
 }
 

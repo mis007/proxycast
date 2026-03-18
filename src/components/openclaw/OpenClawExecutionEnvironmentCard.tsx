@@ -1,5 +1,11 @@
-import { Cpu, Package, TerminalSquare } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, Cpu, Package, TerminalSquare } from "lucide-react";
 import type { OpenClawRuntimeCandidate } from "@/lib/api/openclaw";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -8,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { openClawSubPanelClassName } from "./openclawStyles";
+import { compactPathLabel } from "./pathDisplay";
 
 const AUTO_RUNTIME_VALUE = "__auto_runtime__";
 
@@ -61,6 +68,23 @@ function formatOpenClawStatus(candidate: OpenClawRuntimeCandidate | null): strin
   return "当前运行时尚未安装 OpenClaw";
 }
 
+function buildEnvironmentDetails(
+  candidate: OpenClawRuntimeCandidate | null,
+): Array<{ label: string; value: string }> {
+  if (!candidate) {
+    return [];
+  }
+
+  return [
+    { label: "Node.js 可执行文件", value: candidate.nodePath },
+    { label: "运行时 bin 目录", value: candidate.binDir },
+    { label: "npm 命令", value: candidate.npmPath || "" },
+    { label: "npm 全局前缀", value: candidate.npmGlobalPrefix || "" },
+    { label: "OpenClaw 命令", value: candidate.openclawPath || "" },
+    { label: "OpenClaw 包路径", value: candidate.openclawPackagePath || "" },
+  ].filter((item) => item.value.trim().length > 0);
+}
+
 export function OpenClawExecutionEnvironmentCard({
   candidates,
   preferredRuntimeId,
@@ -69,6 +93,7 @@ export function OpenClawExecutionEnvironmentCard({
   className,
   onChange,
 }: OpenClawExecutionEnvironmentCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const currentCandidate =
     (preferredRuntimeId
       ? candidates.find((candidate) => candidate.id === preferredRuntimeId)
@@ -79,6 +104,10 @@ export function OpenClawExecutionEnvironmentCard({
     null;
   const selectValue = preferredRuntimeId || AUTO_RUNTIME_VALUE;
   const showSelector = candidates.length > 0;
+  const environmentDetails = useMemo(
+    () => buildEnvironmentDetails(currentCandidate),
+    [currentCandidate],
+  );
 
   return (
     <div className={cn(openClawSubPanelClassName, className)}>
@@ -110,8 +139,13 @@ export function OpenClawExecutionEnvironmentCard({
                 <div className="truncate text-sm font-medium text-slate-900">
                   {formatRuntimeSelectionLabel(currentCandidate, preferredRuntimeId)}
                 </div>
-                <div className="mt-1 truncate text-xs text-slate-500">
-                  {currentCandidate?.binDir || "由 Lime 自动选择最合适的运行时"}
+                <div
+                  className="mt-1 truncate text-xs text-slate-500"
+                  title={currentCandidate?.binDir || undefined}
+                >
+                  {currentCandidate?.binDir
+                    ? compactPathLabel(currentCandidate.binDir, 56)
+                    : "由 Lime 自动选择最合适的运行时"}
                 </div>
               </div>
             </SelectTrigger>
@@ -144,8 +178,11 @@ export function OpenClawExecutionEnvironmentCard({
                           ? "已检测到 OpenClaw 包"
                           : "当前运行时未安装 OpenClaw"}
                     </div>
-                    <div className="mt-1 truncate text-[11px] text-slate-400">
-                      {candidate.binDir}
+                    <div
+                      className="mt-1 truncate text-[11px] text-slate-400"
+                      title={candidate.binDir}
+                    >
+                      {compactPathLabel(candidate.binDir, 56)}
                     </div>
                   </div>
                 </SelectItem>
@@ -164,8 +201,13 @@ export function OpenClawExecutionEnvironmentCard({
           <div className="mt-2 text-sm font-medium text-slate-900">
             {currentCandidate?.nodeVersion || "未识别"}
           </div>
-          <div className="mt-1 break-all text-[11px] leading-5 text-slate-500">
-            {currentCandidate?.nodePath || "未检测到"}
+          <div
+            className="mt-1 truncate text-[11px] leading-5 text-slate-500"
+            title={currentCandidate?.nodePath || undefined}
+          >
+            {currentCandidate?.nodePath
+              ? compactPathLabel(currentCandidate.nodePath, 46)
+              : "未检测到"}
           </div>
         </div>
 
@@ -177,10 +219,19 @@ export function OpenClawExecutionEnvironmentCard({
           <div className="mt-2 text-sm font-medium text-slate-900">
             {formatOpenClawStatus(currentCandidate)}
           </div>
-          <div className="mt-1 break-all text-[11px] leading-5 text-slate-500">
-            {currentCandidate?.openclawPath ||
+          <div
+            className="mt-1 truncate text-[11px] leading-5 text-slate-500"
+            title={
+              currentCandidate?.openclawPath ||
               currentCandidate?.openclawPackagePath ||
-              "切换到该运行时后可直接安装 OpenClaw。"}
+              undefined
+            }
+          >
+            {currentCandidate?.openclawPath
+              ? compactPathLabel(currentCandidate.openclawPath, 46)
+              : currentCandidate?.openclawPackagePath
+                ? compactPathLabel(currentCandidate.openclawPackagePath, 46)
+                : "切换到该运行时后可直接安装 OpenClaw。"}
           </div>
         </div>
 
@@ -192,13 +243,73 @@ export function OpenClawExecutionEnvironmentCard({
           <div className="mt-2 text-sm font-medium text-slate-900">
             {currentCandidate?.source || "未识别"}
           </div>
-          <div className="mt-1 break-all text-[11px] leading-5 text-slate-500">
-            {currentCandidate?.npmGlobalPrefix ||
-              currentCandidate?.npmPath ||
-              "当前未检测到 npm 全局前缀"}
+          <div
+            className="mt-1 truncate text-[11px] leading-5 text-slate-500"
+            title={currentCandidate?.npmGlobalPrefix || currentCandidate?.npmPath || undefined}
+          >
+            {currentCandidate?.npmGlobalPrefix
+              ? compactPathLabel(currentCandidate.npmGlobalPrefix, 46)
+              : currentCandidate?.npmPath
+                ? compactPathLabel(currentCandidate.npmPath, 46)
+                : "当前未检测到 npm 全局前缀"}
           </div>
         </div>
       </div>
+
+      {environmentDetails.length > 0 ? (
+        <Collapsible
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          className="mt-4"
+        >
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80">
+            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-900">
+                  环境详情
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  默认只保留运行时摘要，排查路径与前缀冲突时再展开完整信息。
+                </p>
+              </div>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  {detailsOpen ? "收起详情" : "查看详情"}
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-200",
+                      detailsOpen ? "rotate-180" : "rotate-0",
+                    )}
+                  />
+                </button>
+              </CollapsibleTrigger>
+            </div>
+
+            <CollapsibleContent>
+              <div className="border-t border-slate-200/80 px-4 py-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {environmentDetails.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl border border-slate-200/70 bg-slate-50/80 px-3 py-3"
+                    >
+                      <div className="text-[11px] font-medium text-slate-500">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 break-all text-xs leading-6 text-slate-700">
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      ) : null}
     </div>
   );
 }

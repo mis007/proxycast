@@ -705,7 +705,7 @@ mod tests {
         let stale_run = AgentRun {
             id: "run-stale".to_string(),
             source: "chat".to_string(),
-            source_ref: Some("aster_agent_chat_stream".to_string()),
+            source_ref: Some("agent_runtime_submit_turn".to_string()),
             session_id: Some("session-1".to_string()),
             status: AgentRunStatus::Running,
             started_at: stale_started_at.clone(),
@@ -720,7 +720,7 @@ mod tests {
         let fresh_run = AgentRun {
             id: "run-fresh".to_string(),
             source: "chat".to_string(),
-            source_ref: Some("aster_agent_chat_stream".to_string()),
+            source_ref: Some("agent_runtime_submit_turn".to_string()),
             session_id: Some("session-1".to_string()),
             status: AgentRunStatus::Queued,
             started_at: fresh_started_at.clone(),
@@ -735,7 +735,7 @@ mod tests {
         let terminal_run = AgentRun {
             id: "run-terminal".to_string(),
             source: "chat".to_string(),
-            source_ref: Some("aster_agent_chat_stream".to_string()),
+            source_ref: Some("agent_runtime_submit_turn".to_string()),
             session_id: Some("session-1".to_string()),
             status: AgentRunStatus::Success,
             started_at: now.to_rfc3339(),

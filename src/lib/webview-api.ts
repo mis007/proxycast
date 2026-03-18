@@ -8,7 +8,6 @@
  */
 
 import { safeInvoke } from "@/lib/dev-bridge";
-import { Webview } from "@tauri-apps/api/webview";
 
 /**
  * Webview 面板信息
@@ -914,24 +913,7 @@ export async function getBrowserActionAuditLogs(
 export async function closeWebviewPanel(panelId: string): Promise<boolean> {
   console.log("[webview-api] 尝试关闭 webview:", panelId);
 
-  // 方法 1: 尝试使用 Tauri JavaScript API 直接关闭
-  try {
-    const webview = await Webview.getByLabel(panelId);
-    if (webview) {
-      console.log("[webview-api] 找到 webview，尝试关闭");
-      await webview.close();
-      console.log("[webview-api] Tauri API 关闭成功");
-      // 也调用后端清理状态
-      await safeInvoke<boolean>("close_webview_panel", {
-        panelId,
-      }).catch(() => {});
-      return true;
-    }
-  } catch (e) {
-    console.warn("[webview-api] Tauri API 关闭失败:", e);
-  }
-
-  // 方法 2: 使用后端命令关闭
+  // 统一走后端命令，避免前端在启动期提前加载 Tauri webview/window/event 链路。
   try {
     const result = await safeInvoke<boolean>("close_webview_panel", {
       panelId,

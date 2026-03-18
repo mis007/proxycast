@@ -20,9 +20,10 @@ import { useConfiguredProviders } from "@/hooks/useConfiguredProviders";
 import { useProviderModels } from "@/hooks/useProviderModels";
 import { filterModelsByTheme } from "@/components/agent/chat/utils/modelThemePolicy";
 import { getProviderModelCompatibilityIssue } from "@/components/agent/chat/utils/providerModelCompatibility";
+import { getProviderLabel } from "@/lib/constants/providerMappings";
 
 const compactTriggerClassName =
-  "h-8 w-8 rounded-full border-slate-200/80 bg-white/92 p-0 text-slate-500 shadow-none transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-700";
+  "h-8 min-w-[104px] max-w-[168px] justify-start gap-1.5 rounded-full border-slate-200/80 bg-white/92 px-2.5 text-slate-600 shadow-none transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-800";
 
 const defaultTriggerClassName =
   "h-9 w-full min-w-0 justify-start gap-2 rounded-full border-slate-200/80 bg-white/92 px-3 font-normal text-slate-700 shadow-none transition-colors hover:border-slate-300 hover:bg-white";
@@ -68,12 +69,38 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
+  const [backgroundProviderLoadReady, setBackgroundProviderLoadReady] =
+    useState(false);
   const hasInitialized = useRef(false);
   const modelRef = useRef(model);
   modelRef.current = model;
+  const shouldLoadProviders =
+    open ||
+    backgroundProviderLoadReady ||
+    !providerType.trim() ||
+    !model.trim();
+  const shouldLoadModels = open || !providerType.trim() || !model.trim();
+
+  useEffect(() => {
+    if (open || backgroundProviderLoadReady) {
+      return;
+    }
+
+    let cancelled = false;
+    const timerId = window.setTimeout(() => {
+      if (!cancelled) {
+        setBackgroundProviderLoadReady(true);
+      }
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [backgroundProviderLoadReady, open]);
 
   const { providers: configuredProviders, loading: providersLoading } =
-    useConfiguredProviders();
+    useConfiguredProviders({ autoLoad: shouldLoadProviders });
 
   const selectedProvider = useMemo(() => {
     return configuredProviders.find(
@@ -83,7 +110,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   const { models: providerModels, loading: modelsLoading } = useProviderModels(
     selectedProvider,
-    { returnFullMetadata: true },
+    { returnFullMetadata: true, autoLoad: shouldLoadModels },
   );
 
   const filteredResult = useMemo(() => {
@@ -121,6 +148,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   useEffect(() => {
     if (hasInitialized.current) return;
+    if (!shouldLoadProviders) return;
     if (providersLoading) return;
     if (configuredProviders.length === 0) return;
 
@@ -129,9 +157,16 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     if (!providerType.trim()) {
       setProviderType(configuredProviders[0].key);
     }
-  }, [configuredProviders, providerType, providersLoading, setProviderType]);
+  }, [
+    configuredProviders,
+    providerType,
+    providersLoading,
+    setProviderType,
+    shouldLoadProviders,
+  ]);
 
   useEffect(() => {
+    if (!shouldLoadModels) return;
     if (!selectedProvider) return;
     if (modelsLoading) return;
 
@@ -142,7 +177,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     ) {
       setModel(currentModels[0]);
     }
-  }, [currentModels, modelsLoading, selectedProvider, setModel]);
+  }, [
+    currentModels,
+    modelsLoading,
+    selectedProvider,
+    setModel,
+    shouldLoadModels,
+  ]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -173,11 +214,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     setOpen(false);
   }, [disabled, open]);
 
-  const selectedProviderLabel = selectedProvider?.label || providerType;
+  const selectedProviderLabel =
+    selectedProvider?.label || getProviderLabel(providerType || "lime-hub");
   const compactProviderType =
     selectedProvider?.key || providerType || "lime-hub";
   const compactProviderLabel =
-    selectedProvider?.label || providerType || "Lime Hub";
+    selectedProvider?.label ||
+    getProviderLabel(providerType || "lime-hub") ||
+    "Lime Hub";
+  const compactModelLabel = model || "切换模型";
   const normalizedTheme = (activeTheme || "").toLowerCase();
   const activeThemeLabel =
     THEME_LABEL_MAP[normalizedTheme] || activeTheme || "当前主题";
@@ -187,7 +232,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     !filteredResult.usedFallback &&
     filteredResult.filteredOutCount > 0;
   const showNoProviderGuide =
-    !providersLoading && configuredProviders.length === 0;
+    shouldLoadProviders && !providersLoading && configuredProviders.length === 0;
 
   if (showNoProviderGuide) {
     return (
@@ -241,7 +286,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           {compactTrigger ? (
             <Button
               variant="outline"
-              size="icon"
               role="combobox"
               aria-expanded={open}
               disabled={disabled}
@@ -256,6 +300,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 fallbackText={compactProviderLabel}
                 size={15}
               />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                {compactModelLabel}
+              </span>
+              <ChevronDown className="h-3 w-3 shrink-0 text-slate-400 opacity-80" />
             </Button>
           ) : (
             <Button

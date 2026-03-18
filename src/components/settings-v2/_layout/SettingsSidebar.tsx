@@ -19,7 +19,6 @@ const SidebarContainer = styled.aside`
   min-width: 240px;
   height: 100%;
   background: hsl(var(--card));
-  border-right: 1px solid hsl(var(--border));
   overflow-y: auto;
   padding: 16px 8px;
 

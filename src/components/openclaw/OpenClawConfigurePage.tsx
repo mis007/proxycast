@@ -16,6 +16,7 @@ import type {
 } from "@/lib/api/openclaw";
 import { cn } from "@/lib/utils";
 import type { OpenClawLastSynced } from "./types";
+import { compactPathLabel } from "./pathDisplay";
 import {
   openClawDangerButtonClassName,
   openClawInputClassName,
@@ -93,6 +94,9 @@ export function OpenClawConfigurePage({
   const healthText = healthInfo
     ? `${healthInfo.status}${healthInfo.version ? ` · ${healthInfo.version}` : ""}`
     : "尚未执行健康检查";
+  const installPathLabel = installPath
+    ? compactPathLabel(installPath, 76)
+    : "未检测到安装路径";
 
   return (
     <div className="space-y-4">
@@ -184,8 +188,11 @@ export function OpenClawConfigurePage({
                   OpenClaw 安装路径
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-sm leading-6 text-slate-600">
-                  <span className="break-all">
-                    {installPath || "未检测到安装路径"}
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    title={installPath || undefined}
+                  >
+                    {installPathLabel}
                   </span>
                   <button
                     type="button"

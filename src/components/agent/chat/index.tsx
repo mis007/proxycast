@@ -58,11 +58,10 @@ import type { TopicBranchStatus } from "./hooks/useTopicBranchBoard";
 import { useSessionFiles } from "./hooks/useSessionFiles";
 import { useContentSync, type SyncStatus } from "./hooks/useContentSync";
 import { getDefaultGuidePromptByTheme } from "./utils/defaultGuidePrompt";
+import { useTrayModelShortcuts } from "./hooks/useTrayModelShortcuts";
 import { ChatNavbar } from "./components/ChatNavbar";
 import { ChatSidebar } from "./components/ChatSidebar";
-import {
-  ThemeWorkbenchSidebar,
-} from "./components/ThemeWorkbenchSidebar";
+import { ThemeWorkbenchSidebar } from "./components/ThemeWorkbenchSidebar";
 import type { ThemeWorkbenchCreationTaskEvent } from "./components/themeWorkbenchWorkflowData";
 import { AgentRuntimeStrip } from "./components/AgentRuntimeStrip";
 import { HarnessStatusPanel } from "./components/HarnessStatusPanel";
@@ -158,6 +157,7 @@ import {
   type ProjectMemory,
   type Character,
 } from "@/lib/api/memory";
+import { logAgentDebug } from "@/lib/agentDebug";
 import { browserExecuteAction, launchBrowserSession } from "@/lib/webview-api";
 import type { Page, PageParams } from "@/types/page";
 import { SettingsTabs } from "@/types/settings";
@@ -166,7 +166,7 @@ import {
   buildClawAgentParams,
   buildHomeAgentParams,
 } from "@/lib/workspace/navigation";
-import { useConfiguredProviders } from "@/hooks/useConfiguredProviders";
+import { loadConfiguredProviders } from "@/hooks/useConfiguredProviders";
 import { useSubAgentScheduler } from "@/hooks/useSubAgentScheduler";
 import {
   executionRunGet,
@@ -182,7 +182,7 @@ import { recordWorkspaceRepair } from "@/lib/workspaceHealthTelemetry";
 import { listMaterials, uploadMaterial } from "@/lib/api/materials";
 import { setStoredResourceProjectId } from "@/lib/resourceProjectSelection";
 import { resolveProviderModelCompatibility } from "./utils/providerModelCompatibility";
-import { useProviderModels } from "@/hooks/useProviderModels";
+import { loadProviderModels } from "@/hooks/useProviderModels";
 import {
   isReasoningModel,
   resolveBaseModelOnThinkingOff,
@@ -614,21 +614,33 @@ function mergeMessageArtifactsIntoStore(
   ]);
 }
 
-const PageContainer = styled.div`
+const PageContainer = styled.div<{ $compact?: boolean }>`
   display: flex;
   height: 100%;
   width: 100%;
   position: relative;
   min-height: 0;
-  gap: 14px;
-  padding: 14px;
+  gap: ${({ $compact }) => ($compact ? "8px" : "14px")};
+  padding: ${({ $compact }) => ($compact ? "8px" : "14px")};
   box-sizing: border-box;
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(circle at 14% 18%, rgba(56, 189, 248, 0.1), transparent 30%),
-    radial-gradient(circle at 86% 14%, rgba(16, 185, 129, 0.08), transparent 28%),
-    radial-gradient(circle at 72% 84%, rgba(245, 158, 11, 0.06), transparent 24%),
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(56, 189, 248, 0.1),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 86% 14%,
+      rgba(16, 185, 129, 0.08),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 72% 84%,
+      rgba(245, 158, 11, 0.06),
+      transparent 24%
+    ),
     linear-gradient(
       180deg,
       rgba(248, 250, 252, 0.98) 0%,
@@ -642,7 +654,7 @@ const PageContainer = styled.div`
   }
 `;
 
-const MainArea = styled.div`
+const MainArea = styled.div<{ $compact?: boolean }>`
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -651,14 +663,13 @@ const MainArea = styled.div`
   overflow: hidden;
   position: relative;
   border: 1px solid rgba(226, 232, 240, 0.88);
-  border-radius: 32px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.96) 0%,
-      rgba(248, 250, 252, 0.94) 56%,
-      rgba(248, 250, 252, 0.88) 100%
-    );
+  border-radius: ${({ $compact }) => ($compact ? "24px" : "32px")};
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(248, 250, 252, 0.94) 56%,
+    rgba(248, 250, 252, 0.88) 100%
+  );
   box-shadow:
     0 24px 72px -36px rgba(15, 23, 42, 0.18),
     0 16px 28px -24px rgba(15, 23, 42, 0.1),
@@ -743,13 +754,12 @@ const ChatContainerInner = styled.div`
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(248, 250, 252, 0.78) 0%,
-      rgba(255, 255, 255, 0.12) 18%,
-      rgba(255, 255, 255, 0) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.78) 0%,
+    rgba(255, 255, 255, 0.12) 18%,
+    rgba(255, 255, 255, 0) 100%
+  );
 `;
 
 const EntryBanner = styled.div`
@@ -760,12 +770,11 @@ const EntryBanner = styled.div`
   padding: 10px 12px;
   border-radius: 18px;
   border: 1px solid rgba(191, 219, 254, 0.9);
-  background:
-    linear-gradient(
-      180deg,
-      rgba(239, 246, 255, 0.96) 0%,
-      rgba(248, 250, 252, 0.92) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(239, 246, 255, 0.96) 0%,
+    rgba(248, 250, 252, 0.92) 100%
+  );
   color: #0f172a;
   font-size: 13px;
   box-shadow: 0 10px 22px -20px rgba(15, 23, 42, 0.16);
@@ -780,12 +789,12 @@ const EntryBannerClose = styled.button`
   font-size: 13px;
 `;
 
-const ChatContent = styled.div`
+const ChatContent = styled.div<{ $compact?: boolean }>`
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 0 10px 10px;
+  padding: ${({ $compact }) => ($compact ? "0 6px 6px" : "0 10px 10px")};
   overflow: hidden;
   height: 100%;
   position: relative;
@@ -916,12 +925,11 @@ const ThemeWorkbenchLeftExpandButton = styled.button`
   height: 78px;
   border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 14px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.94) 0%,
-      rgba(248, 250, 252, 0.9) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(248, 250, 252, 0.9) 100%
+  );
   color: #64748b;
   display: inline-flex;
   align-items: center;
@@ -933,12 +941,11 @@ const ThemeWorkbenchLeftExpandButton = styled.button`
   &:hover {
     color: #0f172a;
     border-color: rgba(148, 163, 184, 0.84);
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.98) 0%,
-        rgba(241, 245, 249, 0.92) 100%
-      );
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(241, 245, 249, 0.92) 100%
+    );
   }
 `;
 
@@ -2456,6 +2463,39 @@ export function AgentChatPage({
     externalProjectId ??
     (shouldResetToFreshHomeContext ? undefined : internalProjectId) ??
     undefined;
+  const pageMountedAtRef = useRef(Date.now());
+
+  useEffect(() => {
+    const mountedAt = pageMountedAtRef.current;
+    logAgentDebug("AgentChatPage", "mount", {
+      agentEntry,
+      contentId: contentId ?? null,
+      externalProjectId: externalProjectId ?? null,
+      initialCreationMode: initialCreationMode ?? null,
+      initialTheme: initialTheme ?? null,
+      lockTheme,
+    });
+
+    return () => {
+      logAgentDebug(
+        "AgentChatPage",
+        "unmount",
+        {
+          contentId: contentId ?? null,
+          externalProjectId: externalProjectId ?? null,
+          lifetimeMs: Date.now() - mountedAt,
+        },
+        { consoleOnly: true },
+      );
+    };
+  }, [
+    agentEntry,
+    contentId,
+    externalProjectId,
+    initialCreationMode,
+    initialTheme,
+    lockTheme,
+  ]);
 
   // 画布状态（支持多种画布类型）
   const [canvasState, setCanvasState] = useState<CanvasStateUnion | null>(
@@ -2603,7 +2643,7 @@ export function AgentChatPage({
   } | null>(null);
   const isResolvingTopicProjectRef = useRef(false);
 
-  // 文件写入回调 ref（用于传递给 useAgentChat）
+  // 文件写入回调 ref（用于传递给统一聊天主链 Hook）
   const handleWriteFileRef =
     useRef<
       (
@@ -2748,23 +2788,47 @@ export function AgentChatPage({
     _onNavigate?.("settings", { tab: SettingsTabs.Skills });
   }, [_onNavigate]);
 
-  const loadSkills = useCallback(async (): Promise<Skill[]> => {
-    setSkillsLoading(true);
-    try {
-      const loadedSkills = await skillsApi.getAll("lime");
-      setSkills(loadedSkills);
-      return loadedSkills;
-    } catch (error) {
-      console.warn("[AgentChatPage] 加载 skills 失败:", error);
-      setSkills([]);
-      return [];
-    } finally {
-      setSkillsLoading(false);
-    }
-  }, []);
+  const loadSkills = useCallback(
+    async (includeRemote = false): Promise<Skill[]> => {
+      const startedAt = Date.now();
+      logAgentDebug("AgentChatPage", "loadSkills.start", {
+        includeRemote,
+      });
+      setSkillsLoading(true);
+      try {
+        const loadedSkills = includeRemote
+          ? await skillsApi.getAll("lime")
+          : await skillsApi.getLocal("lime");
+        logAgentDebug("AgentChatPage", "loadSkills.success", {
+          durationMs: Date.now() - startedAt,
+          includeRemote,
+          skillsCount: loadedSkills.length,
+        });
+        setSkills(loadedSkills);
+        return loadedSkills;
+      } catch (error) {
+        console.warn("[AgentChatPage] 加载 skills 失败:", error);
+        logAgentDebug(
+          "AgentChatPage",
+          "loadSkills.error",
+          {
+            durationMs: Date.now() - startedAt,
+            error,
+            includeRemote,
+          },
+          { level: "warn" },
+        );
+        setSkills([]);
+        return [];
+      } finally {
+        setSkillsLoading(false);
+      }
+    },
+    [],
+  );
 
   const handleRefreshSkills = useCallback(async () => {
-    await loadSkills();
+    await loadSkills(true);
   }, [loadSkills]);
 
   // 加载项目、Memory 和内容
@@ -2772,6 +2836,13 @@ export function AgentChatPage({
     let cancelled = false;
 
     const loadData = async () => {
+      const startedAt = Date.now();
+      logAgentDebug("AgentChatPage", "loadData.start", {
+        contentId: contentId ?? null,
+        lockTheme,
+        projectId: projectId ?? null,
+      });
+
       if (contentId) {
         setIsInitialContentLoading(true);
         setInitialContentLoadError(null);
@@ -2784,6 +2855,10 @@ export function AgentChatPage({
         if (cancelled) {
           return;
         }
+        logAgentDebug("AgentChatPage", "loadData.noProject", {
+          contentId: contentId ?? null,
+          durationMs: Date.now() - startedAt,
+        });
         setProject(null);
         setProjectMemory(null);
         setIsInitialContentLoading(false);
@@ -2796,6 +2871,16 @@ export function AgentChatPage({
           if (cancelled) {
             return;
           }
+          logAgentDebug(
+            "AgentChatPage",
+            "loadData.projectMissing",
+            {
+              contentId: contentId ?? null,
+              durationMs: Date.now() - startedAt,
+              projectId,
+            },
+            { level: "warn" },
+          );
           setProject(null);
           setProjectMemory(null);
           if (contentId) {
@@ -2810,6 +2895,12 @@ export function AgentChatPage({
 
         setProject(p);
         const theme = projectTypeToTheme(p.workspaceType);
+        logAgentDebug("AgentChatPage", "loadData.projectLoaded", {
+          durationMs: Date.now() - startedAt,
+          projectId: p.id,
+          theme,
+          workspaceType: p.workspaceType,
+        });
         if (!lockTheme || !initialTheme) {
           setActiveTheme(theme);
         }
@@ -2819,8 +2910,19 @@ export function AgentChatPage({
           return;
         }
         setProjectMemory(memory);
+        logAgentDebug("AgentChatPage", "loadData.memoryLoaded", {
+          charactersCount: memory?.characters?.length ?? 0,
+          durationMs: Date.now() - startedAt,
+          hasOutline: Boolean(memory?.outline?.length),
+          hasStyleGuide: Boolean(memory?.style_guide),
+          projectId,
+        });
 
         if (!contentId) {
+          logAgentDebug("AgentChatPage", "loadData.projectOnlyComplete", {
+            durationMs: Date.now() - startedAt,
+            projectId,
+          });
           return;
         }
 
@@ -2830,9 +2932,26 @@ export function AgentChatPage({
         }
 
         if (!content) {
+          logAgentDebug(
+            "AgentChatPage",
+            "loadData.contentMissing",
+            {
+              contentId,
+              durationMs: Date.now() - startedAt,
+              projectId,
+            },
+            { level: "warn" },
+          );
           setInitialContentLoadError("文稿不存在或读取失败");
           return;
         }
+
+        logAgentDebug("AgentChatPage", "loadData.contentLoaded", {
+          bodyLength: content.body?.length ?? 0,
+          contentId: content.id,
+          durationMs: Date.now() - startedAt,
+          projectId,
+        });
 
         contentMetadataRef.current = content.metadata || {};
         const canvasTheme = (
@@ -2865,7 +2984,22 @@ export function AgentChatPage({
               "[AgentChatPage] 读取主题工作台版本状态失败，降级为 metadata 解析:",
               error,
             );
+            logAgentDebug(
+              "AgentChatPage",
+              "loadData.documentStateError",
+              {
+                contentId: content.id,
+                durationMs: Date.now() - startedAt,
+                error,
+              },
+              { level: "warn" },
+            );
             return null;
+          });
+          logAgentDebug("AgentChatPage", "loadData.documentStateLoaded", {
+            contentId: content.id,
+            durationMs: Date.now() - startedAt,
+            hasBackendDocumentState: Boolean(backendDocumentState),
           });
           const backendApplied = backendDocumentState
             ? applyBackendThemeWorkbenchDocumentState(
@@ -2913,8 +3047,25 @@ export function AgentChatPage({
         };
         setCanvasState(initialState);
         setLayoutMode("canvas");
+        logAgentDebug("AgentChatPage", "loadData.complete", {
+          contentId: content.id,
+          durationMs: Date.now() - startedAt,
+          initialStateType: initialState.type,
+          projectId,
+        });
       } catch (error) {
         console.error("[AgentChatPage] 加载项目或文稿失败:", error);
+        logAgentDebug(
+          "AgentChatPage",
+          "loadData.error",
+          {
+            contentId: contentId ?? null,
+            durationMs: Date.now() - startedAt,
+            error,
+            projectId: projectId ?? null,
+          },
+          { level: "error" },
+        );
         if (!cancelled && contentId) {
           setInitialContentLoadError("文稿加载失败，请稍后重试");
         }
@@ -2957,6 +3108,10 @@ export function AgentChatPage({
     const normalizedId = normalizeProjectId(projectId);
     if (!normalizedId) return;
 
+    const startedAt = Date.now();
+    logAgentDebug("AgentChatPage", "workspaceCheck.start", {
+      projectId: normalizedId,
+    });
     ensureWorkspaceReady(normalizedId)
       .then(({ repaired, rootPath }) => {
         if (repaired) {
@@ -2967,10 +3122,26 @@ export function AgentChatPage({
           });
           console.info("[AgentChatPage] workspace 目录已自动修复:", rootPath);
         }
+        logAgentDebug("AgentChatPage", "workspaceCheck.success", {
+          durationMs: Date.now() - startedAt,
+          projectId: normalizedId,
+          repaired,
+          rootPath,
+        });
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         console.warn("[AgentChatPage] workspace 目录检查失败:", message);
+        logAgentDebug(
+          "AgentChatPage",
+          "workspaceCheck.error",
+          {
+            durationMs: Date.now() - startedAt,
+            error: err,
+            projectId: normalizedId,
+          },
+          { level: "warn" },
+        );
         setWorkspaceHealthError(true);
       });
   }, [projectId]);
@@ -3107,6 +3278,59 @@ export function AgentChatPage({
     workspaceId: projectId ?? "",
     disableSessionRestore: isNewTaskEntry,
   });
+  useEffect(() => {
+    logAgentDebug(
+      "AgentChatPage",
+      "stateSnapshot",
+      {
+        activeTheme,
+        contentId: contentId ?? null,
+        initialContentLoadError: initialContentLoadError ?? null,
+        isInitialContentLoading,
+        isSending,
+        layoutMode,
+        messagesCount: messages.length,
+        projectId: projectId ?? null,
+        sessionId: sessionId ?? null,
+        skillsCount: skills.length,
+        skillsLoading,
+        topicsCount: topics.length,
+        workspaceHealthError,
+      },
+      {
+        dedupeKey: JSON.stringify({
+          activeTheme,
+          contentId: contentId ?? null,
+          initialContentLoadError: initialContentLoadError ?? null,
+          isInitialContentLoading,
+          isSending,
+          layoutMode,
+          messagesCount: messages.length,
+          projectId: projectId ?? null,
+          sessionId: sessionId ?? null,
+          skillsCount: skills.length,
+          skillsLoading,
+          topicsCount: topics.length,
+          workspaceHealthError,
+        }),
+        throttleMs: 800,
+      },
+    );
+  }, [
+    activeTheme,
+    contentId,
+    initialContentLoadError,
+    isInitialContentLoading,
+    isSending,
+    layoutMode,
+    messages.length,
+    projectId,
+    sessionId,
+    skills.length,
+    skillsLoading,
+    topics.length,
+    workspaceHealthError,
+  ]);
   const settledLiveArtifact = useMemo(
     () =>
       settleLiveArtifactAfterStreamStops(liveArtifact, {
@@ -3174,7 +3398,6 @@ export function AgentChatPage({
     activeTheme === "general" &&
     layoutMode !== "chat" &&
     currentCanvasArtifact?.type === "browser_assist";
-  const { providers: configuredProviders } = useConfiguredProviders();
   const subAgentRuntime = useSubAgentScheduler(sessionId);
   const syntheticSubagentItems = useMemo(
     () =>
@@ -3211,14 +3434,19 @@ export function AgentChatPage({
   const [harnessPanelVisible, setHarnessPanelVisible] = useState(() =>
     loadPersistedBoolean(HARNESS_PANEL_VISIBILITY_KEY, false),
   );
-  const selectedProvider = useMemo(
-    () => configuredProviders.find((provider) => provider.key === providerType),
-    [configuredProviders, providerType],
-  );
-  const { models: providerModels } = useProviderModels(selectedProvider, {
-    returnFullMetadata: true,
-  });
   const thinkingVariantWarnedRef = useRef<Set<string>>(new Set());
+  const resolveSendProviderContext = useCallback(async () => {
+    const configuredProviders = await loadConfiguredProviders();
+    const selectedProvider =
+      configuredProviders.find((provider) => provider.key === providerType) ||
+      null;
+    const providerModels = await loadProviderModels(selectedProvider);
+
+    return {
+      selectedProvider,
+      providerModels,
+    };
+  }, [providerType]);
 
   useEffect(() => {
     onSessionChange?.(sessionId ?? null);
@@ -3362,7 +3590,7 @@ export function AgentChatPage({
   }, []);
 
   useEffect(() => {
-    void loadSkills();
+    void loadSkills(false);
   }, [loadSkills]);
 
   // 主题工作台模式：同步 skills 状态到 store
@@ -4744,23 +4972,54 @@ export function AgentChatPage({
 
   const runTopicSwitch = useCallback(
     async (topicId: string) => {
-      console.log("[AgentChatPage] switchTopic 包装函数被调用:", topicId);
+      const startedAt = Date.now();
+      logAgentDebug("AgentChatPage", "runTopicSwitch.start", {
+        currentProjectId: projectId ?? null,
+        topicId,
+      });
       resetTopicLocalState();
-      console.log("[AgentChatPage] 调用 originalSwitchTopic");
-      await originalSwitchTopic(topicId);
-      console.log("[AgentChatPage] originalSwitchTopic 完成");
+      try {
+        await originalSwitchTopic(topicId);
+        logAgentDebug("AgentChatPage", "runTopicSwitch.success", {
+          durationMs: Date.now() - startedAt,
+          topicId,
+        });
+      } catch (error) {
+        logAgentDebug(
+          "AgentChatPage",
+          "runTopicSwitch.error",
+          {
+            durationMs: Date.now() - startedAt,
+            error,
+            topicId,
+          },
+          { level: "error" },
+        );
+        throw error;
+      }
     },
-    [originalSwitchTopic, resetTopicLocalState],
+    [originalSwitchTopic, projectId, resetTopicLocalState],
   );
 
   const switchTopic = useCallback(
     async (topicId: string) => {
       if (isResolvingTopicProjectRef.current) {
+        logAgentDebug(
+          "AgentChatPage",
+          "switchTopic.skipWhileResolving",
+          { topicId },
+          { level: "warn", throttleMs: 1000 },
+        );
         return;
       }
 
       isResolvingTopicProjectRef.current = true;
       try {
+        logAgentDebug("AgentChatPage", "switchTopic.start", {
+          currentProjectId: projectId ?? null,
+          externalProjectId: externalProjectId ?? null,
+          topicId,
+        });
         const decision = await resolveTopicSwitchProject({
           lockedProjectId: externalProjectId ?? null,
           topicBoundProjectId: loadPersistedProjectId(
@@ -4786,6 +5045,12 @@ export function AgentChatPage({
               : null;
           },
         });
+        logAgentDebug("AgentChatPage", "switchTopic.decision", {
+          createdDefault: decision.createdDefault,
+          decisionStatus: decision.status,
+          projectId: decision.status === "ready" ? decision.projectId : null,
+          topicId,
+        });
 
         if (decision.status === "blocked") {
           toast.error("该任务绑定了其他项目，请先切换到对应项目");
@@ -4807,6 +5072,11 @@ export function AgentChatPage({
         const currentProjectId = normalizeProjectId(projectId);
         if (currentProjectId !== targetProjectId) {
           pendingTopicSwitchRef.current = { topicId, targetProjectId };
+          logAgentDebug("AgentChatPage", "switchTopic.deferUntilProjectReady", {
+            currentProjectId,
+            targetProjectId,
+            topicId,
+          });
           setInternalProjectId(targetProjectId);
           return;
         }
@@ -4814,6 +5084,16 @@ export function AgentChatPage({
         await runTopicSwitch(topicId);
       } catch (error) {
         console.error("[AgentChatPage] 解析任务项目失败:", error);
+        logAgentDebug(
+          "AgentChatPage",
+          "switchTopic.error",
+          {
+            error,
+            projectId: projectId ?? null,
+            topicId,
+          },
+          { level: "error" },
+        );
         toast.error("切换任务失败，请稍后重试");
       } finally {
         isResolvingTopicProjectRef.current = false;
@@ -4821,6 +5101,14 @@ export function AgentChatPage({
     },
     [externalProjectId, projectId, runTopicSwitch],
   );
+
+  useTrayModelShortcuts({
+    providerType,
+    setProviderType,
+    model,
+    setModel,
+    activeTheme: mappedTheme,
+  });
 
   useEffect(() => {
     const pending = pendingTopicSwitchRef.current;
@@ -4834,8 +5122,22 @@ export function AgentChatPage({
     }
 
     pendingTopicSwitchRef.current = null;
+    logAgentDebug("AgentChatPage", "switchTopic.resumePending", {
+      projectId: currentProjectId,
+      topicId: pending.topicId,
+    });
     runTopicSwitch(pending.topicId).catch((error) => {
       console.error("[AgentChatPage] 执行待切换任务失败:", error);
+      logAgentDebug(
+        "AgentChatPage",
+        "switchTopic.resumePendingError",
+        {
+          error,
+          projectId: currentProjectId,
+          topicId: pending.topicId,
+        },
+        { level: "error" },
+      );
       toast.error("加载任务失败，请重试");
     });
   }, [projectId, runTopicSwitch]);
@@ -5240,6 +5542,8 @@ export function AgentChatPage({
       setMentionedCharacters([]); // 清空引用的角色
 
       try {
+        const { selectedProvider, providerModels } =
+          await resolveSendProviderContext();
         const memoryParams = {
           scope: "aster" as const,
           workspaceId: projectId,
@@ -5415,10 +5719,9 @@ export function AgentChatPage({
       model,
       _onNavigate,
       projectId,
-      providerModels,
       providerType,
+      resolveSendProviderContext,
       runtimeStyleMessagePrompt,
-      selectedProvider?.type,
       sendMessage,
       sessionId,
       setModel,
@@ -7403,7 +7706,7 @@ export function AgentChatPage({
     ],
   );
 
-  // 更新 ref，供 useAgentChat 使用
+  // 更新 ref，供统一聊天主链 Hook 使用
   useEffect(() => {
     handleWriteFileRef.current = handleWriteFile;
   }, [handleWriteFile]);
@@ -8973,6 +9276,10 @@ export function AgentChatPage({
   const shouldRenderInlineA2UI = isContentCreationMode;
   const shouldShowClawEmptyState =
     !isNewTaskEntry && !showChatLayout && !isThemeWorkbench && !sessionId;
+  const isWorkspaceCompactChrome = topBarChrome === "workspace-compact";
+  const shouldRenderBrandedEmptyState =
+    !showChatLayout && !shouldShowClawEmptyState;
+  const shouldRenderTopBar = !hideTopBar && !shouldRenderBrandedEmptyState;
 
   // 聊天区域内容
   const chatContent = useMemo(
@@ -9016,7 +9323,7 @@ export function AgentChatPage({
             />
           ) : null}
           {showChatLayout ? (
-            <ChatContent>
+            <ChatContent $compact={isWorkspaceCompactChrome}>
               <>
                 {contextWorkspace.enabled ? (
                   <MessageViewport>
@@ -9176,6 +9483,13 @@ export function AgentChatPage({
               onRefreshSkills={handleRefreshSkills}
               onLaunchBrowserAssist={handleOpenBrowserAssistInCanvas}
               browserAssistLoading={browserAssistLaunching}
+              projectId={projectId ?? null}
+              onProjectChange={handleProjectChange}
+              onOpenSettings={() => {
+                _onNavigate?.("settings", {
+                  tab: SettingsTabs.Appearance,
+                });
+              }}
             />
           )}
 
@@ -9216,6 +9530,7 @@ export function AgentChatPage({
       </ChatContainer>
     ),
     [
+      _onNavigate,
       activeTheme,
       artifacts.length,
       browserAssistLaunching,
@@ -9241,6 +9556,7 @@ export function AgentChatPage({
       handleManageProviders,
       handleNavigateToSkillSettings,
       handleOpenBrowserAssistInCanvas,
+      handleProjectChange,
       handleRefreshSkills,
       handlePermissionResponseWithBrowserPreflight,
       handleSelectWorkspaceDirectory,
@@ -9250,6 +9566,7 @@ export function AgentChatPage({
       input,
       inputbarNode,
       isContentCreationMode,
+      isWorkspaceCompactChrome,
       isThemeWorkbench,
       lockTheme,
       displayMessages,
@@ -9340,8 +9657,8 @@ export function AgentChatPage({
 
   const mainAreaNode = useMemo(
     () => (
-      <MainArea>
-        {!hideTopBar && (
+      <MainArea $compact={isWorkspaceCompactChrome}>
+        {shouldRenderTopBar && (
           <>
             <ChatNavbar
               isRunning={isSending}
@@ -9397,7 +9714,9 @@ export function AgentChatPage({
               }
             />
 
-            {!isThemeWorkbench && contentId && syncStatus !== "idle" && (
+            {!isThemeWorkbench &&
+              contentId &&
+              syncStatus !== "idle" &&
               (() => {
                 const notice = resolveContentSyncNotice(syncStatus);
                 const NoticeIcon = notice.Icon;
@@ -9405,13 +9724,18 @@ export function AgentChatPage({
                 return (
                   <ContentSyncNotice $status={syncStatus}>
                     <NoticeIcon
-                      className={notice.animated ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+                      className={
+                        notice.animated
+                          ? "h-3.5 w-3.5 animate-spin"
+                          : "h-3.5 w-3.5"
+                      }
                     />
-                    <ContentSyncNoticeText>{notice.label}</ContentSyncNoticeText>
+                    <ContentSyncNoticeText>
+                      {notice.label}
+                    </ContentSyncNoticeText>
                   </ContentSyncNotice>
                 );
-              })()
-            )}
+              })()}
           </>
         )}
 
@@ -9479,10 +9803,10 @@ export function AgentChatPage({
       handleToggleCanvas,
       handleToggleSidebar,
       hideHistoryToggle,
-      hideTopBar,
       inputbarNode,
       isSending,
       isNewTaskEntry,
+      isWorkspaceCompactChrome,
       isThemeWorkbench,
       chatMode,
       generalWorkbenchDialog,
@@ -9500,6 +9824,7 @@ export function AgentChatPage({
       showChatPanel,
       showHarnessToggle,
       showNovelNavbarControls,
+      shouldRenderTopBar,
       syncStatus,
       themeWorkbenchHarnessDialog,
       themeWorkbenchRunState,
@@ -9509,10 +9834,10 @@ export function AgentChatPage({
 
   // ========== 渲染逻辑 ==========
 
-  // 所有主题统一使用 useAgentChat 的状态和渲染逻辑
+  // 所有主题统一使用 useAgentChatUnified / useAsterAgentChat 的状态和渲染逻辑
   // General 主题与其他主题的区别仅在于不显示步骤进度条
   return (
-    <PageContainer>
+    <PageContainer $compact={isWorkspaceCompactChrome}>
       {isThemeWorkbench ? (
         themeWorkbenchSidebarNode
       ) : showChatPanel && showSidebar ? (

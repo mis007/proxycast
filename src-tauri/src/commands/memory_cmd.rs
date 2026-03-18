@@ -3,12 +3,15 @@
 //! 提供项目记忆系统（角色、世界观、风格指南、大纲）的前端 API。
 
 use crate::database::DbConnection;
+use crate::logger;
 use crate::memory::{
     Character, CharacterCreateRequest, CharacterUpdateRequest, MemoryManager, OutlineNode,
     OutlineNodeCreateRequest, OutlineNodeUpdateRequest, ProjectMemory, StyleGuide,
     StyleGuideUpdateRequest, WorldBuilding, WorldBuildingUpdateRequest,
 };
+use crate::LogState;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use tauri::State;
 
 // ==================== 角色相关命令 ====================
@@ -219,8 +222,41 @@ pub async fn outline_node_delete(db: State<'_, DbConnection>, id: String) -> Res
 #[tauri::command]
 pub async fn project_memory_get(
     db: State<'_, DbConnection>,
+    logs: State<'_, LogState>,
     project_id: String,
 ) -> Result<ProjectMemory, String> {
+    let started_at = Instant::now();
+    let sanitized_project_id = logger::sanitize_log_message(&project_id);
+    logs.write().await.add(
+        "info",
+        &format!("[AgentDiag] project_memory_get.start project_id={sanitized_project_id}"),
+    );
     let manager = MemoryManager::new(db.inner().clone());
-    manager.get_project_memory(&project_id)
+    match manager.get_project_memory(&project_id) {
+        Ok(memory) => {
+            logs.write().await.add(
+                "info",
+                &format!(
+                    "[AgentDiag] project_memory_get.success project_id={sanitized_project_id} duration_ms={} characters={} outline={} has_world_building={} has_style_guide={}",
+                    started_at.elapsed().as_millis(),
+                    memory.characters.len(),
+                    memory.outline.len(),
+                    memory.world_building.is_some(),
+                    memory.style_guide.is_some(),
+                ),
+            );
+            Ok(memory)
+        }
+        Err(error) => {
+            logs.write().await.add(
+                "error",
+                &format!(
+                    "[AgentDiag] project_memory_get.error project_id={sanitized_project_id} duration_ms={} error={}",
+                    started_at.elapsed().as_millis(),
+                    logger::sanitize_log_message(&error),
+                ),
+            );
+            Err(error)
+        }
+    }
 }

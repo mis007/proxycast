@@ -63,7 +63,6 @@ const Content = styled.div`
   display: flex;
   flex: 1;
   min-height: 0;
-  gap: 16px;
 `;
 
 const ChapterList = styled.div`
@@ -72,8 +71,9 @@ const ChapterList = styled.div`
   display: flex;
   flex-direction: column;
   background: hsl(var(--background));
-  border-radius: 12px;
+  border-radius: 12px 0 0 12px;
   border: 1px solid hsl(var(--border));
+  border-right: none;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
@@ -162,13 +162,14 @@ const ChapterMeta = styled.div`
   margin-top: 6px;
 `;
 
-const EditorArea = styled.div`
+const EditorArea = styled.div<{ $withSidebar: boolean }>`
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: hsl(var(--background));
-  border-radius: 12px;
+  border-radius: ${({ $withSidebar }) =>
+    $withSidebar ? "0 12px 12px 0" : "12px"};
   border: 1px solid hsl(var(--border));
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -588,7 +589,7 @@ export const NovelCanvas: React.FC<NovelCanvasProps> = memo(
               </ChapterList>
             )}
 
-            <EditorArea>
+            <EditorArea $withSidebar={!isChapterListCollapsed}>
               {!useExternalToolbar && isChapterListCollapsed && (
                 <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-md border bg-background/90 p-1 shadow-sm">
                   <Button
