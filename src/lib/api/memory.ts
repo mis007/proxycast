@@ -264,7 +264,7 @@ export async function getProjectMemory(
 ): Promise<ProjectMemory> {
   const startedAt = Date.now();
   let settled = false;
-  const slowTimer: ReturnType<typeof setTimeout> | null =
+  const slowTimer: number | null =
     typeof window !== "undefined"
       ? window.setTimeout(() => {
           if (settled) {

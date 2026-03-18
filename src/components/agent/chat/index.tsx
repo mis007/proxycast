@@ -5046,9 +5046,10 @@ export function AgentChatPage({
           },
         });
         logAgentDebug("AgentChatPage", "switchTopic.decision", {
-          createdDefault: decision.createdDefault,
+          createdDefault:
+            decision.status === "ok" ? decision.createdDefault : false,
           decisionStatus: decision.status,
-          projectId: decision.status === "ready" ? decision.projectId : null,
+          projectId: decision.status === "ok" ? decision.projectId : null,
           topicId,
         });
 

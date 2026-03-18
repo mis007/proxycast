@@ -224,7 +224,7 @@ export async function createAgentRuntimeSession(
 export async function listAgentRuntimeSessions(): Promise<AsterSessionInfo[]> {
   const startedAt = Date.now();
   let settled = false;
-  const slowTimer: ReturnType<typeof setTimeout> | null =
+  const slowTimer: number | null =
     typeof window !== "undefined"
       ? window.setTimeout(() => {
           if (settled) {
